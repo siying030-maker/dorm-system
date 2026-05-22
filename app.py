@@ -44,7 +44,7 @@ except Exception as e:
 SHEET_URL = "https://docs.google.com/spreadsheets/d/18cr9QP_xp1kEB8V-hWa0iSmyWbxXOneNfppwt30KqbM/edit"
 
 # =========================
-# ⭐ 只建立一次 spreadsheet（避免重複 API）
+# ⭐ cache resource（只連一次）
 # =========================
 @st.cache_resource
 def get_spreadsheet(_client):
@@ -52,9 +52,6 @@ def get_spreadsheet(_client):
 
 spreadsheet = get_spreadsheet(client)
 
-# =========================
-# ⭐ 只抓 worksheets 一次
-# =========================
 @st.cache_resource
 def get_worksheets(_spreadsheet):
     return _spreadsheet.worksheets()
@@ -62,7 +59,7 @@ def get_worksheets(_spreadsheet):
 worksheets = get_worksheets(spreadsheet)
 
 # =========================
-# 篩選日期 sheets
+# 日期 sheets（新 → 舊）
 # =========================
 date_sheets = []
 
@@ -73,16 +70,18 @@ for ws in worksheets:
     except:
         pass
 
+# 🔥 改成新到舊
 date_sheets = sorted(
     date_sheets,
-    key=lambda x: datetime.strptime(x.title, "%Y-%m-%d")
+    key=lambda x: datetime.strptime(x.title, "%Y-%m-%d"),
+    reverse=True
 )
 
 st.write("找到日期 Sheets：")
 st.write([ws.title for ws in date_sheets])
 
 # =========================
-# ⭐ 商用級資料快取（24小時更新）
+# ⭐ 24h cache（資料）
 # =========================
 @st.cache_data(ttl=86400)
 def load_all_sheets(_worksheets):
@@ -106,7 +105,7 @@ def load_all_sheets(_worksheets):
 
             all_data[ws.title] = df
 
-        except Exception:
+        except:
             continue
 
     return all_data
@@ -147,7 +146,7 @@ with tab1:
                 continue
 
             required = ["狀態", "房號", "姓名"]
-            if not all(col in df.columns for col in required):
+            if not all(c in df.columns for c in required):
                 continue
 
             temp = df[df["狀態"].astype(str).str.strip() == "缺"].copy()
@@ -180,13 +179,15 @@ with tab1:
 with tab2:
     st.header("每天點名不到名單")
 
+    all_missing_records = []
+
     for ws in date_sheets:
         df = all_sheet_data.get(ws.title)
         if df is None:
             continue
 
         required = ["狀態", "房號", "姓名"]
-        if not all(col in df.columns for col in required):
+        if not all(c in df.columns for c in required):
             continue
 
         result = df[df["狀態"].astype(str).str.strip() == "缺"]
@@ -196,20 +197,37 @@ with tab2:
 
         st.subheader(ws.title)
 
-        result = result[["房號", "姓名"]].reset_index(drop=True)
-        result.insert(0, "日期", ws.title)
+        show_df = result[["房號", "姓名"]].reset_index(drop=True)
+        show_df.insert(0, "日期", ws.title)
 
-        st.dataframe(result, use_container_width=True)
+        st.dataframe(show_df, use_container_width=True)
+
+        all_missing_records.append(show_df)
+
+    # =========================
+    # ⭐ 常缺席統計（紅字）
+    # =========================
+    if all_missing_records:
+
+        st.divider()
+        st.subheader("🔥 常缺席名單（紅字 ≥ 3 次）")
+
+        summary = pd.concat(all_missing_records)
+
+        freq = summary.groupby(["房號", "姓名"]).size().reset_index(name="缺席次數")
+
+        def color_red(val):
+            return "color: red" if val >= 3 else ""
+
+        st.dataframe(
+            freq.style.applymap(color_red, subset=["缺席次數"]),
+            use_container_width=True
+        )
 
 # =========================
-# 🔥 手動更新按鈕（加分功能）
+# Footer
 # =========================
 st.divider()
-
-if st.button("🔄 立即更新資料"):
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.rerun()
 
 st.caption(
     f"最後更新時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
