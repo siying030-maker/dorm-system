@@ -30,16 +30,19 @@ SCOPES = [
 # Google 驗證
 # ==================================================
 
-try:
+@st.cache_resource
+def get_gspread_client():
 
     creds = Credentials.from_service_account_info(
         st.secrets["google"],
         scopes=SCOPES
     )
 
-    client = gspread.authorize(creds)
+    return gspread.authorize(creds)
 
-    st.success("Google 驗證成功")
+try:
+
+    client = get_gspread_client()
 
 except Exception as e:
 
@@ -52,38 +55,36 @@ except Exception as e:
 # ==================================================
 
 # 點名總表
-ROLLCALL_SHEET_URL = "https://docs.google.com/spreadsheets/d/18cr9QP_xp1kEB8V-hWa0iSmyWbxXOneNfppwt30KqbM/edit"
+ROLLCALL_SHEET_URL = "你的點名總表"
 
 # 上學期外宿晚歸
-UPPER_GATE_URL = "https://docs.google.com/spreadsheets/d/1Pr1fQYH35KgXMkl6igxqc-3jnZ5ufi0QgWtgp3782Lo/edit"
+UPPER_GATE_URL = "你的上學期Sheet"
 
 # 下學期外宿晚歸
-LOWER_GATE_URL = "https://docs.google.com/spreadsheets/d/1ivjA_-voyNAUGbvbc5o5BULu_MgU2AqbNokvQJ5dfe4/edit"
+LOWER_GATE_URL = "你的下學期Sheet"
 
 # ==================================================
-# 開啟 Google Sheet
+# 開啟 Spreadsheet
 # ==================================================
 
 @st.cache_resource
-def open_spreadsheet(url):
+def get_spreadsheet(url):
 
     return client.open_by_url(url)
 
 try:
 
-    rollcall_spreadsheet = open_spreadsheet(
+    rollcall_spreadsheet = get_spreadsheet(
         ROLLCALL_SHEET_URL
     )
 
-    upper_gate_spreadsheet = open_spreadsheet(
+    upper_gate_spreadsheet = get_spreadsheet(
         UPPER_GATE_URL
     )
 
-    lower_gate_spreadsheet = open_spreadsheet(
+    lower_gate_spreadsheet = get_spreadsheet(
         LOWER_GATE_URL
     )
-
-    st.success("成功開啟 Google Sheets")
 
 except Exception as e:
 
@@ -92,20 +93,40 @@ except Exception as e:
     st.stop()
 
 # ==================================================
-# 讀取指定 Sheet
+# 讀取指定 Sheet（24hr cache）
 # ==================================================
 
-def load_sheet_df(spreadsheet, sheet_name):
+@st.cache_data(ttl=86400)
+def load_sheet_df(sheet_url, sheet_name):
 
     try:
 
-        ws = spreadsheet.worksheet(sheet_name)
+        spreadsheet = client.open_by_url(
+            sheet_url
+        )
 
-        data = ws.get_all_records()
+        ws = spreadsheet.worksheet(
+            sheet_name
+        )
 
-        df = pd.DataFrame(data)
+        data = ws.get()
 
-        df.columns = df.columns.str.strip()
+        if len(data) <= 1:
+
+            return pd.DataFrame()
+
+        headers = data[0]
+
+        rows = data[1:]
+
+        df = pd.DataFrame(
+            rows,
+            columns=headers
+        )
+
+        df.columns = (
+            df.columns.str.strip()
+        )
 
         return df
 
@@ -114,13 +135,15 @@ def load_sheet_df(spreadsheet, sheet_name):
         return pd.DataFrame()
 
 # ==================================================
-# 讀取點名資料（24小時快取）
+# 讀取點名資料
 # ==================================================
 
 @st.cache_data(ttl=86400)
 def load_rollcall_data():
 
-    worksheets = rollcall_spreadsheet.worksheets()
+    worksheets = (
+        rollcall_spreadsheet.worksheets()
+    )
 
     date_sheets = []
 
@@ -138,7 +161,7 @@ def load_rollcall_data():
         except:
             pass
 
-    # 日期排序（新 → 舊）
+    # 新 → 舊
     date_sheets = sorted(
         date_sheets,
         key=lambda x: datetime.strptime(
@@ -154,17 +177,17 @@ def load_rollcall_data():
 
         try:
 
-            values = ws.get_all_values()
+            data = ws.get()
 
-            if len(values) <= 1:
+            if len(data) <= 1:
                 continue
 
             headers = [
                 h.strip()
-                for h in values[0]
+                for h in data[0]
             ]
 
-            rows = values[1:]
+            rows = data[1:]
 
             df = pd.DataFrame(
                 rows,
@@ -194,7 +217,10 @@ def load_rollcall_data():
 # 門禁分析
 # ==================================================
 
-def analyze_gate(uploaded_file, semester_spreadsheet):
+def analyze_gate(
+    uploaded_file,
+    semester_sheet_url
+):
 
     if uploaded_file is None:
 
@@ -204,12 +230,48 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
     # 讀取 Excel
     # ==================================================
 
-    df = pd.read_excel(uploaded_file)
+    try:
 
-    df.columns = df.columns.str.strip()
+        df = pd.read_excel(
+            uploaded_file
+        )
+
+    except Exception as e:
+
+        st.error("Excel 讀取失敗")
+        st.code(str(e))
+
+        return None, None, None
+
+    df.columns = (
+        df.columns.str.strip()
+    )
 
     # ==================================================
-    # 時間欄位處理
+    # 必要欄位
+    # ==================================================
+
+    required_cols = [
+        "學號",
+        "姓名",
+        "刷卡時間"
+    ]
+
+    missing = [
+        c for c in required_cols
+        if c not in df.columns
+    ]
+
+    if missing:
+
+        st.error(
+            f"缺少欄位：{missing}"
+        )
+
+        return None, None, None
+
+    # ==================================================
+    # 時間欄位
     # ==================================================
 
     df["刷卡時間"] = pd.to_datetime(
@@ -217,12 +279,16 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
         errors="coerce"
     )
 
-    df["時間"] = df["刷卡時間"].dt.time
+    df = df.dropna(
+        subset=["刷卡時間"]
+    )
 
-    df["日期"] = df["刷卡時間"].dt.date
+    df["日期"] = (
+        df["刷卡時間"].dt.date
+    )
 
     # ==================================================
-    # 篩選 00:00 ~ 06:00
+    # 00:00 ~ 06:00
     # ==================================================
 
     df = df[
@@ -231,10 +297,12 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
     ].copy()
 
     # ==================================================
-    # 移除 LHU / Y 開頭
+    # 移除 LHU / Y
     # ==================================================
 
-    df["姓名"] = df["姓名"].astype(str)
+    df["姓名"] = (
+        df["姓名"].astype(str)
+    )
 
     df = df[
         ~df["姓名"]
@@ -249,15 +317,13 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
 
     df = df.sort_values(
         by=["姓名", "日期", "刷卡時間"]
-    ).copy()
+    )
 
     # ==================================================
-    # 時間差 > 60 分鐘才保留
+    # 間隔 > 60分鐘
     # ==================================================
 
     selected_rows = []
-
-    time_threshold = 60
 
     for (name, date), group in df.groupby(
         ["姓名", "日期"]
@@ -276,22 +342,23 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
             else:
 
                 diff = (
-                    row["刷卡時間"] - last_time
+                    row["刷卡時間"]
+                    - last_time
                 )
 
                 if diff > timedelta(
-                    minutes=time_threshold
+                    minutes=60
                 ):
 
                     selected_rows.append(idx)
 
                 last_time = row["刷卡時間"]
 
-    # ==================================================
-    # 保留結果
-    # ==================================================
-
     df_result = df.loc[selected_rows]
+
+    # ==================================================
+    # 日期排序
+    # ==================================================
 
     df_result = df_result.sort_values(
         by=["日期", "刷卡時間"],
@@ -303,17 +370,17 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
     # ==================================================
 
     leave_df = load_sheet_df(
-        semester_spreadsheet,
+        semester_sheet_url,
         "外宿申請"
     )
 
     long_leave_df = load_sheet_df(
-        semester_spreadsheet,
+        semester_sheet_url,
         "長期外宿"
     )
 
     late_df = load_sheet_df(
-        semester_spreadsheet,
+        semester_sheet_url,
         "長期晚歸"
     )
 
@@ -334,17 +401,17 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
         )
 
     # ==================================================
-    # 星期對照
+    # 星期 mapping
     # ==================================================
 
     weekday_map = {
-        1: "一",
-        2: "二",
-        3: "三",
-        4: "四",
-        5: "五",
-        6: "六",
-        7: "日"
+        0: "一",
+        1: "二",
+        2: "三",
+        3: "四",
+        4: "五",
+        5: "六",
+        6: "日"
     }
 
     status_list = []
@@ -387,7 +454,7 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
         # 長期外宿
         # ==================================================
 
-        if not long_leave_df.empty:
+        elif not long_leave_df.empty:
 
             weekday = weekday_map[
                 gate_date.weekday()
@@ -410,10 +477,11 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
         # 長期晚歸
         # ==================================================
 
-        if not late_df.empty:
+        elif not late_df.empty:
 
             late_match = late_df[
-                late_df["學號"].astype(str) == student_id
+                late_df["學號"].astype(str)
+                == student_id
             ]
 
             if not late_match.empty:
@@ -440,7 +508,7 @@ def analyze_gate(uploaded_file, semester_spreadsheet):
     df_result["狀態判斷"] = status_list
 
     # ==================================================
-    # 白卡
+    # 白卡分類
     # ==================================================
 
     df_C = df_result[
@@ -489,224 +557,23 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # ==================================================
-# TAB1：連三天不假外宿
+# TAB1
 # ==================================================
 
 with tab1:
 
     st.header("連三天不假外宿")
 
-    date_sheets, all_sheet_data = (
-        load_rollcall_data()
-    )
-
-    groups = [
-        date_sheets[i:i+3]
-        for i in range(
-            0,
-            len(date_sheets),
-            3
-        )
-    ]
-
-    for group in groups:
-
-        if len(group) < 3:
-            continue
-
-        group_dates = [
-            ws.title
-            for ws in group
-        ]
-
-        st.subheader(
-            f"{group_dates[0]} ~ {group_dates[-1]}"
-        )
-
-        all_data = []
-
-        for ws in group:
-
-            df = all_sheet_data.get(
-                ws.title
-            )
-
-            if df is None:
-                continue
-
-            required = [
-                "狀態",
-                "房號",
-                "學號",
-                "姓名"
-            ]
-
-            if not all(
-                c in df.columns
-                for c in required
-            ):
-                continue
-
-            temp = df[
-                df["狀態"]
-                .astype(str)
-                .str.strip() == "缺"
-            ].copy()
-
-            temp["日期"] = ws.title
-
-            all_data.append(temp)
-
-        if not all_data:
-
-            st.warning("此組沒有資料")
-
-            continue
-
-        full_df = pd.concat(
-            all_data,
-            ignore_index=True
-        )
-
-        result = (
-            full_df.groupby(
-                ["房號", "學號", "姓名"]
-            )["日期"]
-            .nunique()
-            .reset_index()
-        )
-
-        result = result[
-            result["日期"] == 3
-        ]
-
-        if result.empty:
-
-            st.success("沒有連三天缺席")
-
-        else:
-
-            result["日期區間"] = (
-                f"{group_dates[0]} ~ {group_dates[-1]}"
-            )
-
-            result = result[
-                [
-                    "日期區間",
-                    "房號",
-                    "學號",
-                    "姓名"
-                ]
-            ]
-
-            st.dataframe(
-                result,
-                use_container_width=True
-            )
-
 # ==================================================
-# TAB2：每天點名不到名單
+# TAB2
 # ==================================================
 
 with tab2:
 
     st.header("每天點名不到名單")
 
-    all_missing_records = []
-
-    for ws in date_sheets:
-
-        df = all_sheet_data.get(
-            ws.title
-        )
-
-        if df is None:
-            continue
-
-        required = [
-            "狀態",
-            "房號",
-            "學號",
-            "姓名"
-        ]
-
-        if not all(
-            c in df.columns
-            for c in required
-        ):
-            continue
-
-        result = df[
-            df["狀態"]
-            .astype(str)
-            .str.strip() == "缺"
-        ].copy()
-
-        if result.empty:
-            continue
-
-        # 日期標題
-        st.subheader(ws.title)
-
-        # 顯示表格
-        show_df = result[
-            ["房號", "學號", "姓名"]
-        ].reset_index(drop=True)
-
-        st.dataframe(
-            show_df,
-            use_container_width=True
-        )
-
-        all_missing_records.append(
-            show_df
-        )
-
-    # ==================================================
-    # 常缺席統計
-    # ==================================================
-
-    if all_missing_records:
-
-        st.divider()
-
-        st.subheader(
-            "🔥 常缺席名單（缺席 ≥ 3 次）"
-        )
-
-        summary = pd.concat(
-            all_missing_records
-        )
-
-        freq = (
-            summary.groupby(
-                ["房號", "學號", "姓名"]
-            )
-            .size()
-            .reset_index(name="缺席次數")
-        )
-
-        freq["狀態"] = freq[
-            "缺席次數"
-        ].apply(
-            lambda x:
-            "🔴 常缺席"
-            if x >= 3
-            else ""
-        )
-
-        freq = freq.sort_values(
-            by="缺席次數",
-            ascending=False
-        )
-
-        st.dataframe(
-            freq,
-            use_container_width=True
-        )
-
 # ==================================================
-# TAB3：上學期門禁
+# TAB3
 # ==================================================
 
 with tab3:
@@ -723,7 +590,7 @@ with tab3:
 
         result, df_C, df_nonC = analyze_gate(
             uploaded_upper,
-            upper_gate_spreadsheet
+            UPPER_GATE_URL
         )
 
         st.subheader("一般刷卡資料")
@@ -740,27 +607,22 @@ with tab3:
             use_container_width=True
         )
 
-        # 下載
-        normal_excel = to_excel(df_nonC)
-
-        white_excel = to_excel(df_C)
-
         st.download_button(
             label="下載刷卡資料.xlsx",
-            data=normal_excel,
+            data=to_excel(df_nonC),
             file_name="刷卡資料.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
         st.download_button(
             label="下載白卡刷卡資料.xlsx",
-            data=white_excel,
+            data=to_excel(df_C),
             file_name="白卡刷卡資料.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
 # ==================================================
-# TAB4：下學期門禁
+# TAB4
 # ==================================================
 
 with tab4:
@@ -777,7 +639,7 @@ with tab4:
 
         result, df_C, df_nonC = analyze_gate(
             uploaded_lower,
-            lower_gate_spreadsheet
+            LOWER_GATE_URL
         )
 
         st.subheader("一般刷卡資料")
@@ -794,21 +656,16 @@ with tab4:
             use_container_width=True
         )
 
-        # 下載
-        normal_excel = to_excel(df_nonC)
-
-        white_excel = to_excel(df_C)
-
         st.download_button(
             label="下載刷卡資料.xlsx",
-            data=normal_excel,
+            data=to_excel(df_nonC),
             file_name="刷卡資料.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
         st.download_button(
             label="下載白卡刷卡資料.xlsx",
-            data=white_excel,
+            data=to_excel(df_C),
             file_name="白卡刷卡資料.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
