@@ -23,7 +23,7 @@ SCOPES = [
 ]
 
 # =========================
-# Google 驗證（Streamlit Secrets 版）
+# Google 驗證
 # =========================
 try:
     creds = Credentials.from_service_account_info(
@@ -32,7 +32,6 @@ try:
     )
 
     client = gspread.authorize(creds)
-    st.success("Google 驗證成功")
 
 except Exception as e:
     st.error("Google 驗證失敗")
@@ -40,28 +39,31 @@ except Exception as e:
     st.stop()
 
 # =========================
-# Google Sheet URL
+# Sheet URL
 # =========================
 SHEET_URL = "https://docs.google.com/spreadsheets/d/18cr9QP_xp1kEB8V-hWa0iSmyWbxXOneNfppwt30KqbM/edit"
 
 # =========================
-# 開啟 Sheet
+# ⭐ 只建立一次 spreadsheet（避免重複 API）
 # =========================
-try:
-    spreadsheet = client.open_by_url(SHEET_URL)
-    st.success("成功開啟 Google Sheet")
+@st.cache_resource
+def get_spreadsheet(_client):
+    return _client.open_by_url(SHEET_URL)
 
-except Exception as e:
-    st.error("Google Sheet 開啟失敗")
-    st.code(str(e))
-    st.stop()
+spreadsheet = get_spreadsheet(client)
 
 # =========================
-# 取得 worksheets
+# ⭐ 只抓 worksheets 一次
 # =========================
-worksheets = spreadsheet.worksheets()
+@st.cache_resource
+def get_worksheets(_spreadsheet):
+    return _spreadsheet.worksheets()
 
-# 篩選日期 sheet
+worksheets = get_worksheets(spreadsheet)
+
+# =========================
+# 篩選日期 sheets
+# =========================
 date_sheets = []
 
 for ws in worksheets:
@@ -80,13 +82,13 @@ st.write("找到日期 Sheets：")
 st.write([ws.title for ws in date_sheets])
 
 # =========================
-# 快取讀取
+# ⭐ 商用級資料快取（24小時更新）
 # =========================
-@st.cache_data(ttl=300)
-def load_all_sheets():
+@st.cache_data(ttl=86400)
+def load_all_sheets(_worksheets):
     all_data = {}
 
-    for ws in date_sheets:
+    for ws in _worksheets:
         try:
             values = ws.get_all_values()
 
@@ -104,14 +106,12 @@ def load_all_sheets():
 
             all_data[ws.title] = df
 
-        except Exception as e:
-            st.warning(f"{ws.title} 讀取失敗")
-            st.code(str(e))
+        except Exception:
+            continue
 
     return all_data
 
-
-all_sheet_data = load_all_sheets()
+all_sheet_data = load_all_sheets(worksheets)
 
 # =========================
 # Tabs
@@ -147,7 +147,7 @@ with tab1:
                 continue
 
             required = ["狀態", "房號", "姓名"]
-            if not all(c in df.columns for c in required):
+            if not all(col in df.columns for col in required):
                 continue
 
             temp = df[df["狀態"].astype(str).str.strip() == "缺"].copy()
@@ -186,7 +186,7 @@ with tab2:
             continue
 
         required = ["狀態", "房號", "姓名"]
-        if not all(c in df.columns for c in required):
+        if not all(col in df.columns for col in required):
             continue
 
         result = df[df["狀態"].astype(str).str.strip() == "缺"]
@@ -202,9 +202,14 @@ with tab2:
         st.dataframe(result, use_container_width=True)
 
 # =========================
-# Footer
+# 🔥 手動更新按鈕（加分功能）
 # =========================
 st.divider()
+
+if st.button("🔄 立即更新資料"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.rerun()
 
 st.caption(
     f"最後更新時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
