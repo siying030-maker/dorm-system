@@ -9,7 +9,7 @@ from datetime import datetime
 # =========================
 
 st.set_page_config(
-    page_title="宿舍點名分析系統",
+    page_title="宿舍點名不到名單",
     layout="wide"
 )
 
