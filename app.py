@@ -26,6 +26,7 @@ SCOPES = [
 # Google 驗證
 # =========================
 try:
+
     creds = Credentials.from_service_account_info(
         st.secrets["google"],
         scopes=SCOPES
@@ -33,44 +34,58 @@ try:
 
     client = gspread.authorize(creds)
 
+    st.success("Google 驗證成功")
+
 except Exception as e:
+
     st.error("Google 驗證失敗")
     st.code(str(e))
     st.stop()
 
 # =========================
-# Sheet URL
+# Google Sheet URL
 # =========================
 SHEET_URL = "https://docs.google.com/spreadsheets/d/18cr9QP_xp1kEB8V-hWa0iSmyWbxXOneNfppwt30KqbM/edit"
 
 # =========================
-# ⭐ cache resource（只連一次）
+# 開啟 Google Sheet
 # =========================
-@st.cache_resource
-def get_spreadsheet(_client):
-    return _client.open_by_url(SHEET_URL)
+try:
 
-spreadsheet = get_spreadsheet(client)
+    spreadsheet = client.open_by_url(SHEET_URL)
 
-@st.cache_resource
-def get_worksheets(_spreadsheet):
-    return _spreadsheet.worksheets()
+    st.success("成功開啟 Google Sheet")
 
-worksheets = get_worksheets(spreadsheet)
+except Exception as e:
+
+    st.error("Google Sheet 開啟失敗")
+    st.code(str(e))
+    st.stop()
 
 # =========================
-# 日期 sheets（新 → 舊）
+# 取得 worksheets
+# =========================
+worksheets = spreadsheet.worksheets()
+
+# =========================
+# 篩選日期 sheets
 # =========================
 date_sheets = []
 
 for ws in worksheets:
+
     try:
+
         datetime.strptime(ws.title, "%Y-%m-%d")
+
         date_sheets.append(ws)
+
     except:
         pass
 
-# 🔥 改成新到舊
+# =========================
+# 日期排序（新 → 舊）
+# =========================
 date_sheets = sorted(
     date_sheets,
     key=lambda x: datetime.strptime(x.title, "%Y-%m-%d"),
@@ -78,30 +93,42 @@ date_sheets = sorted(
 )
 
 st.write("找到日期 Sheets：")
+
 st.write([ws.title for ws in date_sheets])
 
 # =========================
-# ⭐ 24h cache（資料）
+# 快取讀取（24小時）
 # =========================
 @st.cache_data(ttl=86400)
-def load_all_sheets(_worksheets):
+def load_all_sheets():
+
     all_data = {}
 
-    for ws in _worksheets:
+    for ws in date_sheets:
+
         try:
+
             values = ws.get_all_values()
 
+            # 空 sheet
             if len(values) <= 1:
                 continue
 
             headers = [h.strip() for h in values[0]]
+
             rows = values[1:]
 
             df = pd.DataFrame(rows, columns=headers)
+
+            # 清除欄位空白
             df.columns = df.columns.str.strip()
 
+            # 移除空姓名
             if "姓名" in df.columns:
-                df = df[df["姓名"].astype(str).str.strip() != ""]
+
+                df = df[
+                    df["姓名"].astype(str).str.strip() != ""
+                ]
 
             all_data[ws.title] = df
 
@@ -110,7 +137,10 @@ def load_all_sheets(_worksheets):
 
     return all_data
 
-all_sheet_data = load_all_sheets(worksheets)
+# =========================
+# 讀取資料
+# =========================
+all_sheet_data = load_all_sheets()
 
 # =========================
 # Tabs
@@ -121,106 +151,198 @@ tab1, tab2 = st.tabs([
 ])
 
 # ==================================================
-# TAB 1
+# TAB 1：連三天不假外宿
 # ==================================================
 with tab1:
+
     st.header("連三天不假外宿")
 
+    # 每三天一組
     groups = [
         date_sheets[i:i+3]
         for i in range(0, len(date_sheets), 3)
     ]
 
     for group in groups:
+
+        # 不足三天跳過
         if len(group) < 3:
             continue
 
         group_dates = [ws.title for ws in group]
-        st.subheader(f"{group_dates[0]} ~ {group_dates[-1]}")
+
+        st.subheader(
+            f"{group_dates[0]} ~ {group_dates[-1]}"
+        )
 
         all_data = []
 
         for ws in group:
+
             df = all_sheet_data.get(ws.title)
+
             if df is None:
                 continue
 
-            required = ["狀態", "房號", "姓名"]
+            required = [
+                "狀態",
+                "房號",
+                "學號",
+                "姓名"
+            ]
+
             if not all(c in df.columns for c in required):
                 continue
 
-            temp = df[df["狀態"].astype(str).str.strip() == "缺"].copy()
+            # 只抓 缺
+            temp = df[
+                df["狀態"].astype(str).str.strip() == "缺"
+            ].copy()
+
             temp["日期"] = ws.title
+
             all_data.append(temp)
 
+        # 沒資料
         if not all_data:
+
             st.warning("此組沒有資料")
+
             continue
 
-        full_df = pd.concat(all_data, ignore_index=True)
+        # 合併
+        full_df = pd.concat(
+            all_data,
+            ignore_index=True
+        )
 
+        # 三天都缺
         result = (
-            full_df.groupby(["房號", "姓名"])["日期"]
+            full_df.groupby(
+                ["房號", "學號", "姓名"]
+            )["日期"]
             .nunique()
             .reset_index()
         )
 
-        result = result[result["日期"] == 3]
+        result = result[
+            result["日期"] == 3
+        ]
 
+        # 顯示
         if result.empty:
+
             st.success("沒有連三天缺席")
+
         else:
-            result["日期"] = f"{group_dates[0]} ~ {group_dates[-1]}"
-            st.dataframe(result, use_container_width=True)
+
+            result["日期區間"] = (
+                f"{group_dates[0]} ~ {group_dates[-1]}"
+            )
+
+            result = result[
+                [
+                    "日期區間",
+                    "房號",
+                    "學號",
+                    "姓名"
+                ]
+            ]
+
+            st.dataframe(
+                result,
+                use_container_width=True
+            )
 
 # ==================================================
-# TAB 2
+# TAB 2：每天點名不到名單
 # ==================================================
 with tab2:
+
     st.header("每天點名不到名單")
 
     all_missing_records = []
 
     for ws in date_sheets:
+
         df = all_sheet_data.get(ws.title)
+
         if df is None:
             continue
 
-        required = ["狀態", "房號", "姓名"]
+        # 必要欄位
+        required = [
+            "狀態",
+            "房號",
+            "學號",
+            "姓名"
+        ]
+
         if not all(c in df.columns for c in required):
             continue
 
-        result = df[df["狀態"].astype(str).str.strip() == "缺"]
+        # 只抓 缺
+        result = df[
+            df["狀態"].astype(str).str.strip() == "缺"
+        ].copy()
 
+        # 無資料
         if result.empty:
             continue
 
+        # =========================
+        # 日期標題
+        # =========================
         st.subheader(ws.title)
 
-        show_df = result[["房號", "姓名"]].reset_index(drop=True)
-        show_df.insert(0, "日期", ws.title)
+        # =========================
+        # 顯示欄位
+        # =========================
+        show_df = result[
+            ["房號", "學號", "姓名"]
+        ].reset_index(drop=True)
 
-        st.dataframe(show_df, use_container_width=True)
+        # 顯示表格
+        st.dataframe(
+            show_df,
+            use_container_width=True
+        )
 
+        # 加入統計
         all_missing_records.append(show_df)
 
     # =========================
-    # ⭐ 常缺席統計（紅字）
+    # 常缺席統計
     # =========================
     if all_missing_records:
 
         st.divider()
-        st.subheader("🔥 常缺席名單（紅字 ≥ 3 次）")
+
+        st.subheader("🔥 常缺席名單（缺席 ≥ 3 次）")
 
         summary = pd.concat(all_missing_records)
 
-        freq = summary.groupby(["房號", "姓名"]).size().reset_index(name="缺席次數")
+        freq = (
+            summary.groupby(
+                ["房號", "學號", "姓名"]
+            )
+            .size()
+            .reset_index(name="缺席次數")
+        )
 
-        def color_red(val):
-            return "color: red" if val >= 3 else ""
+        # 🔴 標記
+        freq["狀態"] = freq["缺席次數"].apply(
+            lambda x: "🔴 常缺席" if x >= 3 else ""
+        )
+
+        # 排序（高→低）
+        freq = freq.sort_values(
+            by="缺席次數",
+            ascending=False
+        )
 
         st.dataframe(
-            freq.style.applymap(color_red, subset=["缺席次數"]),
+            freq,
             use_container_width=True
         )
 
