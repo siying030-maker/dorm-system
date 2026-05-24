@@ -363,4 +363,4 @@ if "整潔比賽" in tabs:
     i = tabs.index("整潔比賽")
 
     with ui[i]:
-        st.title("總樓整潔比賽")
+        st.title("整潔比賽")
