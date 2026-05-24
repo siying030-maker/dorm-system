@@ -93,31 +93,29 @@ if "user" not in st.session_state:
 # LOGIN
 # ==================================================
 
-if not st.session_state.login:
+@st.cache_data(ttl=300)
+def load_users(role):
+    try:
+        ws = admin_ss.worksheet(role)
+        df = pd.DataFrame(ws.get_all_records())
 
-    st.subheader("登入")
+        df.columns = df.columns.str.strip()
 
-    role = st.selectbox("身分", ["舍監","行政","樓長"])
+        # 強制欄位名稱標準化（避免 KeyError）
+        df = df.rename(columns={
+            df.columns[0]: "使用者",
+            df.columns[1]: "密碼"
+        })
 
-    dfu = load_users(role)
+        df["使用者"] = df["使用者"].astype(str).str.strip()
+        df["密碼"] = df["密碼"].astype(str).str.strip()
 
-    ucol = dfu.columns[0]
-    pcol = dfu.columns[1]
+        return df
 
-    user = st.selectbox("帳號", dfu[ucol].tolist())
-    pwd = st.text_input("密碼", type="password")
-
-    if st.button("登入"):
-        ok = dfu[(dfu[ucol]==user)&(dfu[pcol]==pwd)]
-        if not ok.empty:
-            st.session_state.login=True
-            st.session_state.role=role
-            st.session_state.user=user
-            st.rerun()
-        else:
-            st.error("錯誤")
-
-    st.stop()
+    except Exception as e:
+        st.error(f"{role} Sheet 讀取失敗")
+        st.code(str(e))
+        return pd.DataFrame()
 
 # ==================================================
 # 登出（置頂）
