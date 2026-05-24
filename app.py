@@ -29,7 +29,6 @@ creds = Credentials.from_service_account_info(
     st.secrets["google"],
     scopes=SCOPES
 )
-
 client = gspread.authorize(creds)
 
 # ==================================================
@@ -37,7 +36,6 @@ client = gspread.authorize(creds)
 # ==================================================
 
 _last_call = 0
-
 def rate_limit():
     global _last_call
     now = time.time()
@@ -55,7 +53,7 @@ LOWER_GATE_URL = "https://docs.google.com/spreadsheets/d/1ivjA_-voyNAUGbvbc5o5BU
 ADMIN_SHEET_URL = "https://docs.google.com/spreadsheets/d/1eZgdlelXQWcO3ZRxeXRjXNTI1g1I6RUZPGtJoC9iRes/edit"
 
 # ==================================================
-# Open Sheet
+# open sheet
 # ==================================================
 
 @st.cache_resource(ttl=CACHE_TTL)
@@ -64,9 +62,12 @@ def open_sheet(url):
         try:
             rate_limit()
             return client.open_by_url(url)
-        except:
-            time.sleep((i + 1) * 5)
-    raise Exception("Google API error")
+        except Exception as e:
+            if "429" in str(e):
+                time.sleep((i + 1) * 5)
+            else:
+                raise e
+    raise Exception("Google API 過載")
 
 rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
 upper_ss = open_sheet(UPPER_GATE_URL)
@@ -74,7 +75,7 @@ lower_ss = open_sheet(LOWER_GATE_URL)
 admin_ss = open_sheet(ADMIN_SHEET_URL)
 
 # ==================================================
-# 登入系統
+# 登入
 # ==================================================
 
 @st.cache_data(ttl=300)
@@ -86,11 +87,13 @@ def load_users(role):
 
 if "login" not in st.session_state:
     st.session_state.login = False
+if "role" not in st.session_state:
     st.session_state.role = ""
+if "user" not in st.session_state:
     st.session_state.user = ""
 
 # ==================================================
-# 登入頁
+# 登入畫面
 # ==================================================
 
 if not st.session_state.login:
@@ -98,23 +101,24 @@ if not st.session_state.login:
     st.subheader("登入系統")
 
     role = st.selectbox("身分", ["舍監", "行政", "樓長"])
+    df_user = load_users(role)
 
-    users = load_users(role)
+    user_col = df_user.columns[0]
+    pass_col = df_user.columns[1]
 
-    username = st.selectbox("使用者", users.iloc[:, 0].tolist(), key="login_user")
-    password = st.text_input("密碼", type="password", key="login_pass")
+    user = st.selectbox("使用者", df_user[user_col].tolist())
+    pwd = st.text_input("密碼", type="password")
 
-    if st.button("登入", key="login_btn"):
-
-        ok = users[
-            (users.iloc[:,0].astype(str) == username) &
-            (users.iloc[:,1].astype(str) == password)
+    if st.button("登入"):
+        ok = df_user[
+            (df_user[user_col].astype(str) == user) &
+            (df_user[pass_col].astype(str) == pwd)
         ]
 
         if not ok.empty:
             st.session_state.login = True
             st.session_state.role = role
-            st.session_state.user = username
+            st.session_state.user = user
             st.rerun()
         else:
             st.error("登入失敗")
@@ -125,16 +129,25 @@ if not st.session_state.login:
 # 登出（置頂）
 # ==================================================
 
-col1, col2 = st.columns([8,1])
+col1, col2 = st.columns([8, 1])
 with col2:
-    if st.button("登出", key="logout"):
-        st.session_state.login = False
-        st.session_state.role = ""
-        st.session_state.user = ""
+    if st.button("登出"):
+        st.session_state.clear()
         st.rerun()
 
 st.success(f"{st.session_state.role} / {st.session_state.user}")
-st.divider()
+
+# ==================================================
+# 月份 + 搜尋
+# ==================================================
+
+month = st.selectbox(
+    "月份",
+    ["全部"] + [f"{i:02d}" for i in range(1, 13)],
+    index=0
+)
+
+search = st.text_input("搜尋學號 / 姓名")
 
 # ==================================================
 # 點名資料
@@ -147,196 +160,261 @@ def load_rollcall():
         try:
             if "-" not in ws.title:
                 continue
+
             values = ws.get_all_values()
             df = pd.DataFrame(values[1:], columns=values[0])
             df.columns = df.columns.str.strip()
+
+            if "姓名" in df.columns:
+                df = df[df["姓名"].astype(str).str.strip() != ""]
+
             data[ws.title] = df
         except:
-            pass
+            continue
     return data
 
 data = load_rollcall()
-
-# ==================================================
-# 月份 + 搜尋（全域）
-# ==================================================
-
-months = sorted(list(set([k[:7] for k in data.keys()])), reverse=True)
-
-month = st.selectbox("月份", ["全部"] + months, key="month_select")
-global_search = st.text_input("搜尋學號 / 姓名", key="global_search")
-
-if month != "全部":
-    data = {k:v for k,v in data.items() if k.startswith(month)}
-
 dates = sorted(data.keys(), reverse=True)
 
 # ==================================================
-# Tabs 權限
+# 門禁分析（你提供完整版）
 # ==================================================
 
-role = st.session_state.role
+def analyze_gate(file, semester_url):
 
-tabs_list = []
+    if file is None:
+        return None, None, None
 
-if role in ["舍監", "行政"]:
-    tabs_list += ["連三天不假外宿", "每天點名不到名單"]
+    df = pd.read_excel(file)
+    df.columns = df.columns.str.strip()
 
-if role == "行政":
-    tabs_list += ["上學期門禁", "下學期門禁"]
+    df["刷卡時間"] = pd.to_datetime(df["刷卡時間"], errors="coerce")
+    df["日期"] = df["刷卡時間"].dt.date
 
-if role == "樓長":
-    tabs_list += ["每天點名不到名單"]
+    df = df[(df["刷卡時間"].dt.hour >= 0) & (df["刷卡時間"].dt.hour < 6)]
 
-tabs = st.tabs(tabs_list)
+    df["姓名"] = df["姓名"].astype(str)
+    df = df[~df["姓名"].str.upper().str.startswith(("LHU", "Y"))]
 
-# ==================================================
-# TAB1：三天外宿
-# ==================================================
+    df = df.sort_values(by=["姓名", "日期", "刷卡時間"])
 
-if "連三天不假外宿" in tabs_list:
+    selected = []
+    threshold = timedelta(minutes=60)
 
-    with tabs[tabs_list.index("連三天不假外宿")]:
+    for (name, date), g in df.groupby(["姓名", "日期"]):
 
-        st.header("連三天不假外宿")
-
-        search = st.text_input("搜尋", key="t1")
-
-        found = False
-
-        groups = [dates[i:i+3] for i in range(0, len(dates), 3)]
-
-        for g in groups:
-
-            if len(g) < 3:
-                continue
-
-            all_d = []
-
-            for d in g:
-                df = data.get(d)
-                if df is None or "狀態" not in df.columns:
-                    continue
-
-                tmp = df[df["狀態"] == "缺"].copy()
-                tmp["日期"] = d
-                all_d.append(tmp)
-
-            st.subheader(f"{g[0]} ~ {g[-1]}")
-
-            if not all_d:
-                st.info("無連續三天不假外宿")
-                continue
-
-            df_all = pd.concat(all_d)
-
-            res = df_all.groupby(["房號","學號","姓名"])["日期"].nunique().reset_index()
-            res = res[res["日期"] == 3]
-
-            key = search or global_search
-            if key:
-                res = res[
-                    res["學號"].astype(str).str.contains(key) |
-                    res["姓名"].astype(str).str.contains(key)
-                ]
-
-            if res.empty:
-                st.info("無連續三天不假外宿")
+        last = None
+        for idx, row in g.iterrows():
+            if last is None:
+                selected.append(idx)
             else:
-                found = True
-                st.dataframe(res, use_container_width=True)
+                if row["刷卡時間"] - last > threshold:
+                    selected.append(idx)
+            last = row["刷卡時間"]
 
-        if not found:
-            st.warning("本月無連續三天不假外宿")
+    df = df.loc[selected].copy()
+
+    leave = load_sheet_df(semester_url, "外宿申請")
+    long_leave = load_sheet_df(semester_url, "長期外宿")
+    late = load_sheet_df(semester_url, "長期晚歸")
+
+    status = []
+
+    weekday_map = {1:"一",2:"二",3:"三",4:"四",5:"五",6:"六",7:"日"}
+
+    for _, r in df.iterrows():
+
+        sid = str(r["學號"]).strip()
+        d = pd.to_datetime(r["日期"])
+        t = r["刷卡時間"]
+
+        s = "未申請"
+
+        if not leave.empty:
+            leave["申請日期"] = pd.to_datetime(leave["申請日期"], errors="coerce")
+            leave["結束日期"] = pd.to_datetime(leave["結束日期"], errors="coerce")
+
+            m = leave[
+                (leave["學號"].astype(str) == sid) &
+                (leave["申請日期"] <= d) &
+                (leave["結束日期"] >= d)
+            ]
+
+            if not m.empty:
+                s = "外宿"
+
+        if not long_leave.empty:
+            weekday = weekday_map[d.weekday()]
+
+            m = long_leave[
+                (long_leave["學號"].astype(str) == sid) &
+                (long_leave["星期"].astype(str).str.contains(weekday))
+            ]
+
+            if not m.empty:
+                s = "長期外宿"
+
+        if not late.empty:
+            m = late[late["學號"].astype(str) == sid]
+
+            if not m.empty:
+                limit = pd.to_datetime(m.iloc[0]["返回時間"]).time()
+
+                if t.time() <= limit:
+                    s = "晚歸正常"
+                else:
+                    s = "晚歸超時"
+
+        status.append(s)
+
+    df["狀態判斷"] = status
+
+    show = ["房號","學號","姓名"]
+
+    df_C = df[df["姓名"].str.upper().str.startswith("C")][show]
+    df_N = df[~df["姓名"].str.upper().str.startswith("C")][show]
+
+    return df, df_C, df_N
 
 # ==================================================
-# TAB2：每日缺席
+# sheet helper
 # ==================================================
 
-if "每天點名不到名單" in tabs_list:
+def load_sheet_df(ss, name):
+    try:
+        ws = ss.worksheet(name)
+        return pd.DataFrame(ws.get_all_records())
+    except:
+        return pd.DataFrame()
 
-    with tabs[tabs_list.index("每天點名不到名單")]:
+# ==================================================
+# Tabs
+# ==================================================
 
-        st.header("每天點名不到名單")
+tab1, tab2, tab3, tab4 = st.tabs([
+    "連三天不假外宿",
+    "每日缺席名單",
+    "上學期門禁",
+    "下學期門禁"
+])
 
-        search = st.text_input("搜尋", key="t2")
+# ==================================================
+# TAB1
+# ==================================================
 
-        all_miss = []
+with tab1:
 
-        for d in dates:
+    st.subheader("連三天不假外宿")
 
+    found = False
+
+    groups = [dates[i:i+3] for i in range(0, len(dates), 3)]
+
+    for g in groups:
+
+        if len(g) < 3:
+            continue
+
+        rows = []
+
+        for d in g:
             df = data.get(d)
-            if df is None or "狀態" not in df.columns:
+            if df is None:
                 continue
 
-            miss = df[df["狀態"] == "缺"]
+            miss = df[df["狀態"].astype(str).str.strip() == "缺"]
+            miss = miss[["房號","學號","姓名"]].copy()
+            miss["日期"] = d
+            rows.append(miss)
 
-            if miss.empty:
-                continue
+        if not rows:
+            continue
 
-            show = miss[["房號","學號","姓名"]]
+        all_df = pd.concat(rows)
+        res = all_df.groupby(["房號","學號","姓名"]).nunique("日期").reset_index()
+        res = res[res["日期"] == 3][["房號","學號","姓名"]]
 
-            key = search or global_search
-            if key:
-                show = show[
-                    show["學號"].astype(str).str.contains(key) |
-                    show["姓名"].astype(str).str.contains(key)
-                ]
+        if search:
+            res = res[
+                res["學號"].astype(str).str.contains(search) |
+                res["姓名"].astype(str).str.contains(search)
+            ]
 
-            st.subheader(d)
-            st.dataframe(show, use_container_width=True)
+        if not res.empty:
+            found = True
+            st.write(f"{g[0]} ~ {g[-1]}")
+            st.dataframe(res)
 
-            all_miss.append(show)
+    if not found:
+        st.info("無連續三天不假外宿")
 
-        if all_miss:
-            st.divider()
-            st.subheader("🔥 常缺席排行")
+# ==================================================
+# TAB2
+# ==================================================
 
-            total = pd.concat(all_miss)
+with tab2:
 
-            freq = total.groupby(["房號","學號","姓名"]).size().reset_index(name="次數")
+    st.subheader("每日缺席名單")
 
-            st.dataframe(freq, use_container_width=True)
+    found = False
+
+    for d in dates:
+
+        df = data.get(d)
+        if df is None:
+            continue
+
+        miss = df[df["狀態"].astype(str).str.strip() == "缺"]
+        miss = miss[["房號","學號","姓名"]]
+
+        if search:
+            miss = miss[
+                miss["學號"].astype(str).str.contains(search) |
+                miss["姓名"].astype(str).str.contains(search)
+            ]
+
+        if month != "全部" and not d.startswith(f"2026-{month}"):
+            continue
+
+        if miss.empty:
+            continue
+
+        found = True
+        st.write(d)
+        st.dataframe(miss)
+
+    if not found:
+        st.info("無缺席資料")
 
 # ==================================================
 # TAB3
 # ==================================================
 
-if "上學期門禁" in tabs_list:
+with tab3:
 
-    with tabs[tabs_list.index("上學期門禁")]:
+    st.subheader("上學期門禁")
 
-        st.header("上學期門禁")
+    f = st.file_uploader("Excel上傳", key="upper")
 
-        f = st.file_uploader(
-            "上學期門禁 Excel",
-            type=["xlsx"],
-            key="upper_file"
-        )
-
-        if f:
-            df = pd.read_excel(f)
-            st.dataframe(df)
+    if f:
+        df, c, n = analyze_gate(f, upper_ss)
+        st.dataframe(n[["房號","學號","姓名"]])
+        st.dataframe(c[["房號","學號","姓名"]])
 
 # ==================================================
 # TAB4
 # ==================================================
 
-if "下學期門禁" in tabs_list:
+with tab4:
 
-    with tabs[tabs_list.index("下學期門禁")]:
+    st.subheader("下學期門禁")
 
-        st.header("下學期門禁")
+    f = st.file_uploader("Excel上傳", key="lower")
 
-        f = st.file_uploader(
-            "下學期門禁 Excel",
-            type=["xlsx"],
-            key="lower_file"
-        )
-
-        if f:
-            df = pd.read_excel(f)
-            st.dataframe(df)
+    if f:
+        df, c, n = analyze_gate(f, lower_ss)
+        st.dataframe(n[["房號","學號","姓名"]])
+        st.dataframe(c[["房號","學號","姓名"]])
 
 # ==================================================
 # footer
