@@ -312,29 +312,33 @@ if st.button("登出", key="logout_btn"):
     st.rerun()
 
 # ==================================================
-# ⭐ Tab 初始化（只要一段！！）
+# Tab
 # ==================================================
 
 tab_names = []
 
-if st.session_state.role in ["舍監", "行政"]:
-    tab_names.extend([
-        "連三天不假外宿",
-        "每日缺席名單"
-    ])
+role = st.session_state.role
+is_main = st.session_state.is_main
 
-if st.session_state.role == "行政":
-    tab_names.extend([
-        "上學期門禁",
-        "下學期門禁",
-        "整潔比賽(檢視)"
-    ])
+# 舍監 / 行政
+if role in ["舍監", "行政"]:
+    tab_names += ["連三天不假外宿", "每日缺席名單"]
 
-if st.session_state.role == "樓長":
-    tab_names.append("每日缺席名單")
+# 行政額外功能
+if role == "行政":
+    tab_names += ["上學期門禁", "下學期門禁"]
 
-    if st.session_state.is_main:
-        tab_names.append("整潔比賽")
+# 樓長功能
+if role == "樓長":
+    tab_names += ["每日缺席名單"]
+
+    if is_main:
+        tab_names += ["整潔比賽"]
+
+# 🚨 去重（非常重要）
+tab_names = list(dict.fromkeys(tab_names))
+
+tabs = st.tabs(tab_names)
 
 # ==================================================
 # ⭐⭐⭐ 防炸：如果沒 tab 直接 stop
@@ -343,10 +347,6 @@ if st.session_state.role == "樓長":
 if len(tab_names) == 0:
     st.warning("目前沒有可用功能")
     st.stop()
-
-# ==================================================
-# 建立 Tabs
-# ==================================================
 
 tabs = st.tabs(tab_names)
 
@@ -1069,7 +1069,7 @@ FLOOR_OPTIONS = {
 }
 
 # ==================================================
-# 讀住宿名單
+# 讀 sheet
 # ==================================================
 
 @st.cache_data(ttl=300)
@@ -1077,17 +1077,14 @@ def load_clean_sheet(url):
     try:
         ss = open_sheet(url)
         ws = ss.sheet1
-
         df = pd.DataFrame(ws.get_all_records())
         df.columns = df.columns.str.strip()
-
         return df
     except:
         return pd.DataFrame()
 
-
 # ==================================================
-# 整潔比賽 TAB（✔ 完整修正）
+# TAB：整潔比賽（穩定版）
 # ==================================================
 
 if "整潔比賽" in tab_names:
@@ -1097,17 +1094,15 @@ if "整潔比賽" in tab_names:
     with tabs[idx]:
 
         st.header("整潔比賽")
-
         dorm = st.session_state.dorm
+
         st.subheader(f"宿舍：{dorm}")
 
-        # 基本資料
         school_year = st.text_input("學年", placeholder="例如：114")
         semester = st.selectbox("學期", ["上學期", "下學期"])
         contest = st.selectbox("第幾次", ["第一次", "第二次", "第三次"])
         rank = st.selectbox("名次", ["第一名", "第二名", "第三名"])
 
-        # 樓層
         floors = FLOOR_OPTIONS.get(dorm, [])
 
         st.divider()
@@ -1122,62 +1117,66 @@ if "整潔比賽" in tab_names:
             )
 
         # ==================================================
-        # 查詢結果（✔ 必須在 tab 裡）
+        # 查詢資料
         # ==================================================
 
         result_list = []
 
         for floor, room in room_inputs.items():
 
-            if not room.strip():
+            room = str(room).strip()
+
+            if not room:
                 continue
 
             try:
                 url = CLEAN_SHEET[semester][dorm]
                 df = load_clean_sheet(url)
 
-                room_col = None
-                for c in df.columns:
-                    if "房" in c:
-                        room_col = c
-                        break
+                if df.empty:
+                    continue
 
-                if room_col:
-                    res = df[df[room_col].astype(str).str.strip() == room.strip()]
+                room_col = next((c for c in df.columns if "房" in c), None)
+                if not room_col:
+                    continue
 
-                    if not res.empty:
+                res = df[
+                    df[room_col].astype(str).str.strip() == room
+                ]
 
-                        show_cols = [
-                            c for c in df.columns
-                            if ("房" in c or "學號" in c or "姓名" in c)
-                        ]
+                if res.empty:
+                    continue
 
-                        temp = res[show_cols].copy()
-                        temp["樓層"] = floor
+                show_cols = [
+                    c for c in df.columns
+                    if ("房" in c or "學號" in c or "姓名" in c)
+                ]
 
-                        result_list.append(temp)
+                temp = res[show_cols].copy()
+                temp["樓層"] = floor
+
+                result_list.append(temp)
 
             except Exception as e:
-                st.error(str(e))
+                st.error(f"{floor} 查詢錯誤：{e}")
 
         # ==================================================
         # 顯示結果
         # ==================================================
 
-        if result_list:
+        if len(result_list) > 0:
 
             total = pd.concat(result_list, ignore_index=True)
 
             st.divider()
             st.subheader("名單確認")
-
             st.dataframe(total, use_container_width=True)
 
             # ==================================================
-            # 儲存
+            # 儲存（防重複）
             # ==================================================
 
-            if st.button(f"儲存_{dorm}_{semester}_{contest}_{rank}"):
+            if st.button("儲存", key=f"save_clean_{dorm}_{semester}_{contest}_{rank}"):
 
                 try:
 
@@ -1194,6 +1193,12 @@ if "整潔比賽" in tab_names:
                             "宿舍", "樓層", "房號", "學號", "姓名"
                         ])
 
+                    # ==================================================
+                    # 🔥 防止重複寫入（關鍵修正）
+                    # ==================================================
+
+                    existing = pd.DataFrame(ws.get_all_records())
+
                     for _, r in total.iterrows():
 
                         room_value = ""
@@ -1208,6 +1213,13 @@ if "整潔比賽" in tab_names:
                             if "姓名" in c:
                                 name_value = r[c]
 
+                        # 防重複 key
+                        key = f"{school_year}-{semester}-{contest}-{rank}-{dorm}-{room_value}-{sid_value}"
+
+                        if not existing.empty:
+                            if key in existing.astype(str).agg("-".join, axis=1).values:
+                                continue
+
                         ws.append_row([
                             school_year,
                             semester,
@@ -1220,7 +1232,7 @@ if "整潔比賽" in tab_names:
                             name_value
                         ])
 
-                    st.success("儲存成功")
+                    st.success("儲存成功（已防止重複資料）")
 
                 except Exception as e:
                     st.error(str(e))
