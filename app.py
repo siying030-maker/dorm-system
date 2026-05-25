@@ -348,7 +348,7 @@ if len(tab_names) == 0:
 # 建立 Tabs
 # ==================================================
 
-#tabs = st.tabs(tab_names)
+tabs = st.tabs(tab_names)
 
 
 # ==================================================
@@ -1040,18 +1040,14 @@ if "下學期門禁" in tab_names:
 # ==================================================
 
 CLEAN_SHEET = {
-
     "上學期": {
-
         "男一": "https://docs.google.com/spreadsheets/d/1S2axgu2BWP8HnEs0RJdDcccdD1bvPdH26qrx3c4DeWo/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1RcRTslmv4s_C_7AH-WuqtLrty9l0A7YECvaGJETnpis/edit",
         "女一": "https://docs.google.com/spreadsheets/d/1U9bdg8CWASheYE7XxLt5p-otLDxKiotju4s72Car9rk/edit",
         "女二": "https://docs.google.com/spreadsheets/d/1jNbe--UINl7NS6dpBU82AZJuT6wQ9VwVAlglyG7infQ/edit",
         "女三": "https://docs.google.com/spreadsheets/d/1Vrst2-bqPE7flCIXeAI-lyN51Os9QwStx388DWx11w8/edit"
     },
-
     "下學期": {
-
         "男一": "https://docs.google.com/spreadsheets/d/1JSJx0cLdUxfIeYoe6dldeBe3Xeewm3uuIYrJkeYi_A8/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1KpqeWBWIR0g6RxZ_oFUFXbn34PbH7r18UI9NBsfWIPY/edit",
         "女一": "https://docs.google.com/spreadsheets/d/1Nf7U106SxRZUu1pb35Fu2xrN2BTV80lit43BcgE6GnA/edit",
@@ -1061,42 +1057,15 @@ CLEAN_SHEET = {
 }
 
 # ==================================================
-# 整潔比賽結果 Sheet
-# ==================================================
-
-CLEAN_RESULT_URL = "https://docs.google.com/spreadsheets/d/1ojWln4x5MGTqZZfGe3ySbd8-g6FwTsMff2tonx5tCRc/edit?usp=sharing"
-
-clean_result_ss = open_sheet(
-    CLEAN_RESULT_URL
-)
-
-# ==================================================
 # 樓層設定
 # ==================================================
 
 FLOOR_OPTIONS = {
-
-    "女一": [
-        "1F", "2F", "3F",
-        "5F", "6F", "7F"
-    ],
-
-    "女二": [
-        "1F", "2F", "3F"
-    ],
-
-    "女三": [
-        "6F"
-    ],
-
-    "男一": [
-        "MB", "1F", "2F",
-        "3F", "4F", "5F"
-    ],
-
-    "男三": [
-        "3F", "4F", "5F"
-    ]
+    "女一": ["1F", "2F", "3F", "5F", "6F", "7F"],
+    "女二": ["1F", "2F", "3F"],
+    "女三": ["6F"],
+    "男一": ["MB", "1F", "2F", "3F", "4F", "5F"],
+    "男三": ["3F", "4F", "5F"]
 }
 
 # ==================================================
@@ -1105,193 +1074,125 @@ FLOOR_OPTIONS = {
 
 @st.cache_data(ttl=300)
 def load_clean_sheet(url):
-
     try:
-
         ss = open_sheet(url)
-
         ws = ss.sheet1
 
-        df = pd.DataFrame(
-            ws.get_all_records()
-        )
-
-        df.columns = (
-            df.columns.str.strip()
-        )
+        df = pd.DataFrame(ws.get_all_records())
+        df.columns = df.columns.str.strip()
 
         return df
-
     except:
-
         return pd.DataFrame()
 
+
 # ==================================================
-# 整潔比賽（總樓）
+# 整潔比賽 TAB（✔ 完整修正）
 # ==================================================
 
 if "整潔比賽" in tab_names:
 
-    idx = tab_names.index(
-        "整潔比賽"
-    )
+    idx = tab_names.index("整潔比賽")
 
     with tabs[idx]:
 
         st.header("整潔比賽")
 
         dorm = st.session_state.dorm
+        st.subheader(f"宿舍：{dorm}")
 
-        st.subheader(
-            f"宿舍：{dorm}"
-        )
-
-        # ==================================================
         # 基本資料
-        # ==================================================
+        school_year = st.text_input("學年", placeholder="例如：114")
+        semester = st.selectbox("學期", ["上學期", "下學期"])
+        contest = st.selectbox("第幾次", ["第一次", "第二次", "第三次"])
+        rank = st.selectbox("名次", ["第一名", "第二名", "第三名"])
 
-        school_year = st.text_input(
-            "學年",
-            placeholder="例如：114"
-        )
-
-        semester = st.selectbox(
-            "學期",
-            ["上學期", "下學期"]
-        )
-
-        contest = st.selectbox(
-            "第幾次",
-            ["第一次", "第二次", "第三次"]
-        )
-
-        rank = st.selectbox(
-            "名次",
-            ["第一名", "第二名", "第三名"]
-        )
-
-        # ==================================================
         # 樓層
+        floors = FLOOR_OPTIONS.get(dorm, [])
+
+        st.divider()
+        st.subheader("各樓層房號")
+
+        room_inputs = {}
+
+        for floor in floors:
+            room_inputs[floor] = st.text_input(
+                f"{floor} 房號",
+                key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
+            )
+
+        # ==================================================
+        # 查詢結果（✔ 必須在 tab 裡）
         # ==================================================
 
-        floors = FLOOR_OPTIONS.get(
-            dorm,
-            []
-        )
+        result_list = []
 
-room_inputs = {}
+        for floor, room in room_inputs.items():
 
-st.divider()
-st.subheader("各樓層房號")
+            if not room.strip():
+                continue
 
-for floor in floors:
-    room_inputs[floor] = st.text_input(
-        f"{floor} 房號",
-        key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
-    )
+            try:
+                url = CLEAN_SHEET[semester][dorm]
+                df = load_clean_sheet(url)
 
-# ==================================================
-# 顯示名單（這裡一定要回到最左邊）
-# ==================================================
+                room_col = None
+                for c in df.columns:
+                    if "房" in c:
+                        room_col = c
+                        break
 
-result_list = []
+                if room_col:
+                    res = df[df[room_col].astype(str).str.strip() == room.strip()]
 
-for floor, room in room_inputs.items():
+                    if not res.empty:
 
-    if room.strip() == "":
-        continue
+                        show_cols = [
+                            c for c in df.columns
+                            if ("房" in c or "學號" in c or "姓名" in c)
+                        ]
 
-    try:
-        url = CLEAN_SHEET[semester][dorm]
-        df = load_clean_sheet(url)
+                        temp = res[show_cols].copy()
+                        temp["樓層"] = floor
 
-        room_col = None
-        for c in df.columns:
-            if "房" in c:
-                room_col = c
-                break
+                        result_list.append(temp)
 
-        if room_col:
-            res = df[
-                df[room_col].astype(str).str.strip() == room.strip()
-            ]
-
-            if not res.empty:
-
-                show_cols = [
-                    c for c in df.columns
-                    if ("房" in c or "學號" in c or "姓名" in c)
-                ]
-
-                temp = res[show_cols].copy()
-                temp["樓層"] = floor
-
-                result_list.append(temp)
-
-    except Exception as e:
-        st.error(str(e))
+            except Exception as e:
+                st.error(str(e))
 
         # ==================================================
         # 顯示結果
         # ==================================================
 
-        if len(result_list) > 0:
+        if result_list:
 
-            total = pd.concat(
-                result_list,
-                ignore_index=True
-            )
+            total = pd.concat(result_list, ignore_index=True)
 
             st.divider()
-
             st.subheader("名單確認")
 
-            st.dataframe(
-                total,
-                use_container_width=True
-            )
+            st.dataframe(total, use_container_width=True)
 
             # ==================================================
             # 儲存
             # ==================================================
 
-            if st.button("儲存", key=f"save_clean_{dorm}_{semester}_{contest}_{rank}"):
+            if st.button(f"儲存_{dorm}_{semester}_{contest}_{rank}"):
 
                 try:
 
-                    # ==================================================
-                    # 取得 worksheet
-                    # ==================================================
-
                     try:
-
-                        ws = clean_result_ss.worksheet(
-                            "整潔比賽"
-                        )
-
+                        ws = clean_result_ss.worksheet("整潔比賽")
                     except:
-
                         ws = clean_result_ss.add_worksheet(
                             title="整潔比賽",
                             rows=5000,
                             cols=20
                         )
-
                         ws.append_row([
-                            "學年",
-                            "學期",
-                            "次數",
-                            "名次",
-                            "宿舍",
-                            "樓層",
-                            "房號",
-                            "學號",
-                            "姓名"
+                            "學年", "學期", "次數", "名次",
+                            "宿舍", "樓層", "房號", "學號", "姓名"
                         ])
-
-                    # ==================================================
-                    # 寫入
-                    # ==================================================
 
                     for _, r in total.iterrows():
 
@@ -1300,21 +1201,14 @@ for floor, room in room_inputs.items():
                         name_value = ""
 
                         for c in total.columns:
-
                             if "房" in c:
-
                                 room_value = r[c]
-
                             if "學號" in c:
-
                                 sid_value = r[c]
-
                             if "姓名" in c:
-
                                 name_value = r[c]
 
                         ws.append_row([
-
                             school_year,
                             semester,
                             contest,
@@ -1324,90 +1218,9 @@ for floor, room in room_inputs.items():
                             room_value,
                             sid_value,
                             name_value
-
                         ])
 
                     st.success("儲存成功")
 
                 except Exception as e:
-
                     st.error(str(e))
-
-# ==================================================
-# 整潔比賽(檢視)
-# ==================================================
-
-if "整潔比賽(檢視)" in tab_names:
-
-    idx = tab_names.index(
-        "整潔比賽(檢視)"
-    )
-
-    with tabs[idx]:
-
-        st.header("整潔比賽(檢視)")
-
-        try:
-
-            ws = clean_result_ss.worksheet(
-                "整潔比賽"
-            )
-
-            df = pd.DataFrame(
-                ws.get_all_records()
-            )
-
-            if df.empty:
-
-                st.info("尚無資料")
-
-            else:
-
-                # ==================================================
-                # 篩選
-                # ==================================================
-
-                sem = st.selectbox(
-                    "學期",
-                    ["全部", "上學期", "下學期"]
-                )
-
-                contest = st.selectbox(
-                    "第幾次",
-                    ["全部", "第一次", "第二次", "第三次"]
-                )
-
-                rank = st.selectbox(
-                    "名次",
-                    ["全部", "第一名", "第二名", "第三名"]
-                )
-
-                if sem != "全部":
-
-                    df = df[
-                        df["學期"]
-                        == sem
-                    ]
-
-                if contest != "全部":
-
-                    df = df[
-                        df["次數"]
-                        == contest
-                    ]
-
-                if rank != "全部":
-
-                    df = df[
-                        df["名次"]
-                        == rank
-                    ]
-
-                st.dataframe(
-                    df,
-                    use_container_width=True
-                )
-
-        except Exception as e:
-
-            st.error(str(e))
