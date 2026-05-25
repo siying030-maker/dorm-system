@@ -312,7 +312,7 @@ if st.button("登出", key="logout_btn"):
     st.rerun()
 
 # ==================================================
-# Tab
+# Tab（唯一版本）
 # ==================================================
 
 tab_names = []
@@ -320,36 +320,28 @@ tab_names = []
 role = st.session_state.role
 is_main = st.session_state.is_main
 
-# 舍監 / 行政
 if role in ["舍監", "行政"]:
     tab_names += ["連三天不假外宿", "每日缺席名單"]
 
-# 行政額外功能
 if role == "行政":
     tab_names += ["上學期門禁", "下學期門禁"]
 
-# 樓長功能
 if role == "樓長":
     tab_names += ["每日缺席名單"]
 
     if is_main:
         tab_names += ["整潔比賽"]
 
-# 🚨 去重（非常重要）
+# 🚨 去重（保險）
 tab_names = list(dict.fromkeys(tab_names))
 
-tabs = st.tabs(tab_names)
-
-# ==================================================
-# ⭐⭐⭐ 防炸：如果沒 tab 直接 stop
-# ==================================================
-
+# 🚨 沒 tab 直接停止
 if len(tab_names) == 0:
     st.warning("目前沒有可用功能")
     st.stop()
 
+# ⭐⭐⭐ 只建立一次 tabs（重點）
 tabs = st.tabs(tab_names)
-
 
 # ==================================================
 # 點名資料（每天自動同步）
