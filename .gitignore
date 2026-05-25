@@ -1,12 +1,3 @@
-# 機密檔案
 service_account.json
-
-# 所有 JSON（如果你有敏感資料）
 *.json
-
-# 環境變數
-.env
-
-# Python cache
-__pycache__/
-*.pyc
+.streamlit/secrets.toml
