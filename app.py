@@ -297,10 +297,8 @@ if not st.session_state.login:
 # 登入成功
 # ==================================================
 
-st.success(
-    f"{st.session_state.role} / "
-    f"{st.session_state.user}"
-)
+st.success(f"{st.session_state.get('role','')} / {st.session_state.get('user','')}")
+
 
 # ==================================================
 # 登出
@@ -315,12 +313,6 @@ if st.button("登出"):
     st.session_state.is_main = False
 
     st.rerun()
-
-# ==================================================
-# Tabs
-# ==================================================
-
-tab_names = []
 
 # ==================================================
 # 舍監 / 行政
@@ -367,29 +359,7 @@ if st.session_state.role == "樓長":
 
 tabs = st.tabs(tab_names)
 
-# ==================================================
-# 頂部資訊
-# ==================================================
 
-top1, top2 = st.columns([8, 2])
-
-with top1:
-
-    st.success(
-        f"{st.session_state.role} / {st.session_state.user}"
-    )
-
-with top2:
-
-    if st.button("登出"):
-
-        st.session_state.login = False
-        st.session_state.role = ""
-        st.session_state.user = ""
-        st.session_state.is_main = False
-        st.session_state.dorm = ""
-
-        st.rerun()
 
 # ==================================================
 # 點名資料（每天自動同步）
