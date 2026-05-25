@@ -1189,12 +1189,16 @@ if "整潔比賽" in tab_names:
 
         st.subheader("各樓層房號")
 
-        for floor in floors:
+       room_inputs = {}
 
-        room_inputs[floor] = st.text_input(
-            f"{floor} 房號",
-            key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
-        )
+st.divider()
+st.subheader("各樓層房號")
+
+for floor in floors:
+    room_inputs[floor] = st.text_input(
+        f"{floor} 房號",
+        key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
+    )
 
         # ==================================================
         # 顯示名單
