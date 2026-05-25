@@ -21,7 +21,7 @@ st.title("宿舍管理系統")
 CACHE_TTL = 300
 
 # ==================================================
-# Session 初始化
+# Session
 # ==================================================
 
 if "login" not in st.session_state:
@@ -33,11 +33,15 @@ if "role" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = ""
 
-if "is_main" not in st.session_state:
-    st.session_state.is_main = False
+# ==================================================
+# 新增
+# ==================================================
 
 if "dorm" not in st.session_state:
     st.session_state.dorm = ""
+
+if "is_main" not in st.session_state:
+    st.session_state.is_main = False
 
 # ==================================================
 # Google API
@@ -140,10 +144,10 @@ def load_users(sheet_name):
 
 if not st.session_state.login:
 
-    st.subheader("登入權限")
+    st.title("宿舍管理系統")
 
     role = st.selectbox(
-        "選擇身分",
+        "登入權限",
         ["舍監", "行政", "樓長"]
     )
 
@@ -153,11 +157,13 @@ if not st.session_state.login:
 
     if role in ["舍監", "行政"]:
 
-        df = load_users(role)
+        user_df = load_users(role)
 
         username = st.selectbox(
             "使用者",
-            df["使用者"].astype(str).tolist()
+            user_df.iloc[:, 0]
+            .astype(str)
+            .tolist()
         )
 
         password = st.text_input(
@@ -167,10 +173,20 @@ if not st.session_state.login:
 
         if st.button("登入"):
 
-            match = df[
-                (df["使用者"].astype(str) == username)
+            match = user_df[
+                (
+                    user_df.iloc[:, 0]
+                    .astype(str)
+                    .str.strip()
+                    == username
+                )
                 &
-                (df["密碼"].astype(str) == password)
+                (
+                    user_df.iloc[:, 1]
+                    .astype(str)
+                    .str.strip()
+                    == password
+                )
             ]
 
             if not match.empty:
@@ -178,6 +194,13 @@ if not st.session_state.login:
                 st.session_state.login = True
                 st.session_state.role = role
                 st.session_state.user = username
+
+                # ==================================================
+                # 非樓長初始化
+                # ==================================================
+
+                st.session_state.dorm = ""
+                st.session_state.is_main = False
 
                 st.rerun()
 
@@ -186,23 +209,37 @@ if not st.session_state.login:
                 st.error("密碼錯誤")
 
     # ==================================================
-    # 樓長
+    # 樓長登入
     # ==================================================
 
-    else:
+    if role == "樓長":
 
-        df = load_users("樓長")
+        user_df = load_users("樓長")
+
+        dorms = (
+            user_df.iloc[:, 0]
+            .astype(str)
+            .unique()
+            .tolist()
+        )
 
         dorm = st.selectbox(
             "宿舍別",
-            sorted(df["宿舍別"].dropna().unique())
+            dorms
         )
 
-        dorm_df = df[df["宿舍別"] == dorm]
+        temp_df = user_df[
+            user_df.iloc[:, 0]
+            .astype(str)
+            .str.strip()
+            == dorm
+        ]
 
         username = st.selectbox(
             "使用者",
-            dorm_df["使用者"].astype(str).tolist()
+            temp_df.iloc[:, 1]
+            .astype(str)
+            .tolist()
         )
 
         password = st.text_input(
@@ -212,10 +249,20 @@ if not st.session_state.login:
 
         if st.button("登入"):
 
-            match = dorm_df[
-                (dorm_df["使用者"].astype(str) == username)
+            match = temp_df[
+                (
+                    temp_df.iloc[:, 1]
+                    .astype(str)
+                    .str.strip()
+                    == username
+                )
                 &
-                (dorm_df["密碼"].astype(str) == password)
+                (
+                    temp_df.iloc[:, 2]
+                    .astype(str)
+                    .str.strip()
+                    == password
+                )
             ]
 
             if not match.empty:
@@ -223,14 +270,19 @@ if not st.session_state.login:
                 st.session_state.login = True
                 st.session_state.role = role
                 st.session_state.user = username
-                st.session_state.dorm = dorm
 
-                total = str(
-                    match.iloc[0]["總樓"]
+                # ==================================================
+                # 樓長資訊
+                # ==================================================
+
+                row = match.iloc[0]
+
+                st.session_state.dorm = str(
+                    row.iloc[0]
                 ).strip()
 
                 st.session_state.is_main = (
-                    total == "是"
+                    str(row.iloc[3]).strip() == "是"
                 )
 
                 st.rerun()
@@ -240,6 +292,80 @@ if not st.session_state.login:
                 st.error("密碼錯誤")
 
     st.stop()
+
+# ==================================================
+# 登入成功
+# ==================================================
+
+st.success(
+    f"{st.session_state.role} / "
+    f"{st.session_state.user}"
+)
+
+# ==================================================
+# 登出
+# ==================================================
+
+if st.button("登出"):
+
+    st.session_state.login = False
+    st.session_state.role = ""
+    st.session_state.user = ""
+    st.session_state.dorm = ""
+    st.session_state.is_main = False
+
+    st.rerun()
+
+# ==================================================
+# Tabs
+# ==================================================
+
+tab_names = []
+
+# ==================================================
+# 舍監 / 行政
+# ==================================================
+
+if st.session_state.role in ["舍監", "行政"]:
+
+    tab_names.extend([
+        "連三天不假外宿",
+        "每日缺席名單"
+    ])
+
+# ==================================================
+# 行政
+# ==================================================
+
+if st.session_state.role == "行政":
+
+    tab_names.extend([
+        "上學期門禁",
+        "下學期門禁",
+        "整潔比賽(檢視)"
+    ])
+
+# ==================================================
+# 樓長
+# ==================================================
+
+if st.session_state.role == "樓長":
+
+    tab_names.append("每日缺席名單")
+
+    # ==================================================
+    # 總樓才有整潔比賽
+    # ==================================================
+
+    if st.session_state.is_main:
+
+        tab_names.append("整潔比賽")
+
+# ==================================================
+# 建立 Tabs
+# ==================================================
+
+tabs = st.tabs(tab_names)
 
 # ==================================================
 # 頂部資訊
