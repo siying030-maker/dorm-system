@@ -266,7 +266,7 @@ with top2:
         st.rerun()
 
 # ==================================================
-# 點名資料
+# 點名資料（自動同步 Google Sheet）
 # ==================================================
 
 @st.cache_data(ttl=300)
@@ -280,6 +280,7 @@ def load_rollcall_data():
 
         try:
 
+            # 只抓 YYYY-MM-DD sheet
             datetime.strptime(
                 ws.title,
                 "%Y-%m-%d"
@@ -297,17 +298,46 @@ def load_rollcall_data():
                 columns=values[0]
             )
 
-            df.columns = df.columns.str.strip()
+            df.columns = (
+                df.columns.str.strip()
+            )
+
+            # ==================================================
+            # 狀態欄位
+            # ==================================================
 
             if "狀態" not in df.columns:
                 continue
 
-            df = df[
+            df["狀態"] = (
                 df["狀態"]
                 .astype(str)
                 .str.strip()
-                .isin(["缺", "未入住"])
-            ]
+            )
+
+            # ==================================================
+            # 只保留 缺 / 未入住
+            # ==================================================
+
+            df = df[
+                df["狀態"]
+                .isin([
+                    "缺",
+                    "未入住"
+                ])
+            ].copy()
+
+            # ==================================================
+            # 清空姓名不要
+            # ==================================================
+
+            if "姓名" in df.columns:
+
+                df = df[
+                    df["姓名"]
+                    .astype(str)
+                    .str.strip() != ""
+                ]
 
             data[ws.title] = df
 
@@ -316,6 +346,10 @@ def load_rollcall_data():
 
     return data
 
+# ==================================================
+# 載入點名資料
+# ==================================================
+
 data = load_rollcall_data()
 
 # ==================================================
@@ -323,8 +357,11 @@ data = load_rollcall_data()
 # ==================================================
 
 all_months = sorted(list(set([
+
     d[:7]
+
     for d in data.keys()
+
 ])), reverse=True)
 
 current_month = datetime.now().strftime("%Y-%m")
@@ -332,6 +369,7 @@ current_month = datetime.now().strftime("%Y-%m")
 default_index = 0
 
 if current_month in all_months:
+
     default_index = all_months.index(current_month)
 
 month = st.selectbox(
@@ -349,20 +387,24 @@ search = st.text_input(
 )
 
 # ==================================================
-# 日期篩選
+# 日期
 # ==================================================
 
 dates = sorted([
+
     d for d in data.keys()
+
     if d.startswith(month)
+
 ])
 
 # ==================================================
-# Tabs
+# 權限 Tabs
 # ==================================================
 
 tab_names = []
 
+# 舍監 / 行政
 if st.session_state.role in ["舍監", "行政"]:
 
     tab_names.extend([
@@ -370,31 +412,32 @@ if st.session_state.role in ["舍監", "行政"]:
         "每日缺席名單"
     ])
 
+# 行政
 if st.session_state.role == "行政":
 
     tab_names.extend([
         "上學期門禁",
-        "下學期門禁",
-        "整潔比賽(檢視)"
+        "下學期門禁"
     ])
 
+# 樓長
 if st.session_state.role == "樓長":
 
-    tab_names.append("每日缺席名單")
-
-    if st.session_state.is_main:
-
-        tab_names.append("整潔比賽")
+    tab_names.append(
+        "每日缺席名單"
+    )
 
 tabs = st.tabs(tab_names)
 
 # ==================================================
-# TAB1 連三天
+# TAB1 連三天不假外宿
 # ==================================================
 
 if "連三天不假外宿" in tab_names:
 
-    idx = tab_names.index("連三天不假外宿")
+    idx = tab_names.index(
+        "連三天不假外宿"
+    )
 
     with tabs[idx]:
 
@@ -420,91 +463,184 @@ if "連三天不假外宿" in tab_names:
 
             res = (
                 total.groupby(
-                    ["房號", "學號", "姓名"]
+                    [
+                        "房號",
+                        "學號",
+                        "姓名"
+                    ]
                 )["日期"]
                 .nunique()
                 .reset_index()
             )
 
-            res = res[res["日期"] == 3]
+            res = res[
+                res["日期"] == 3
+            ]
+
+            # ==================================================
+            # 搜尋
+            # ==================================================
 
             if search:
 
                 res = res[
+
                     (
                         res["學號"]
                         .astype(str)
                         .str.contains(search)
                     )
+
                     |
+
                     (
                         res["姓名"]
                         .astype(str)
                         .str.contains(search)
                     )
+
                 ]
+
+            # ==================================================
+            # 顯示
+            # ==================================================
 
             if not res.empty:
 
                 found = True
 
+                res["狀態"] = "缺 / 未入住"
+
+                show = res[
+                    [
+                        "房號",
+                        "學號",
+                        "姓名",
+                        "狀態"
+                    ]
+                ]
+
                 st.subheader(
                     f"{group[0]} ~ {group[-1]}"
                 )
 
-                st.dataframe(
-                    res[
-                        ["房號", "學號", "姓名"]
+                style_df = show.style.apply(
+
+                    lambda row: [
+
+                        "color:red;font-weight:bold"
+                        if "未入住" in str(row["狀態"])
+                        else ""
+
+                        for _ in row
+
                     ],
+
+                    axis=1
+                )
+
+                st.dataframe(
+                    style_df,
                     use_container_width=True
                 )
 
+        # ==================================================
+        # 無資料
+        # ==================================================
+
         if not found:
 
-            st.info("無連續三天不假外宿")
+            st.info(
+                "無連續三天不假外宿"
+            )
 
 # ==================================================
-# TAB2 每日缺席
+# TAB2 每日缺席名單
 # ==================================================
 
 if "每日缺席名單" in tab_names:
 
-    idx = tab_names.index("每日缺席名單")
+    idx = tab_names.index(
+        "每日缺席名單"
+    )
 
     with tabs[idx]:
 
         st.header("每日缺席名單")
 
+        found = False
+
         for d in dates:
 
             df = data[d].copy()
 
+            # ==================================================
+            # 搜尋
+            # ==================================================
+
             if search:
 
                 df = df[
+
                     (
                         df["學號"]
                         .astype(str)
                         .str.contains(search)
                     )
+
                     |
+
                     (
                         df["姓名"]
                         .astype(str)
                         .str.contains(search)
                     )
+
                 ]
 
+            if df.empty:
+                continue
+
+            found = True
+
+            # ==================================================
+            # 顯示欄位
+            # ==================================================
+
             show = df[
-                ["房號", "學號", "姓名"]
+                [
+                    "房號",
+                    "學號",
+                    "姓名",
+                    "狀態"
+                ]
             ]
 
             st.subheader(d)
 
+            style_df = show.style.apply(
+
+                lambda row: [
+
+                    "color:red;font-weight:bold"
+                    if str(row["狀態"]).strip() == "未入住"
+                    else ""
+
+                    for _ in row
+
+                ],
+
+                axis=1
+            )
+
             st.dataframe(
-                show,
+                style_df,
                 use_container_width=True
             )
+
+        if not found:
+
+            st.info("本月無資料")
 
 # ==================================================
 # 門禁 helper
