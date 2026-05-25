@@ -1189,75 +1189,47 @@ for floor in floors:
         f"{floor} 房號",
         key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
     )
-        # ==================================================
-        # 顯示名單
-        # ==================================================
 
-        result_list = []
+# ==================================================
+# 顯示名單（這裡一定要回到最左邊）
+# ==================================================
 
-        for floor, room in room_inputs.items():
+result_list = []
 
-            if room.strip() == "":
-                continue
+for floor, room in room_inputs.items():
 
-            try:
+    if room.strip() == "":
+        continue
 
-                url = CLEAN_SHEET[
-                    semester
-                ][dorm]
+    try:
+        url = CLEAN_SHEET[semester][dorm]
+        df = load_clean_sheet(url)
 
-                df = load_clean_sheet(url)
+        room_col = None
+        for c in df.columns:
+            if "房" in c:
+                room_col = c
+                break
 
-                room_col = None
+        if room_col:
+            res = df[
+                df[room_col].astype(str).str.strip() == room.strip()
+            ]
 
-                for c in df.columns:
+            if not res.empty:
 
-                    if "房" in c:
+                show_cols = [
+                    c for c in df.columns
+                    if ("房" in c or "學號" in c or "姓名" in c)
+                ]
 
-                        room_col = c
-                        break
+                temp = res[show_cols].copy()
+                temp["樓層"] = floor
 
-                if room_col:
+                result_list.append(temp)
 
-                    res = df[
-
-                        df[room_col]
-                        .astype(str)
-                        .str.strip()
-
-                        ==
-
-                        room.strip()
-
-                    ]
-
-                    if not res.empty:
-
-                        show_cols = []
-
-                        for c in df.columns:
-
-                            if (
-                                "房" in c
-                                or
-                                "學號" in c
-                                or
-                                "姓名" in c
-                            ):
-
-                                show_cols.append(c)
-
-                        temp = res[
-                            show_cols
-                        ].copy()
-
-                        temp["樓層"] = floor
-
-                        result_list.append(temp)
-
-            except Exception as e:
-
-                st.error(str(e))
+    except Exception as e:
+        st.error(str(e))
 
         # ==================================================
         # 顯示結果
