@@ -144,7 +144,7 @@ def load_users(sheet_name):
 
 if not st.session_state.login:
 
-    st.title("宿舍管理系統")
+    
 
     role = st.selectbox(
         "登入權限",
@@ -299,66 +299,60 @@ if not st.session_state.login:
 
 st.success(f"{st.session_state.get('role','')} / {st.session_state.get('user','')}")
 
-
 # ==================================================
 # 登出
 # ==================================================
 
-if st.button("登出"):
-
+if st.button("登出", key="logout_btn"):
     st.session_state.login = False
     st.session_state.role = ""
     st.session_state.user = ""
     st.session_state.dorm = ""
     st.session_state.is_main = False
-
     st.rerun()
 
 # ==================================================
-# 舍監 / 行政
+# ⭐⭐⭐ 必加：初始化 tab_names（你這裡原本是錯的）
+# ==================================================
+
+tab_names = []
+
+# ==================================================
+# 權限 Tabs
 # ==================================================
 
 if st.session_state.role in ["舍監", "行政"]:
-
     tab_names.extend([
         "連三天不假外宿",
         "每日缺席名單"
     ])
 
-# ==================================================
-# 行政
-# ==================================================
-
 if st.session_state.role == "行政":
-
     tab_names.extend([
         "上學期門禁",
         "下學期門禁",
         "整潔比賽(檢視)"
     ])
 
-# ==================================================
-# 樓長
-# ==================================================
-
 if st.session_state.role == "樓長":
-
     tab_names.append("每日缺席名單")
 
-    # ==================================================
-    # 總樓才有整潔比賽
-    # ==================================================
-
     if st.session_state.is_main:
-
         tab_names.append("整潔比賽")
+
+# ==================================================
+# ⭐⭐⭐ 防炸：如果沒 tab 直接 stop
+# ==================================================
+
+if len(tab_names) == 0:
+    st.warning("目前沒有可用功能")
+    st.stop()
 
 # ==================================================
 # 建立 Tabs
 # ==================================================
 
 tabs = st.tabs(tab_names)
-
 
 
 # ==================================================
@@ -1108,7 +1102,7 @@ FLOOR_OPTIONS = {
         "3F", "4F", "5F"
     ]
 }
-
+"女一": ...
 # ==================================================
 # 讀住宿名單
 # ==================================================
@@ -1197,10 +1191,10 @@ if "整潔比賽" in tab_names:
 
         for floor in floors:
 
-            room_inputs[floor] = st.text_input(
-                f"{floor} 房號",
-                key=f"{rank}_{floor}"
-            )
+        room_inputs[floor] = st.text_input(
+            f"{floor} 房號",
+            key=f"clean_{dorm}_{semester}_{contest}_{rank}_{floor}"
+        )
 
         # ==================================================
         # 顯示名單
@@ -1296,7 +1290,7 @@ if "整潔比賽" in tab_names:
             # 儲存
             # ==================================================
 
-            if st.button("儲存"):
+            if st.button("儲存", key=f"save_clean_{dorm}_{semester}_{contest}_{rank}"):
 
                 try:
 
