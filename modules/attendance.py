@@ -224,7 +224,43 @@ def save_rollcall(attendance_date, dorm, floor, data):
         ws.append_rows(rows)
 
 
+def get_dorm_gender(dorm):
+    dorm = str(dorm).replace("ㄧ", "一").strip()
+
+    if dorm.startswith("女"):
+        return "女生"
+
+    if dorm.startswith("男"):
+        return "男生"
+
+    return ""
+
+
+def get_login_dorm_options():
+    role = st.session_state.get("role", "")
+    dorm = st.session_state.get("dorm", "")
+    manage_dorms = st.session_state.get("manage_dorms", "")
+
+    if role == "樓長":
+
+        if manage_dorms:
+            dorms = [
+                d.strip().replace("ㄧ", "一")
+                for d in manage_dorms.replace("，", ",").split(",")
+                if d.strip()
+            ]
+        else:
+            dorms = [
+                str(dorm).strip().replace("ㄧ", "一")
+            ]
+
+        return list(dict.fromkeys(dorms))
+
+    return ["女一", "女二", "女三", "男一", "男三"]
+
+
 def show_attendance():
+
     st.header("點名系統")
 
     term = st.selectbox(
@@ -233,21 +269,21 @@ def show_attendance():
         key="attendance_term"
     )
 
-    gender = st.selectbox(
-        "性別",
-        ["女生", "男生"],
-        key="attendance_gender"
-    )
-
-    if gender == "女生":
-        dorm_options = ["女一", "女二", "女三"]
-    else:
-        dorm_options = ["男一", "男三"]
+    dorm_options = get_login_dorm_options()
 
     dorm = st.selectbox(
         "宿舍",
         dorm_options,
         key="attendance_dorm"
+    )
+
+    gender = get_dorm_gender(dorm)
+
+    st.text_input(
+        "性別",
+        value=gender,
+        disabled=True,
+        key="attendance_gender_show"
     )
 
     floors = FLOOR_OPTIONS.get(dorm, [])
@@ -267,8 +303,13 @@ def show_attendance():
     custom_url = ""
 
     if term in ["寒假", "暑假"]:
+
         folder_url = VACATION_FOLDERS[term][gender]
-        st.link_button("開啟雲端資料夾", folder_url)
+
+        st.link_button(
+            "開啟雲端資料夾",
+            folder_url
+        )
 
         custom_url = st.text_input(
             "請貼上寒假 / 暑假的床位試算表網址",
@@ -280,6 +321,7 @@ def show_attendance():
     st.info(f"將讀取 Sheet：{sheet_name}")
 
     if st.button("載入點名名單", key="load_attendance"):
+
         students = load_attendance_students(
             term,
             dorm,
@@ -308,6 +350,7 @@ def show_attendance():
     records = []
 
     for i, r in students.iterrows():
+
         cols = st.columns([1, 1, 1, 1, 1, 2])
 
         cols[0].write(r["房號"])
@@ -340,6 +383,7 @@ def show_attendance():
     st.divider()
 
     if st.button("儲存點名結果", key="save_attendance"):
+
         save_rollcall(
             attendance_date,
             dorm,
