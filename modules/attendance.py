@@ -21,7 +21,7 @@ creds = Credentials.from_service_account_info(
     st.secrets["google"],
     scopes=scope
 )
-)
+
 
 gc = gspread.authorize(creds)
 
