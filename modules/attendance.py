@@ -88,11 +88,10 @@ def normalize_value(value):
     if value.endswith(".0"):
         value = value[:-2]
 
+    if value in ["NAN", "NONE", "NA"]:
+        value = ""
+
     return value
-
-
-def normalize_text(value):
-    return str(value).strip()
 
 
 def get_dorm_gender(dorm):
@@ -113,7 +112,6 @@ def get_login_dorm_options():
     manage_dorms = st.session_state.get("manage_dorms", "")
 
     if role == "樓長":
-
         if manage_dorms:
             dorms = [
                 normalize_dorm(d)
@@ -184,6 +182,7 @@ def build_unique_headers(headers):
 def read_worksheet_df(ss, sheet_name):
     try:
         ws = ss.worksheet(sheet_name)
+
         values = ws.get_all_values(
             value_render_option="UNFORMATTED_VALUE"
         )
@@ -227,6 +226,19 @@ def find_col(df, keywords, exclude_keywords=None):
             if k in c_str:
                 if not any(ex in c_str for ex in exclude_keywords):
                     return c
+
+    return None
+
+
+def find_date_col(df, keywords):
+    columns = list(df.columns)
+
+    for k in keywords:
+        for c in columns:
+            c_str = str(c).strip()
+
+            if k in c_str:
+                return c
 
     return None
 
@@ -336,7 +348,7 @@ def load_attendance_students(term, dorm, floor):
 
 # ==================================================
 # 載入外宿 / 晚歸資料
-# 只用學號判斷
+# 完全用學號判斷
 # ==================================================
 
 @st.cache_data(ttl=300)
@@ -349,7 +361,7 @@ def load_special_status(term, attendance_date):
         long_leave_df = read_worksheet_df(ss, "長期外宿")
         late_df = read_worksheet_df(ss, "長期晚歸")
 
-        target_date = pd.to_datetime(attendance_date)
+        target_date = pd.to_datetime(attendance_date).date()
 
         outside_ids = set()
         late_ids = set()
@@ -360,31 +372,49 @@ def load_special_status(term, attendance_date):
 
         if not leave_df.empty:
             sid_col = find_col(leave_df, ["學號"])
-            start_col = find_col(
+
+            start_col = find_date_col(
                 leave_df,
-                ["申請日期", "開始日期", "起始日期", "日期"]
-            )
-            end_col = find_col(
-                leave_df,
-                ["結束日期", "迄日", "截止日期"]
+                [
+                    "申請日期",
+                    "開始日期",
+                    "起始日期",
+                    "外宿日期",
+                    "日期"
+                ]
             )
 
-            if sid_col and start_col and end_col:
+            end_col = find_date_col(
+                leave_df,
+                [
+                    "結束日期",
+                    "結束日",
+                    "迄日",
+                    "截止日期"
+                ]
+            )
+
+            if sid_col and start_col:
                 leave_df[start_col] = pd.to_datetime(
                     leave_df[start_col],
                     errors="coerce"
-                )
+                ).dt.date
 
-                leave_df[end_col] = pd.to_datetime(
-                    leave_df[end_col],
-                    errors="coerce"
-                )
+                if end_col:
+                    leave_df[end_col] = pd.to_datetime(
+                        leave_df[end_col],
+                        errors="coerce"
+                    ).dt.date
 
-                temp = leave_df[
-                    (leave_df[start_col] <= target_date)
-                    &
-                    (leave_df[end_col] >= target_date)
-                ]
+                    temp = leave_df[
+                        (leave_df[start_col] <= target_date)
+                        &
+                        (leave_df[end_col] >= target_date)
+                    ]
+                else:
+                    temp = leave_df[
+                        leave_df[start_col] == target_date
+                    ]
 
                 outside_ids.update(
                     temp[sid_col]
@@ -399,7 +429,7 @@ def load_special_status(term, attendance_date):
 
         if not long_leave_df.empty:
             sid_col = find_col(long_leave_df, ["學號"])
-            week_col = find_col(long_leave_df, ["星期"])
+            week_col = find_col(long_leave_df, ["星期", "外宿星期"])
 
             weekday_map = {
                 0: "一",
@@ -411,14 +441,19 @@ def load_special_status(term, attendance_date):
                 6: "日",
             }
 
-            weekday = weekday_map[target_date.weekday()]
+            weekday = weekday_map[
+                pd.to_datetime(attendance_date).weekday()
+            ]
 
-            if sid_col and week_col:
-                temp = long_leave_df[
-                    long_leave_df[week_col]
-                    .astype(str)
-                    .str.contains(weekday, na=False)
-                ]
+            if sid_col:
+                if week_col:
+                    temp = long_leave_df[
+                        long_leave_df[week_col]
+                        .astype(str)
+                        .str.contains(weekday, na=False)
+                    ]
+                else:
+                    temp = long_leave_df
 
                 outside_ids.update(
                     temp[sid_col]
@@ -601,6 +636,11 @@ def show_attendance():
             st.warning("查無學生資料")
         else:
             st.success(f"成功載入 {len(students)} 筆資料")
+
+            st.caption(
+                f"外宿 {len(special_status['outside_ids'])} 筆，"
+                f"晚歸 {len(special_status['late_ids'])} 筆"
+            )
 
     students = st.session_state.get(
         "attendance_students",
