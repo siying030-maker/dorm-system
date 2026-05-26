@@ -181,7 +181,6 @@ def query_clean(semester, dorm, rooms):
             continue
 
         sid_col = find_col(df, ["學號"])
-        class_col = find_col(df, ["班級", "班"])
         name_col = find_col(df, ["姓名", "名字"])
 
         df["_床位比對"] = df[bed_col].apply(normalize_room)
@@ -197,15 +196,19 @@ def query_clean(semester, dorm, rooms):
             continue
 
         temp = pd.DataFrame({
-            "樓層": [floor] * len(res),
             "房號": [room] * len(res),
-            "床位": res[bed_col].apply(normalize_room).tolist(),
             "學號": res[sid_col].astype(str).tolist() if sid_col else [""] * len(res),
-            "班級": res[class_col].astype(str).tolist() if class_col else [""] * len(res),
             "姓名": res[name_col].astype(str).tolist() if name_col else [""] * len(res),
         })
 
-        result.append(temp)
+        temp = temp[
+            temp["姓名"]
+            .astype(str)
+            .str.strip() != ""
+        ]
+
+        if not temp.empty:
+            result.append(temp)
 
     if result:
         return pd.concat(result, ignore_index=True)
@@ -216,15 +219,16 @@ def query_clean(semester, dorm, rooms):
 def save_clean_result(total, school_year, semester, contest, rank, dorm):
 
     dorm = normalize_dorm(dorm)
+    sheet_name = str(school_year).strip()
 
     ss = open_sheet(CLEAN_RESULT_URL)
 
     try:
-        ws = ss.worksheet("整潔比賽")
+        ws = ss.worksheet(sheet_name)
 
     except:
         ws = ss.add_worksheet(
-            title="整潔比賽",
+            title=sheet_name,
             rows=5000,
             cols=20
         )
@@ -235,26 +239,24 @@ def save_clean_result(total, school_year, semester, contest, rank, dorm):
             "次數",
             "名次",
             "宿舍",
-            "樓層",
             "房號",
-            "床位",
             "學號",
-            "班級",
             "姓名"
         ])
 
     for _, r in total.iterrows():
+
+        if str(r.get("姓名", "")).strip() == "":
+            continue
+
         ws.append_row([
             school_year,
             semester,
             contest,
             rank,
             dorm,
-            r.get("樓層", ""),
             r.get("房號", ""),
-            r.get("床位", ""),
             r.get("學號", ""),
-            r.get("班級", ""),
             r.get("姓名", "")
         ])
 
@@ -355,11 +357,8 @@ def show_clean():
     st.dataframe(
         total[
             [
-                "樓層",
                 "房號",
-                "床位",
                 "學號",
-                "班級",
                 "姓名"
             ]
         ],
@@ -397,7 +396,25 @@ def show_clean_view():
 
     try:
         ss = open_sheet(CLEAN_RESULT_URL)
-        ws = ss.worksheet("整潔比賽")
+
+        worksheets = ss.worksheets()
+
+        sheet_names = [
+            ws.title
+            for ws in worksheets
+        ]
+
+        if len(sheet_names) == 0:
+            st.info("尚無資料")
+            return
+
+        school_year = st.selectbox(
+            "學年",
+            sheet_names,
+            key="view_clean_school_year"
+        )
+
+        ws = ss.worksheet(school_year)
 
         values = ws.get_all_values()
 
