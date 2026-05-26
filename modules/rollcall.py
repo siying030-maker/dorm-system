@@ -5,17 +5,26 @@ from datetime import datetime
 from core.google_api import rate_limit
 
 
+# ==================================================
+# 載入點名資料
+# ==================================================
+
 @st.cache_data(ttl=300)
-def load_rollcall_data(rollcall_ss):
+def load_rollcall_data(_rollcall_ss):
 
     data = {}
 
-    for ws in rollcall_ss.worksheets():
+    for ws in _rollcall_ss.worksheets():
 
         try:
-            datetime.strptime(ws.title, "%Y-%m-%d")
+
+            datetime.strptime(
+                ws.title,
+                "%Y-%m-%d"
+            )
 
             rate_limit()
+
             values = ws.get_all_values()
 
             if len(values) <= 1:
@@ -26,7 +35,13 @@ def load_rollcall_data(rollcall_ss):
                 columns=values[0]
             )
 
-            df.columns = df.columns.str.strip()
+            df.columns = (
+                df.columns.str.strip()
+            )
+
+            # ==================================================
+            # 必須有狀態欄
+            # ==================================================
 
             if "狀態" not in df.columns:
                 continue
@@ -37,11 +52,24 @@ def load_rollcall_data(rollcall_ss):
                 .str.strip()
             )
 
+            # ==================================================
+            # 只保留 缺 / 未入住
+            # ==================================================
+
             df = df[
-                df["狀態"].isin(["缺", "未入住"])
+                df["狀態"]
+                .isin([
+                    "缺",
+                    "未入住"
+                ])
             ].copy()
 
+            # ==================================================
+            # 清除空姓名
+            # ==================================================
+
             if "姓名" in df.columns:
+
                 df = df[
                     df["姓名"]
                     .astype(str)
@@ -56,15 +84,29 @@ def load_rollcall_data(rollcall_ss):
     return data
 
 
-def get_month_and_search(data, key_prefix):
+# ==================================================
+# 顯示頁面
+# ==================================================
 
-    all_months = sorted(
-        list(set([d[:7] for d in data.keys()])),
-        reverse=True
-    )
+def show_rollcall(rollcall_ss, mode="daily"):
 
-    if len(all_months) == 0:
-        return None, ""
+    data = load_rollcall_data(rollcall_ss)
+
+    if len(data) == 0:
+        st.warning("沒有資料")
+        return
+
+    # ==================================================
+    # 月份
+    # ==================================================
+
+    all_months = sorted(list(set([
+
+        d[:7]
+
+        for d in data.keys()
+
+    ])), reverse=True)
 
     current_month = datetime.now().strftime("%Y-%m")
 
@@ -76,184 +118,221 @@ def get_month_and_search(data, key_prefix):
     month = st.selectbox(
         "月份",
         all_months,
-        index=default_index,
-        key=f"{key_prefix}_month"
+        index=default_index
     )
+
+    # ==================================================
+    # 搜尋
+    # ==================================================
 
     search = st.text_input(
         "搜尋學號 / 姓名",
-        key=f"{key_prefix}_search"
+        key=f"search_{mode}"
     )
 
-    return month, search
+    # ==================================================
+    # 日期
+    # ==================================================
 
+    dates = sorted([
 
-def show_daily(data, dates, search):
+        d for d in data.keys()
 
-    st.header("每日缺席名單")
+        if d.startswith(month)
 
-    found = False
+    ], reverse=True)
 
-    for d in dates:
+    # ==================================================
+    # 每日缺席名單
+    # ==================================================
 
-        df = data[d].copy()
+    if mode == "daily":
 
-        if search:
-            df = df[
-                df["學號"].astype(str).str.contains(search, na=False)
-                |
-                df["姓名"].astype(str).str.contains(search, na=False)
-            ]
+        st.header("每日缺席名單")
 
-        if df.empty:
-            continue
+        found = False
 
-        found = True
-
-        st.subheader(d)
-
-        show = df[["房號", "學號", "姓名"]]
-
-        unlive_ids = df[
-            df["狀態"] == "未入住"
-        ]["學號"].astype(str).tolist()
-
-        style_df = show.style.apply(
-            lambda row: [
-                "color:red;font-weight:bold"
-                if str(row["學號"]) in unlive_ids
-                else ""
-                for _ in row
-            ],
-            axis=1
-        )
-
-        st.dataframe(
-            style_df,
-            use_container_width=True
-        )
-
-    if not found:
-        st.info("本月無資料")
-
-
-def show_three_days(data, dates, search):
-
-    st.header("連三天不假外宿")
-
-    found = False
-
-    for i in range(len(dates) - 2):
-
-        group = dates[i:i + 3]
-
-        dfs = []
-
-        for d in group:
+        for d in dates:
 
             df = data[d].copy()
-            df["日期"] = d
-            dfs.append(df)
 
-        if len(dfs) == 0:
-            continue
+            # 搜尋
+            if search:
 
-        total = pd.concat(dfs)
+                df = df[
 
-        res = (
-            total.groupby(
+                    (
+                        df["學號"]
+                        .astype(str)
+                        .str.contains(search)
+                    )
+
+                    |
+
+                    (
+                        df["姓名"]
+                        .astype(str)
+                        .str.contains(search)
+                    )
+
+                ]
+
+            if df.empty:
+                continue
+
+            found = True
+
+            st.subheader(d)
+
+            show = df[
                 ["房號", "學號", "姓名"]
-            )["日期"]
-            .nunique()
-            .reset_index()
-        )
-
-        res = res[
-            res["日期"] == 3
-        ]
-
-        if search:
-            res = res[
-                res["學號"].astype(str).str.contains(search, na=False)
-                |
-                res["姓名"].astype(str).str.contains(search, na=False)
             ]
 
-        if res.empty:
-            continue
+            # ==================================================
+            # 未入住紅字
+            # ==================================================
 
-        found = True
+            unlive_ids = df[
+                df["狀態"] == "未入住"
+            ]["學號"].astype(str).tolist()
 
-        show = res[
-            ["房號", "學號", "姓名"]
-        ]
+            style_df = show.style.apply(
 
-        st.subheader(
-            f"{group[0]} ~ {group[-1]}"
-        )
+                lambda row: [
 
-        unlive_ids = []
+                    "color:red;font-weight:bold"
+                    if str(row["學號"]) in unlive_ids
+                    else ""
 
-        for d in group:
+                    for _ in row
 
-            temp = data[d]
+                ],
 
-            temp = temp[
-                temp["狀態"] == "未入住"
-            ]
-
-            unlive_ids.extend(
-                temp["學號"]
-                .astype(str)
-                .tolist()
+                axis=1
             )
 
-        style_df = show.style.apply(
-            lambda row: [
-                "color:red;font-weight:bold"
-                if str(row["學號"]) in unlive_ids
-                else ""
-                for _ in row
-            ],
-            axis=1
-        )
+            st.dataframe(
+                style_df,
+                use_container_width=True
+            )
 
-        st.dataframe(
-            style_df,
-            use_container_width=True
-        )
+        if not found:
+            st.info("本月無資料")
 
-    if not found:
-        st.info("無連續三天不假外宿")
+    # ==================================================
+    # 連三天不假外宿
+    # ==================================================
 
+    elif mode == "three_days":
 
-def show_rollcall(rollcall_ss, mode="daily"):
+        st.header("連三天不假外宿")
 
-    data = load_rollcall_data(rollcall_ss)
+        found = False
 
-    if len(data) == 0:
-        st.warning("沒有資料")
-        return
+        for i in range(len(dates) - 2):
 
-    month, search = get_month_and_search(
-        data,
-        key_prefix=mode
-    )
+            group = dates[i:i+3]
 
-    if month is None:
-        st.warning("沒有月份資料")
-        return
+            dfs = []
 
-    dates = sorted(
-        [
-            d for d in data.keys()
-            if d.startswith(month)
-        ],
-        reverse=True
-    )
+            for d in group:
 
-    if mode == "three_days":
-        show_three_days(data, dates, search)
+                df = data[d].copy()
 
-    else:
-        show_daily(data, dates, search)
+                df["日期"] = d
+
+                dfs.append(df)
+
+            total = pd.concat(dfs)
+
+            # ==================================================
+            # 連三天
+            # ==================================================
+
+            res = (
+                total.groupby(
+                    ["房號", "學號", "姓名"]
+                )["日期"]
+                .nunique()
+                .reset_index()
+            )
+
+            res = res[
+                res["日期"] == 3
+            ]
+
+            # 搜尋
+            if search:
+
+                res = res[
+
+                    (
+                        res["學號"]
+                        .astype(str)
+                        .str.contains(search)
+                    )
+
+                    |
+
+                    (
+                        res["姓名"]
+                        .astype(str)
+                        .str.contains(search)
+                    )
+
+                ]
+
+            if not res.empty:
+
+                found = True
+
+                show = res[
+                    ["房號", "學號", "姓名"]
+                ]
+
+                st.subheader(
+                    f"{group[0]} ~ {group[-1]}"
+                )
+
+                # ==================================================
+                # 未入住紅字
+                # ==================================================
+
+                unlive_ids = []
+
+                for d in group:
+
+                    temp = data[d]
+
+                    temp = temp[
+                        temp["狀態"] == "未入住"
+                    ]
+
+                    unlive_ids.extend(
+                        temp["學號"]
+                        .astype(str)
+                        .tolist()
+                    )
+
+                style_df = show.style.apply(
+
+                    lambda row: [
+
+                        "color:red;font-weight:bold"
+                        if str(row["學號"]) in unlive_ids
+                        else ""
+
+                        for _ in row
+
+                    ],
+
+                    axis=1
+                )
+
+                st.dataframe(
+                    style_df,
+                    use_container_width=True
+                )
+
+        if not found:
+            st.info("無連續三天不假外宿")
