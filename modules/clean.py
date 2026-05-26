@@ -34,6 +34,15 @@ FLOOR_OPTIONS = {
     "男三": ["3F", "4F", "5F"]
 }
 
+DORM_PREFIX = {
+    "女一": "81",
+    "女ㄧ": "81",
+    "女二": "82",
+    "女三": "83",
+    "男一": "82",
+    "男三": "83"
+}
+
 
 def normalize_dorm(dorm):
     return str(dorm).strip().replace("ㄧ", "一")
@@ -41,30 +50,33 @@ def normalize_dorm(dorm):
 
 def normalize_room(value):
     value = str(value).strip()
-
     if value.endswith(".0"):
         value = value[:-2]
-
     return value
 
 
+def get_floor_sheet_name(dorm, floor):
+    dorm = normalize_dorm(dorm)
+    prefix = DORM_PREFIX.get(dorm, "")
+    return f"{prefix}-{floor}"
+
+
 @st.cache_data(ttl=1800)
-def load_clean_sheet(url):
+def load_clean_floor_sheet(url, sheet_name):
     try:
         ss = open_sheet(url)
-        ws = ss.sheet1
+        ws = ss.worksheet(sheet_name)
 
         df = pd.DataFrame(ws.get_all_records())
         df.columns = df.columns.str.strip()
 
         return df
 
-    except:
+    except Exception:
         return pd.DataFrame()
 
 
 def get_manage_dorm_options():
-
     manage_dorms = st.session_state.get("manage_dorms", "")
 
     if manage_dorms:
@@ -81,17 +93,15 @@ def get_manage_dorm_options():
     return list(dict.fromkeys(dorm_options))
 
 
-def find_room_column(df):
-
+def find_col(df, keywords):
     for c in df.columns:
-        if "房" in c:
-            return c
-
+        for k in keywords:
+            if k in c:
+                return c
     return None
 
 
 def query_clean(semester, dorm, rooms):
-
     dorm = normalize_dorm(dorm)
 
     if semester not in CLEAN_SHEET:
@@ -102,54 +112,70 @@ def query_clean(semester, dorm, rooms):
         st.warning(f"找不到 {dorm} 的住宿名單連結")
         return pd.DataFrame()
 
-    df = load_clean_sheet(CLEAN_SHEET[semester][dorm])
-
-    if df.empty:
-        st.warning("住宿名單是空的，或無法讀取 Google Sheet")
-        return pd.DataFrame()
-
-    room_col = find_room_column(df)
-
-    if room_col is None:
-        st.warning("住宿名單找不到房號欄位")
-        st.write("目前欄位：", list(df.columns))
-        return pd.DataFrame()
-
-    df["_房號比對"] = df[room_col].apply(normalize_room)
-
     result = []
 
-    for floor, room in rooms.items():
+    url = CLEAN_SHEET[semester][dorm]
 
+    for floor, room in rooms.items():
         room = normalize_room(room)
 
         if room == "":
             continue
 
+        sheet_name = get_floor_sheet_name(dorm, floor)
+        df = load_clean_floor_sheet(url, sheet_name)
+
+        if df.empty:
+            st.warning(f"{floor} 找不到 Sheet：{sheet_name}，或此 Sheet 沒資料")
+            continue
+
+        room_col = find_col(df, ["房號", "房"])
+        sid_col = find_col(df, ["學號"])
+        class_col = find_col(df, ["班級", "班"])
+        name_col = find_col(df, ["姓名", "名字"])
+
+        if room_col is None:
+            st.warning(f"{sheet_name} 找不到房號欄位")
+            st.write("目前欄位：", list(df.columns))
+            continue
+
+        df["_房號比對"] = df[room_col].apply(normalize_room)
+
         res = df[df["_房號比對"] == room]
 
         if res.empty:
-            st.warning(f"{floor} 查無房號：{room}")
+            st.warning(f"{sheet_name} 查無房號：{room}")
             continue
 
-        show_cols = [
-            c for c in df.columns
-            if "房" in c or "學號" in c or "姓名" in c
-        ]
+        temp = pd.DataFrame()
 
-        temp = res[show_cols].copy()
         temp["樓層"] = floor
+        temp["房號"] = res[room_col].apply(normalize_room)
+
+        if sid_col:
+            temp["學號"] = res[sid_col].astype(str)
+        else:
+            temp["學號"] = ""
+
+        if class_col:
+            temp["班級"] = res[class_col].astype(str)
+        else:
+            temp["班級"] = ""
+
+        if name_col:
+            temp["姓名"] = res[name_col].astype(str)
+        else:
+            temp["姓名"] = ""
 
         result.append(temp)
 
-    if len(result) > 0:
+    if result:
         return pd.concat(result, ignore_index=True)
 
     return pd.DataFrame()
 
 
 def save_clean_result(total, school_year, semester, contest, rank, dorm):
-
     dorm = normalize_dorm(dorm)
 
     ss = open_sheet(CLEAN_RESULT_URL)
@@ -172,41 +198,26 @@ def save_clean_result(total, school_year, semester, contest, rank, dorm):
             "樓層",
             "房號",
             "學號",
+            "班級",
             "姓名"
         ])
 
     for _, r in total.iterrows():
-
-        room_value = ""
-        sid_value = ""
-        name_value = ""
-
-        for c in total.columns:
-
-            if "房" in c:
-                room_value = r[c]
-
-            if "學號" in c:
-                sid_value = r[c]
-
-            if "姓名" in c:
-                name_value = r[c]
-
         ws.append_row([
             school_year,
             semester,
             contest,
             rank,
             dorm,
-            r["樓層"],
-            room_value,
-            sid_value,
-            name_value
+            r.get("樓層", ""),
+            r.get("房號", ""),
+            r.get("學號", ""),
+            r.get("班級", ""),
+            r.get("姓名", "")
         ])
 
 
 def show_clean():
-
     st.header("整潔比賽")
 
     dorm_options = get_manage_dorm_options()
@@ -259,8 +270,10 @@ def show_clean():
     rooms = {}
 
     for floor in floors:
+        sheet_name = get_floor_sheet_name(dorm, floor)
+
         rooms[floor] = st.text_input(
-            f"{floor} 房號",
+            f"{floor} 房號（讀取 {sheet_name}）",
             key=f"clean_room_{dorm}_{floor}_{semester}_{contest}_{rank}"
         )
 
@@ -270,7 +283,6 @@ def show_clean():
         "查詢名單",
         key=f"query_clean_{dorm}_{semester}_{contest}_{rank}"
     ):
-
         total = query_clean(
             semester,
             dorm,
@@ -280,7 +292,7 @@ def show_clean():
         st.session_state[query_key] = total
 
         if total.empty:
-            st.warning("查無資料，請確認房號是否存在於該宿舍住宿名單")
+            st.warning("查無資料，請確認房號是否存在於該樓層 Sheet")
         else:
             st.success("查詢成功")
 
@@ -297,7 +309,7 @@ def show_clean():
     st.subheader("名單確認")
 
     st.dataframe(
-        total,
+        total[["樓層", "房號", "學號", "班級", "姓名"]],
         use_container_width=True
     )
 
@@ -327,7 +339,6 @@ def show_clean():
 
 
 def show_clean_view():
-
     st.header("整潔比賽(檢視)")
 
     try:
