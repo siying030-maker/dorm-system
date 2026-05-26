@@ -22,7 +22,6 @@ creds = Credentials.from_service_account_info(
     scopes=scope
 )
 
-
 gc = gspread.authorize(creds)
 
 
@@ -291,7 +290,7 @@ def load_attendance_students(
     )
 
     df.columns = (
-        df.columns
+        pd.Index(df.columns)
         .astype(str)
         .str.strip()
     )
@@ -408,6 +407,7 @@ def load_attendance_students(
 
         result["房號"] = (
             result["床位"]
+            .astype(str)
             .str.split("-")
             .str[0]
         )
