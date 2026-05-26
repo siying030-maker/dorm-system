@@ -240,7 +240,7 @@ def get_attendance_url(term, dorm):
 
 
 # ==================================================
-# 建立唯一欄位名稱（修正 .str error）
+# 建立唯一欄位名稱
 # ==================================================
 
 def build_unique_headers(headers):
@@ -255,7 +255,6 @@ def build_unique_headers(headers):
         if h in used:
 
             used[h] += 1
-
             h = f"{h}_{used[h]}"
 
         else:
@@ -289,25 +288,27 @@ def load_attendance_students(
     # ==================================================
     # 寒暑假
     # ==================================================
-if term in ["寒假", "暑假"]:
 
-    worksheets = sh.worksheets()
+    if term in ["寒假", "暑假"]:
 
-    ws = None
+        worksheets = sh.worksheets()
 
-    for w in worksheets:
+        ws = None
 
-        title = str(w.title)
+        for w in worksheets:
 
-        if dorm in title:
+            title = str(w.title)
 
-            ws = w
-            break
+            if dorm in title:
 
-    if ws is None:
-        ws = worksheets[0]
+                ws = w
+                break
 
-    st.write("目前讀取 Sheet：", ws.title)
+        if ws is None:
+
+            ws = worksheets[0]
+
+        st.write("目前讀取 Sheet：", ws.title)
 
     # ==================================================
     # 上下學期
@@ -360,20 +361,14 @@ if term in ["寒假", "暑假"]:
 
             c_str = str(c).strip()
 
-            if room_col is None:
+            if room_col is None and "房號" in c_str:
+                room_col = c
 
-                if "房號" in c_str:
-                    room_col = c
+            if sid_col is None and "學號" in c_str:
+                sid_col = c
 
-            if sid_col is None:
-
-                if "學號" in c_str:
-                    sid_col = c
-
-            if name_col is None:
-
-                if "姓名" in c_str:
-                    name_col = c
+            if name_col is None and "姓名" in c_str:
+                name_col = c
 
         if room_col is None:
             return pd.DataFrame()
@@ -423,24 +418,20 @@ if term in ["寒假", "暑假"]:
 
             c_str = str(c).strip()
 
-            if room_col is None:
+            if room_col is None and "床位" in c_str:
+                room_col = c
 
-                if "床位" in c_str:
-                    room_col = c
+            if (
+                sid_col is None
+                and
+                "學號" in c_str
+                and
+                "替代" not in c_str
+            ):
+                sid_col = c
 
-            if sid_col is None:
-
-                if (
-                    "學號" in c_str
-                    and
-                    "替代" not in c_str
-                ):
-                    sid_col = c
-
-            if name_col is None:
-
-                if "姓名" in c_str:
-                    name_col = c
+            if name_col is None and "姓名" in c_str:
+                name_col = c
 
         if room_col is None:
             return pd.DataFrame()
