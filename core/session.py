@@ -7,7 +7,8 @@ def init_session():
         "role": "",
         "user": "",
         "dorm": "",
-        "is_main": False
+        "is_main": False,
+        "manage_dorms": ""
     }
 
     for key, value in defaults.items():

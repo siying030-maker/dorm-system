@@ -9,6 +9,7 @@ CLEAN_SHEET = {
         "男一": "https://docs.google.com/spreadsheets/d/1S2axgu2BWP8HnEs0RJdDcccdD1bvPdH26qrx3c4DeWo/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1RcRTslmv4s_C_7AH-WuqtLrty9l0A7YECvaGJETnpis/edit",
         "女一": "https://docs.google.com/spreadsheets/d/1U9bdg8CWASheYE7XxLt5p-otLDxKiotju4s72Car9rk/edit",
+        "女ㄧ": "https://docs.google.com/spreadsheets/d/1U9bdg8CWASheYE7XxLt5p-otLDxKiotju4s72Car9rk/edit",
         "女二": "https://docs.google.com/spreadsheets/d/1jNbe--UINl7NS6dpBU82AZJuT6wQ9VwVAlglyG7infQ/edit",
         "女三": "https://docs.google.com/spreadsheets/d/1Vrst2-bqPE7flCIXeAI-lyN51Os9QwStx388DWx11w8/edit"
     },
@@ -16,6 +17,7 @@ CLEAN_SHEET = {
         "男一": "https://docs.google.com/spreadsheets/d/1JSJx0cLdUxfIeYoe6dldeBe3Xeewm3uuIYrJkeYi_A8/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1KpqeWBWIR0g6RxZ_oFUFXbn34PbH7r18UI9NBsfWIPY/edit",
         "女一": "https://docs.google.com/spreadsheets/d/1Nf7U106SxRZUu1pb35Fu2xrN2BTV80lit43BcgE6GnA/edit",
+        "女ㄧ": "https://docs.google.com/spreadsheets/d/1Nf7U106SxRZUu1pb35Fu2xrN2BTV80lit43BcgE6GnA/edit",
         "女二": "https://docs.google.com/spreadsheets/d/1NVt6M8SVc64zmRmxh268NlZqzT3JLpcGwuRBlkCe8oE/edit",
         "女三": "https://docs.google.com/spreadsheets/d/1y2YB118Xg2Mq8w6NeabTXgZ-n1gN56kCalyJ5KlMk1I/edit"
     }
@@ -25,6 +27,7 @@ CLEAN_RESULT_URL = "https://docs.google.com/spreadsheets/d/1ojWln4x5MGTqZZfGe3yS
 
 FLOOR_OPTIONS = {
     "女一": ["1F", "2F", "3F", "5F", "6F", "7F"],
+    "女ㄧ": ["1F", "2F", "3F", "5F", "6F", "7F"],
     "女二": ["1F", "2F", "3F"],
     "女三": ["6F"],
     "男一": ["MB", "1F", "2F", "3F", "4F", "5F"],
@@ -32,19 +35,48 @@ FLOOR_OPTIONS = {
 }
 
 
+def normalize_dorm(dorm):
+    return str(dorm).strip().replace("ㄧ", "一")
+
+
 @st.cache_data(ttl=300)
 def load_clean_sheet(url):
     try:
         ss = open_sheet(url)
         ws = ss.sheet1
+
         df = pd.DataFrame(ws.get_all_records())
         df.columns = df.columns.str.strip()
+
         return df
+
     except:
         return pd.DataFrame()
 
 
+def get_manage_dorm_options():
+
+    manage_dorms = st.session_state.get("manage_dorms", "")
+
+    if manage_dorms:
+        dorm_options = [
+            normalize_dorm(d)
+            for d in manage_dorms.replace("，", ",").split(",")
+            if d.strip()
+        ]
+    else:
+        dorm_options = [
+            normalize_dorm(st.session_state.get("dorm", ""))
+        ]
+
+    dorm_options = list(dict.fromkeys(dorm_options))
+
+    return dorm_options
+
+
 def query_clean(semester, dorm, rooms):
+
+    dorm = normalize_dorm(dorm)
 
     if semester not in CLEAN_SHEET:
         return pd.DataFrame()
@@ -104,6 +136,8 @@ def query_clean(semester, dorm, rooms):
 
 def save_clean_result(total, school_year, semester, contest, rank, dorm):
 
+    dorm = normalize_dorm(dorm)
+
     ss = open_sheet(CLEAN_RESULT_URL)
 
     try:
@@ -161,7 +195,17 @@ def show_clean():
 
     st.header("整潔比賽")
 
-    dorm = st.session_state.dorm
+    dorm_options = get_manage_dorm_options()
+
+    if len(dorm_options) == 0:
+        st.warning("沒有可管理的宿舍")
+        return
+
+    dorm = st.selectbox(
+        "宿舍",
+        dorm_options,
+        key="clean_dorm_select"
+    )
 
     st.subheader(f"宿舍：{dorm}")
 

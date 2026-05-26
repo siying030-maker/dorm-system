@@ -30,6 +30,10 @@ def login_page():
         ["舍監", "行政", "樓長"]
     )
 
+    # ==================================================
+    # 舍監 / 行政
+    # ==================================================
+
     if role in ["舍監", "行政"]:
 
         user_df = load_users(role)
@@ -73,11 +77,16 @@ def login_page():
                 st.session_state.user = username
                 st.session_state.dorm = ""
                 st.session_state.is_main = False
+                st.session_state.manage_dorms = ""
 
                 st.rerun()
 
             else:
                 st.error("密碼錯誤")
+
+    # ==================================================
+    # 樓長
+    # ==================================================
 
     if role == "樓長":
 
@@ -142,8 +151,14 @@ def login_page():
                 st.session_state.login = True
                 st.session_state.role = "樓長"
                 st.session_state.user = username
+
                 st.session_state.dorm = str(row.iloc[0]).strip()
                 st.session_state.is_main = str(row.iloc[3]).strip() == "是"
+
+                if len(row) >= 5:
+                    st.session_state.manage_dorms = str(row.iloc[4]).strip()
+                else:
+                    st.session_state.manage_dorms = str(row.iloc[0]).strip()
 
                 st.rerun()
 
