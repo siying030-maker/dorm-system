@@ -39,6 +39,15 @@ def normalize_dorm(dorm):
     return str(dorm).strip().replace("ㄧ", "一")
 
 
+def normalize_room(value):
+    value = str(value).strip()
+
+    if value.endswith(".0"):
+        value = value[:-2]
+
+    return value
+
+
 @st.cache_data(ttl=300)
 def load_clean_sheet(url):
     try:
@@ -69,9 +78,7 @@ def get_manage_dorm_options():
             normalize_dorm(st.session_state.get("dorm", ""))
         ]
 
-    dorm_options = list(dict.fromkeys(dorm_options))
-
-    return dorm_options
+    return list(dict.fromkeys(dorm_options))
 
 
 def query_clean(semester, dorm, rooms):
@@ -84,38 +91,34 @@ def query_clean(semester, dorm, rooms):
     if dorm not in CLEAN_SHEET[semester]:
         return pd.DataFrame()
 
-    df = load_clean_sheet(
-        CLEAN_SHEET[semester][dorm]
-    )
+    df = load_clean_sheet(CLEAN_SHEET[semester][dorm])
 
     if df.empty:
         return pd.DataFrame()
 
     result = []
 
+    room_col = next(
+        (c for c in df.columns if "房" in c),
+        None
+    )
+
+    if room_col is None:
+        return pd.DataFrame()
+
+    df["_房號比對"] = df[room_col].apply(normalize_room)
+
     for floor, room in rooms.items():
 
-        room = str(room).strip()
+        room = normalize_room(room)
 
         if room == "":
             continue
 
-        room_col = next(
-            (c for c in df.columns if "房" in c),
-            None
-        )
-
-        if room_col is None:
-            continue
-
-        res = df[
-            df[room_col]
-            .astype(str)
-            .str.strip()
-            == room
-        ]
+        res = df[df["_房號比對"] == room]
 
         if res.empty:
+            st.warning(f"{floor} 查無房號：{room}")
             continue
 
         show_cols = [
@@ -328,19 +331,13 @@ def show_clean_view():
         )
 
         if semester != "全部":
-            df = df[
-                df["學期"] == semester
-            ]
+            df = df[df["學期"] == semester]
 
         if contest != "全部":
-            df = df[
-                df["次數"] == contest
-            ]
+            df = df[df["次數"] == contest]
 
         if rank != "全部":
-            df = df[
-                df["名次"] == rank
-            ]
+            df = df[df["名次"] == rank]
 
         st.dataframe(
             df,
