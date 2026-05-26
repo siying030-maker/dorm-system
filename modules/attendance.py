@@ -1,5 +1,6 @@
 # modules/attendance.py
 
+import time
 import streamlit as st
 import pandas as pd
 import gspread
@@ -267,8 +268,10 @@ def build_unique_headers(headers):
 
 
 # ==================================================
-# 載入點名名單
+# 讀取 Google Sheet（快取）
 # ==================================================
+
+@st.cache_data(ttl=300)
 
 def load_attendance_students(
     term,
@@ -276,184 +279,225 @@ def load_attendance_students(
     floor
 ):
 
-    url = get_attendance_url(term, dorm)
+    try:
 
-    if url == "":
-        return pd.DataFrame()
+        url = get_attendance_url(
+            term,
+            dorm
+        )
 
-    sheet_id = extract_sheet_id(url)
-
-    sh = gc.open_by_key(sheet_id)
-
-    # ==================================================
-    # 統一讀取樓層 Sheet
-    # ==================================================
-
-    sheet_name = get_floor_sheet_name(
-        dorm,
-        floor
-    )
-
-    ws = sh.worksheet(sheet_name)
-
-    st.info(f"目前讀取 Sheet：{sheet_name}")
-
-    values = ws.get_all_values()
-
-    if len(values) <= 1:
-        return pd.DataFrame()
-
-    headers = build_unique_headers(
-        values[0]
-    )
-
-    df = pd.DataFrame(
-        values[1:],
-        columns=headers
-    )
-
-    df.columns = (
-        pd.Index(df.columns)
-        .astype(str)
-        .str.strip()
-    )
-
-    # ==================================================
-    # 寒暑假格式
-    # ==================================================
-
-    if term in ["寒假", "暑假"]:
-
-        room_col = None
-        sid_col = None
-        name_col = None
-
-        for c in df.columns:
-
-            c_str = str(c).strip()
-
-            if room_col is None and "房號" in c_str:
-                room_col = c
-
-            if sid_col is None and "學號" in c_str:
-                sid_col = c
-
-            if name_col is None and "姓名" in c_str:
-                name_col = c
-
-        if room_col is None:
+        if url == "":
             return pd.DataFrame()
 
-        if name_col is None:
+        sheet_id = extract_sheet_id(url)
+
+        # ==================================================
+        # API 保護
+        # ==================================================
+
+        time.sleep(1)
+
+        sh = gc.open_by_key(sheet_id)
+
+        # ==================================================
+        # 統一樓層 Sheet
+        # ==================================================
+
+        sheet_name = get_floor_sheet_name(
+            dorm,
+            floor
+        )
+
+        ws = sh.worksheet(sheet_name)
+
+        values = ws.get_all_values(
+            value_render_option="UNFORMATTED_VALUE"
+        )
+
+        if len(values) <= 1:
             return pd.DataFrame()
 
-        result = pd.DataFrame()
+        # ==================================================
+        # 修正重複欄位
+        # ==================================================
 
-        result["房號"] = (
-            df[room_col]
+        headers = build_unique_headers(
+            values[0]
+        )
+
+        df = pd.DataFrame(
+            values[1:],
+            columns=headers
+        )
+
+        df.columns = (
+            pd.Index(df.columns)
             .astype(str)
             .str.strip()
         )
 
-        result["床位"] = ""
+        # ==================================================
+        # 寒暑假格式
+        # ==================================================
 
-        if sid_col:
+        if term in ["寒假", "暑假"]:
 
-            result["學號"] = (
-                df[sid_col]
+            room_col = None
+            sid_col = None
+            name_col = None
+
+            for c in df.columns:
+
+                c_str = str(c).strip()
+
+                if (
+                    room_col is None
+                    and
+                    "房號" in c_str
+                ):
+                    room_col = c
+
+                if (
+                    sid_col is None
+                    and
+                    "學號" in c_str
+                ):
+                    sid_col = c
+
+                if (
+                    name_col is None
+                    and
+                    "姓名" in c_str
+                ):
+                    name_col = c
+
+            if room_col is None:
+                return pd.DataFrame()
+
+            if name_col is None:
+                return pd.DataFrame()
+
+            result = pd.DataFrame()
+
+            result["房號"] = (
+                df[room_col]
                 .astype(str)
                 .str.strip()
             )
 
-        else:
+            result["床位"] = ""
 
-            result["學號"] = ""
+            if sid_col:
 
-        result["姓名"] = (
-            df[name_col]
-            .astype(str)
-            .str.strip()
-        )
+                result["學號"] = (
+                    df[sid_col]
+                    .astype(str)
+                    .str.strip()
+                )
 
-    # ==================================================
-    # 上下學期格式
-    # ==================================================
+            else:
 
-    else:
+                result["學號"] = ""
 
-        room_col = None
-        sid_col = None
-        name_col = None
-
-        for c in df.columns:
-
-            c_str = str(c).strip()
-
-            if room_col is None and "床位" in c_str:
-                room_col = c
-
-            if (
-                sid_col is None
-                and
-                "學號" in c_str
-                and
-                "替代" not in c_str
-            ):
-                sid_col = c
-
-            if name_col is None and "姓名" in c_str:
-                name_col = c
-
-        if room_col is None:
-            return pd.DataFrame()
-
-        if name_col is None:
-            return pd.DataFrame()
-
-        result = pd.DataFrame()
-
-        result["床位"] = (
-            df[room_col]
-            .astype(str)
-            .str.strip()
-        )
-
-        result["房號"] = (
-            result["床位"]
-            .astype(str)
-            .str.split("-")
-            .str[0]
-        )
-
-        if sid_col:
-
-            result["學號"] = (
-                df[sid_col]
+            result["姓名"] = (
+                df[name_col]
                 .astype(str)
                 .str.strip()
             )
 
+        # ==================================================
+        # 上下學期格式
+        # ==================================================
+
         else:
 
-            result["學號"] = ""
+            room_col = None
+            sid_col = None
+            name_col = None
 
-        result["姓名"] = (
-            df[name_col]
-            .astype(str)
-            .str.strip()
-        )
+            for c in df.columns:
 
-    # ==================================================
-    # 清除空白
-    # ==================================================
+                c_str = str(c).strip()
 
-    result = result[
-        result["姓名"] != ""
-    ]
+                if (
+                    room_col is None
+                    and
+                    "床位" in c_str
+                ):
+                    room_col = c
 
-    return result[
-        ["房號", "床位", "學號", "姓名"]
-    ]
+                if (
+                    sid_col is None
+                    and
+                    "學號" in c_str
+                    and
+                    "替代" not in c_str
+                ):
+                    sid_col = c
+
+                if (
+                    name_col is None
+                    and
+                    "姓名" in c_str
+                ):
+                    name_col = c
+
+            if room_col is None:
+                return pd.DataFrame()
+
+            if name_col is None:
+                return pd.DataFrame()
+
+            result = pd.DataFrame()
+
+            result["床位"] = (
+                df[room_col]
+                .astype(str)
+                .str.strip()
+            )
+
+            result["房號"] = (
+                result["床位"]
+                .astype(str)
+                .str.split("-")
+                .str[0]
+            )
+
+            if sid_col:
+
+                result["學號"] = (
+                    df[sid_col]
+                    .astype(str)
+                    .str.strip()
+                )
+
+            else:
+
+                result["學號"] = ""
+
+            result["姓名"] = (
+                df[name_col]
+                .astype(str)
+                .str.strip()
+            )
+
+        # ==================================================
+        # 清除空白
+        # ==================================================
+
+        result = result[
+            result["姓名"] != ""
+        ]
+
+        return result[
+            ["房號", "床位", "學號", "姓名"]
+        ]
+
+    except Exception as e:
+
+        st.error(f"讀取失敗：{e}")
+
+        return pd.DataFrame()
 
 
 # ==================================================
@@ -471,6 +515,10 @@ def show_attendance():
     )
 
     dorm_options = get_login_dorm_options()
+
+    # ==================================================
+    # 寒暑假限制宿舍
+    # ==================================================
 
     if term in ["寒假", "暑假"]:
 
@@ -513,35 +561,31 @@ def show_attendance():
         value=date.today()
     )
 
+    # ==================================================
+    # 載入名單
+    # ==================================================
+
     if st.button("載入點名名單"):
 
-        try:
+        students = load_attendance_students(
+            term,
+            dorm,
+            floor
+        )
 
-            students = load_attendance_students(
-                term,
-                dorm,
-                floor
+        st.session_state[
+            "attendance_students"
+        ] = students
+
+        if students.empty:
+
+            st.warning("查無學生資料")
+
+        else:
+
+            st.success(
+                f"成功載入 {len(students)} 筆資料"
             )
-
-            st.session_state[
-                "attendance_students"
-            ] = students
-
-            if students.empty:
-
-                st.warning(
-                    "查無學生資料"
-                )
-
-            else:
-
-                st.success(
-                    f"成功載入 {len(students)} 筆資料"
-                )
-
-        except Exception as e:
-
-            st.error(str(e))
 
     students = st.session_state.get(
         "attendance_students",
@@ -559,7 +603,9 @@ def show_attendance():
 
     for i, row in students.iterrows():
 
-        cols = st.columns([1, 1, 1, 1, 1])
+        cols = st.columns(
+            [1, 1, 1, 1, 1]
+        )
 
         cols[0].write(row["房號"])
         cols[1].write(row["學號"])
