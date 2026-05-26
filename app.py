@@ -14,12 +14,6 @@ from modules.gate import show_gate
 from modules.clean import show_clean, show_clean_view
 
 
-
-
-# ==================================================
-# 基本設定
-# ==================================================
-
 st.set_page_config(
     page_title="宿舍管理系統",
     layout="wide"
@@ -29,19 +23,9 @@ st.title("宿舍管理系統")
 
 init_session()
 
-
-# ==================================================
-# 登入
-# ==================================================
-
 if not st.session_state.login:
     login_page()
     st.stop()
-
-
-# ==================================================
-# 登入成功 / 登出
-# ==================================================
 
 st.success(
     f"{st.session_state.role} / {st.session_state.user}"
@@ -50,20 +34,6 @@ st.success(
 if st.button("登出", key="logout_btn"):
     st.session_state.clear()
     st.rerun()
-
-
-# ==================================================
-# 開啟 Google Sheets
-# ==================================================
-
-rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
-upper_ss = open_sheet(UPPER_GATE_URL)
-lower_ss = open_sheet(LOWER_GATE_URL)
-
-
-# ==================================================
-# Tabs
-# ==================================================
 
 tab_names = build_tabs(
     st.session_state.role,
@@ -76,13 +46,9 @@ if not tab_names:
 
 tabs = st.tabs(tab_names)
 
-
-# ==================================================
-# 分頁內容
-# ==================================================
-
 if "連三天不假外宿" in tab_names:
     with tabs[tab_names.index("連三天不假外宿")]:
+        rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
         show_rollcall(
             rollcall_ss,
             mode="three_days"
@@ -90,6 +56,7 @@ if "連三天不假外宿" in tab_names:
 
 if "每日缺席名單" in tab_names:
     with tabs[tab_names.index("每日缺席名單")]:
+        rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
         show_rollcall(
             rollcall_ss,
             mode="daily"
@@ -97,6 +64,7 @@ if "每日缺席名單" in tab_names:
 
 if "上學期門禁" in tab_names:
     with tabs[tab_names.index("上學期門禁")]:
+        upper_ss = open_sheet(UPPER_GATE_URL)
         show_gate(
             "上學期門禁",
             upper_ss,
@@ -105,6 +73,7 @@ if "上學期門禁" in tab_names:
 
 if "下學期門禁" in tab_names:
     with tabs[tab_names.index("下學期門禁")]:
+        lower_ss = open_sheet(LOWER_GATE_URL)
         show_gate(
             "下學期門禁",
             lower_ss,

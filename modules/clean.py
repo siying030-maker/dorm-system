@@ -48,7 +48,7 @@ def normalize_room(value):
     return value
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=1800)
 def load_clean_sheet(url):
     try:
         ss = open_sheet(url)
@@ -253,14 +253,24 @@ def show_clean():
             key=f"clean_room_{dorm}_{floor}_{semester}_{contest}_{rank}"
         )
 
-    total = query_clean(
-        semester,
-        dorm,
-        rooms
+    if st.button(
+        "查詢名單",
+        key=f"query_clean_{dorm}_{semester}_{contest}_{rank}"
+    ):
+
+        st.session_state.clean_query_result = query_clean(
+            semester,
+            dorm,
+            rooms
+        )
+
+    total = st.session_state.get(
+        "clean_query_result",
+        pd.DataFrame()
     )
 
     if total.empty:
-        st.info("請輸入房號查詢資料")
+        st.info("請輸入房號後按「查詢名單」")
         return
 
     st.divider()

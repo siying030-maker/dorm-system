@@ -3,7 +3,7 @@ import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
 
-CACHE_TTL = 300
+CACHE_TTL = 3600
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -14,7 +14,6 @@ _last_call = 0
 
 def rate_limit():
     global _last_call
-
     now = time.time()
 
     if now - _last_call < 0.3:
@@ -29,7 +28,6 @@ def get_client():
         st.secrets["google"],
         scopes=SCOPES
     )
-
     return gspread.authorize(creds)
 
 

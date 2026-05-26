@@ -5,7 +5,7 @@ from datetime import datetime
 from core.google_api import rate_limit
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=1800)
 def load_rollcall_data(_rollcall_ss):
 
     data = {}
@@ -72,6 +72,7 @@ def show_rollcall(rollcall_ss, mode="daily"):
     current_month = datetime.now().strftime("%Y-%m")
 
     default_index = 0
+
     if current_month in all_months:
         default_index = all_months.index(current_month)
 
