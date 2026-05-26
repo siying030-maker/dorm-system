@@ -81,32 +81,43 @@ def get_manage_dorm_options():
     return list(dict.fromkeys(dorm_options))
 
 
+def find_room_column(df):
+
+    for c in df.columns:
+        if "房" in c:
+            return c
+
+    return None
+
+
 def query_clean(semester, dorm, rooms):
 
     dorm = normalize_dorm(dorm)
 
     if semester not in CLEAN_SHEET:
+        st.warning("找不到學期設定")
         return pd.DataFrame()
 
     if dorm not in CLEAN_SHEET[semester]:
+        st.warning(f"找不到 {dorm} 的住宿名單連結")
         return pd.DataFrame()
 
     df = load_clean_sheet(CLEAN_SHEET[semester][dorm])
 
     if df.empty:
+        st.warning("住宿名單是空的，或無法讀取 Google Sheet")
         return pd.DataFrame()
 
-    result = []
-
-    room_col = next(
-        (c for c in df.columns if "房" in c),
-        None
-    )
+    room_col = find_room_column(df)
 
     if room_col is None:
+        st.warning("住宿名單找不到房號欄位")
+        st.write("目前欄位：", list(df.columns))
         return pd.DataFrame()
 
     df["_房號比對"] = df[room_col].apply(normalize_room)
+
+    result = []
 
     for floor, room in rooms.items():
 
@@ -253,19 +264,28 @@ def show_clean():
             key=f"clean_room_{dorm}_{floor}_{semester}_{contest}_{rank}"
         )
 
+    query_key = f"clean_result_{dorm}_{semester}_{contest}_{rank}"
+
     if st.button(
         "查詢名單",
         key=f"query_clean_{dorm}_{semester}_{contest}_{rank}"
     ):
 
-        st.session_state.clean_query_result = query_clean(
+        total = query_clean(
             semester,
             dorm,
             rooms
         )
 
+        st.session_state[query_key] = total
+
+        if total.empty:
+            st.warning("查無資料，請確認房號是否存在於該宿舍住宿名單")
+        else:
+            st.success("查詢成功")
+
     total = st.session_state.get(
-        "clean_query_result",
+        query_key,
         pd.DataFrame()
     )
 
@@ -282,12 +302,12 @@ def show_clean():
     )
 
     if st.button(
-        "儲存",
+        "儲存到試算表",
         key=f"save_clean_{dorm}_{semester}_{contest}_{rank}"
     ):
 
         if school_year.strip() == "":
-            st.error("請輸入學年")
+            st.error("請先輸入學年")
             return
 
         try:
@@ -300,7 +320,7 @@ def show_clean():
                 dorm
             )
 
-            st.success("儲存成功")
+            st.success("已成功儲存到整潔比賽試算表")
 
         except Exception as e:
             st.error(str(e))
