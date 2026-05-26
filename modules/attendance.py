@@ -240,7 +240,7 @@ def get_attendance_url(term, dorm):
 
 
 # ==================================================
-# 建立唯一欄位名稱
+# 修正重複欄位名稱
 # ==================================================
 
 def build_unique_headers(headers):
@@ -267,7 +267,7 @@ def build_unique_headers(headers):
 
 
 # ==================================================
-# 載入資料
+# 載入點名名單
 # ==================================================
 
 def load_attendance_students(
@@ -286,16 +286,8 @@ def load_attendance_students(
     sh = gc.open_by_key(sheet_id)
 
     # ==================================================
-# 寒暑假
-# ==================================================
-
-if term in ["寒假", "暑假"]:
-
-    # 寒暑假也是依照樓層 Sheet
-    # 例如：
-    # 81-1F
-    # 82-3F
-    # 83-6F
+    # 統一讀取樓層 Sheet
+    # ==================================================
 
     sheet_name = get_floor_sheet_name(
         dorm,
@@ -304,49 +296,12 @@ if term in ["寒假", "暑假"]:
 
     ws = sh.worksheet(sheet_name)
 
-    st.write(
-        "目前讀取 Sheet：",
-        sheet_name
-    )
-
-# ==================================================
-# 上下學期
-# ==================================================
-
-else:
-
-    sheet_name = get_floor_sheet_name(
-        dorm,
-        floor
-    )
-
-    ws = sh.worksheet(sheet_name)
-
-    st.write(
-        "目前讀取 Sheet：",
-        sheet_name
-    )
-    # ==================================================
-    # 上下學期
-    # ==================================================
-
-    else:
-
-        sheet_name = get_floor_sheet_name(
-            dorm,
-            floor
-        )
-
-        ws = sh.worksheet(sheet_name)
+    st.info(f"目前讀取 Sheet：{sheet_name}")
 
     values = ws.get_all_values()
 
     if len(values) <= 1:
         return pd.DataFrame()
-
-    # ==================================================
-    # 修正重複欄位名稱
-    # ==================================================
 
     headers = build_unique_headers(
         values[0]
@@ -364,7 +319,7 @@ else:
     )
 
     # ==================================================
-    # 寒暑假
+    # 寒暑假格式
     # ==================================================
 
     if term in ["寒假", "暑假"]:
@@ -421,7 +376,7 @@ else:
         )
 
     # ==================================================
-    # 上下學期
+    # 上下學期格式
     # ==================================================
 
     else:
@@ -517,10 +472,6 @@ def show_attendance():
 
     dorm_options = get_login_dorm_options()
 
-    # ==================================================
-    # 寒暑假限制宿舍
-    # ==================================================
-
     if term in ["寒假", "暑假"]:
 
         dorm_options = [
@@ -543,8 +494,7 @@ def show_attendance():
     st.text_input(
         "性別",
         value=gender,
-        disabled=True,
-        key="attendance_gender"
+        disabled=True
     )
 
     floors = FLOOR_OPTIONS.get(
@@ -560,14 +510,10 @@ def show_attendance():
 
     attendance_date = st.date_input(
         "點名日期",
-        value=date.today(),
-        key="attendance_date"
+        value=date.today()
     )
 
-    if st.button(
-        "載入點名名單",
-        key="load_attendance"
-    ):
+    if st.button("載入點名名單"):
 
         try:
 
@@ -613,9 +559,7 @@ def show_attendance():
 
     for i, row in students.iterrows():
 
-        cols = st.columns(
-            [1, 1, 1, 1, 1]
-        )
+        cols = st.columns([1, 1, 1, 1, 1])
 
         cols[0].write(row["房號"])
         cols[1].write(row["學號"])
