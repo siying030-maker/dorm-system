@@ -425,11 +425,9 @@ def show_clean_view():
     try:
         ss = open_sheet(CLEAN_RESULT_URL)
 
-        worksheets = ss.worksheets()
-
         sheet_names = [
             ws.title
-            for ws in worksheets
+            for ws in ss.worksheets()
         ]
 
         if len(sheet_names) == 0:
@@ -482,8 +480,20 @@ def show_clean_view():
         if rank != "全部":
             df = df[df["名次"] == rank]
 
+        show_cols = [
+            "宿舍",
+            "名次",
+            "房號",
+            "學號",
+            "姓名"
+        ]
+
+        for col in show_cols:
+            if col not in df.columns:
+                df[col] = ""
+
         st.dataframe(
-            df,
+            df[show_cols],
             use_container_width=True
         )
 
