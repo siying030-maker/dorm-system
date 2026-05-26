@@ -94,10 +94,7 @@ def load_clean_floor_sheet(url, sheet_name):
     try:
         ss = open_sheet(url)
 
-        sheet_names = [
-            ws.title
-            for ws in ss.worksheets()
-        ]
+        sheet_names = [ws.title for ws in ss.worksheets()]
 
         if sheet_name not in sheet_names:
             st.warning(f"找不到 Sheet：{sheet_name}")
@@ -105,7 +102,6 @@ def load_clean_floor_sheet(url, sheet_name):
             return pd.DataFrame()
 
         ws = ss.worksheet(sheet_name)
-
         values = ws.get_all_values()
 
         if len(values) == 0:
@@ -117,7 +113,6 @@ def load_clean_floor_sheet(url, sheet_name):
         used = {}
 
         for i, h in enumerate(headers):
-
             h = str(h).strip()
 
             if h == "":
@@ -136,11 +131,7 @@ def load_clean_floor_sheet(url, sheet_name):
             columns=fixed_headers
         )
 
-        df.columns = (
-            df.columns
-            .astype(str)
-            .str.strip()
-        )
+        df.columns = df.columns.astype(str).str.strip()
 
         return df
 
@@ -162,7 +153,6 @@ def query_clean(semester, dorm, rooms):
         return pd.DataFrame()
 
     url = CLEAN_SHEET[semester][dorm]
-
     result = []
 
     for floor, room in rooms.items():
@@ -172,10 +162,7 @@ def query_clean(semester, dorm, rooms):
         if room == "":
             continue
 
-        sheet_name = get_floor_sheet_name(
-            dorm,
-            floor
-        )
+        sheet_name = get_floor_sheet_name(dorm, floor)
 
         df = load_clean_floor_sheet(
             url,
@@ -186,91 +173,42 @@ def query_clean(semester, dorm, rooms):
             st.warning(f"{floor} 找不到 Sheet：{sheet_name}，或此 Sheet 沒資料")
             continue
 
-        bed_col = find_col(
-            df,
-            ["床位", "房號", "房"]
-        )
-
-        sid_col = find_col(
-            df,
-            ["學號"]
-        )
-
-        class_col = find_col(
-            df,
-            ["班級", "班"]
-        )
-
-        name_col = find_col(
-            df,
-            ["姓名", "名字"]
-        )
+        bed_col = find_col(df, ["床位"])
 
         if bed_col is None:
-            st.warning(f"{sheet_name} 找不到床位 / 房號欄位")
+            st.warning(f"{sheet_name} 找不到床位欄位")
             st.write("目前欄位：", list(df.columns))
             continue
 
-        df["_床位比對"] = (
-            df[bed_col]
-            .apply(normalize_room)
-        )
+        sid_col = find_col(df, ["學號"])
+        class_col = find_col(df, ["班級", "班"])
+        name_col = find_col(df, ["姓名", "名字"])
+
+        df["_床位比對"] = df[bed_col].apply(normalize_room)
 
         res = df[
             df["_床位比對"]
             .astype(str)
-            .str.startswith(room)
-        ]
+            .str.startswith(room + "-")
+        ].copy()
 
         if res.empty:
             st.warning(f"{sheet_name} 查無房號：{room}")
             continue
 
-        temp = pd.DataFrame()
-
-        temp["樓層"] = floor
-        temp["房號"] = room
-
-        temp["床位"] = (
-            res[bed_col]
-            .apply(normalize_room)
-            .values
-        )
-
-        if sid_col:
-            temp["學號"] = (
-                res[sid_col]
-                .astype(str)
-                .values
-            )
-        else:
-            temp["學號"] = ""
-
-        if class_col:
-            temp["班級"] = (
-                res[class_col]
-                .astype(str)
-                .values
-            )
-        else:
-            temp["班級"] = ""
-
-        if name_col:
-            temp["姓名"] = (
-                res[name_col]
-                .astype(str)
-                .values
-            )
-        else:
-            temp["姓名"] = ""
+        temp = pd.DataFrame({
+            "樓層": [floor] * len(res),
+            "房號": [room] * len(res),
+            "床位": res[bed_col].apply(normalize_room).tolist(),
+            "學號": res[sid_col].astype(str).tolist() if sid_col else [""] * len(res),
+            "班級": res[class_col].astype(str).tolist() if class_col else [""] * len(res),
+            "姓名": res[name_col].astype(str).tolist() if name_col else [""] * len(res),
+        })
 
         result.append(temp)
 
     if result:
-        return pd.concat(
-            result,
-            ignore_index=True
-        )
+        return pd.concat(result, ignore_index=True)
 
     return pd.DataFrame()
 
@@ -306,7 +244,6 @@ def save_clean_result(total, school_year, semester, contest, rank, dorm):
         ])
 
     for _, r in total.iterrows():
-
         ws.append_row([
             school_year,
             semester,
@@ -376,11 +313,7 @@ def show_clean():
     rooms = {}
 
     for floor in floors:
-
-        sheet_name = get_floor_sheet_name(
-            dorm,
-            floor
-        )
+        sheet_name = get_floor_sheet_name(dorm, floor)
 
         rooms[floor] = st.text_input(
             f"{floor} 房號（讀取 {sheet_name}）",
