@@ -96,6 +96,27 @@ def find_col(df, keywords):
     return None
 
 
+def find_student_id_col(df):
+    columns = list(df.columns)
+
+    # 最高優先：真正的「學號」
+    for c in columns:
+        if str(c).strip() == "學號":
+            return c
+
+    # 第二優先：正式學號
+    for c in columns:
+        if "正式" in str(c) and "學號" in str(c):
+            return c
+
+    # 不要抓「替代」
+    for c in columns:
+        if "學號" in str(c) and "替代" not in str(c):
+            return c
+
+    return None
+
+
 @st.cache_data(ttl=1800)
 def load_clean_floor_sheet(url, sheet_name):
 
@@ -182,7 +203,7 @@ def query_clean(semester, dorm, rooms):
             continue
 
         bed_col = find_col(df, ["床位"])
-        sid_col = find_col(df, ["學號", "輸入-學號-正式"])
+        sid_col = find_student_id_col(df)
         name_col = find_col(df, ["姓名", "名字"])
 
         if bed_col is None:
