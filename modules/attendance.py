@@ -286,30 +286,46 @@ def load_attendance_students(
     sh = gc.open_by_key(sheet_id)
 
     # ==================================================
-    # 寒暑假
-    # ==================================================
+# 寒暑假
+# ==================================================
 
-    if term in ["寒假", "暑假"]:
+if term in ["寒假", "暑假"]:
 
-        worksheets = sh.worksheets()
+    # 寒暑假也是依照樓層 Sheet
+    # 例如：
+    # 81-1F
+    # 82-3F
+    # 83-6F
 
-        ws = None
+    sheet_name = get_floor_sheet_name(
+        dorm,
+        floor
+    )
 
-        for w in worksheets:
+    ws = sh.worksheet(sheet_name)
 
-            title = str(w.title)
+    st.write(
+        "目前讀取 Sheet：",
+        sheet_name
+    )
 
-            if dorm in title:
+# ==================================================
+# 上下學期
+# ==================================================
 
-                ws = w
-                break
+else:
 
-        if ws is None:
+    sheet_name = get_floor_sheet_name(
+        dorm,
+        floor
+    )
 
-            ws = worksheets[0]
+    ws = sh.worksheet(sheet_name)
 
-        st.write("目前讀取 Sheet：", ws.title)
-
+    st.write(
+        "目前讀取 Sheet：",
+        sheet_name
+    )
     # ==================================================
     # 上下學期
     # ==================================================
