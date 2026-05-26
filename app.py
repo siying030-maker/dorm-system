@@ -12,6 +12,7 @@ from modules.tab import build_tabs
 from modules.rollcall import show_rollcall
 from modules.gate import show_gate
 from modules.clean import show_clean, show_clean_view
+from modules.attendance import show_attendance
 
 
 st.set_page_config(
@@ -45,6 +46,10 @@ if not tab_names:
     st.stop()
 
 tabs = st.tabs(tab_names)
+
+if "點名系統" in tab_names:
+    with tabs[tab_names.index("點名系統")]:
+        show_attendance()
 
 if "連三天不假外宿" in tab_names:
     with tabs[tab_names.index("連三天不假外宿")]:
