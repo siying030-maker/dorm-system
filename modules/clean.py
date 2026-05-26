@@ -81,10 +81,18 @@ def get_manage_dorm_options():
 
 
 def find_col(df, keywords):
-    for c in df.columns:
-        for k in keywords:
-            if k in c:
+    columns = list(df.columns)
+
+    for k in keywords:
+        for c in columns:
+            if str(c).strip() == k:
                 return c
+
+    for k in keywords:
+        for c in columns:
+            if k in str(c):
+                return c
+
     return None
 
 
@@ -174,14 +182,13 @@ def query_clean(semester, dorm, rooms):
             continue
 
         bed_col = find_col(df, ["床位"])
+        sid_col = find_col(df, ["學號", "輸入-學號-正式"])
+        name_col = find_col(df, ["姓名", "名字"])
 
         if bed_col is None:
             st.warning(f"{sheet_name} 找不到床位欄位")
             st.write("目前欄位：", list(df.columns))
             continue
-
-        sid_col = find_col(df, ["學號"])
-        name_col = find_col(df, ["姓名", "名字"])
 
         df["_床位比對"] = df[bed_col].apply(normalize_room)
 
