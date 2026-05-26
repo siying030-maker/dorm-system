@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 
+from core.google_api import open_sheet
+
 def login_page(load_users):
 
     role = st.selectbox("登入權限", ["舍監", "行政", "樓長"])
