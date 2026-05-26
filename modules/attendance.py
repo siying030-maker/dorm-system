@@ -23,14 +23,20 @@ ATTENDANCE_SHEETS = {
     },
 }
 
-VACATION_FOLDERS = {
+VACATION_SHEETS = {
     "寒假": {
-        "女生": "https://drive.google.com/drive/folders/18x7TgnoenstC2goy2J_Qpcr4xhowJ2Fx",
-        "男生": "https://drive.google.com/drive/folders/1tYgC18fytCFW0Hh3n3mw27UTIRf04C2M",
+        "女一": "https://docs.google.com/spreadsheets/d/1svJOTt-BQmws2Xsy2e3mrHrsqZAi_GD1rYX4t2LxE6Y/edit",
+        "女二": "https://docs.google.com/spreadsheets/d/17TqcEpi_6O-qsO5ZFl17GvO91yU2LgmN36sjO_Zbbi8/edit",
+        "女三": "https://docs.google.com/spreadsheets/d/17TqcEpi_6O-qsO5ZFl17GvO91yU2LgmN36sjO_Zbbi8/edit",
+        "男一": "https://docs.google.com/spreadsheets/d/1xX2DBG8z5jGSthFdnLqsn5yhz-8JmLmTK_7VUVqHGmo/edit",
+        "男三": "https://docs.google.com/spreadsheets/d/1xX2DBG8z5jGSthFdnLqsn5yhz-8JmLmTK_7VUVqHGmo/edit",
     },
     "暑假": {
-        "女生": "https://drive.google.com/drive/folders/1ceM2nNCXW62CV78v75LHiJBevXYB6PJ4",
-        "男生": "https://drive.google.com/drive/folders/1kKgsP-60UYxM1lcvtMh4vDKXRfl2Pf2v",
+        "女一": "https://docs.google.com/spreadsheets/d/1kxfciu8TMwnQuwzA94H0c6cY3ClgRuRijzYwM4qEtt8/edit",
+        "女二": "https://docs.google.com/spreadsheets/d/1cXDLQM5F3lWwBlM_KRn1dhGfOviLfcJmAFiXBxp36u8/edit",
+        "女三": "https://docs.google.com/spreadsheets/d/1cXDLQM5F3lWwBlM_KRn1dhGfOviLfcJmAFiXBxp36u8/edit",
+        "男一": "https://docs.google.com/spreadsheets/d/1WpBP8lCWUdTm-SAIIplFOGdpBjv5vLsuCXb8tDCXx9Y/edit",
+        "男三": "https://docs.google.com/spreadsheets/d/1WpBP8lCWUdTm-SAIIplFOGdpBjv5vLsuCXb8tDCXx9Y/edit",
     },
 }
 
@@ -51,6 +57,10 @@ DORM_PREFIX = {
 }
 
 
+def normalize_dorm(dorm):
+    return str(dorm).strip().replace("ㄧ", "一")
+
+
 def normalize_room(value):
     value = str(value).strip()
     if value.endswith(".0"):
@@ -58,8 +68,42 @@ def normalize_room(value):
     return value
 
 
+def get_dorm_gender(dorm):
+    dorm = normalize_dorm(dorm)
+
+    if dorm.startswith("女"):
+        return "女生"
+
+    if dorm.startswith("男"):
+        return "男生"
+
+    return ""
+
+
 def get_floor_sheet_name(dorm, floor):
+    dorm = normalize_dorm(dorm)
     return f"{DORM_PREFIX[dorm]}-{floor}"
+
+
+def get_login_dorm_options():
+    role = st.session_state.get("role", "")
+    dorm = st.session_state.get("dorm", "")
+    manage_dorms = st.session_state.get("manage_dorms", "")
+
+    if role == "樓長":
+
+        if manage_dorms:
+            dorms = [
+                normalize_dorm(d)
+                for d in manage_dorms.replace("，", ",").split(",")
+                if d.strip()
+            ]
+        else:
+            dorms = [normalize_dorm(dorm)]
+
+        return list(dict.fromkeys(dorms))
+
+    return ["女一", "女二", "女三", "男一", "男三"]
 
 
 def fix_headers(headers):
@@ -83,31 +127,35 @@ def fix_headers(headers):
     return fixed
 
 
-def find_col(df, names):
-    for name in names:
-        for c in df.columns:
-            if str(c).strip() == name:
+def find_col(df, keywords):
+    columns = list(df.columns)
+
+    for k in keywords:
+        for c in columns:
+            if str(c).strip() == k:
                 return c
 
-    for name in names:
-        for c in df.columns:
-            if name in str(c):
+    for k in keywords:
+        for c in columns:
+            if k in str(c):
                 return c
 
     return None
 
 
 def find_student_id_col(df):
-    for c in df.columns:
+    columns = list(df.columns)
+
+    for c in columns:
         if str(c).strip() == "學號":
             return c
 
-    for c in df.columns:
+    for c in columns:
         c_str = str(c)
         if "學號" in c_str and "正式" in c_str:
             return c
 
-    for c in df.columns:
+    for c in columns:
         c_str = str(c)
         if "學號" in c_str and "替代" not in c_str:
             return c
@@ -128,7 +176,11 @@ def load_floor_data(url, sheet_name):
 
         headers = fix_headers(values[0])
 
-        df = pd.DataFrame(values[1:], columns=headers)
+        df = pd.DataFrame(
+            values[1:],
+            columns=headers
+        )
+
         df.columns = df.columns.astype(str).str.strip()
 
         return df
@@ -137,11 +189,22 @@ def load_floor_data(url, sheet_name):
         return pd.DataFrame()
 
 
-def load_attendance_students(term, dorm, floor, custom_url=""):
+def get_attendance_url(term, dorm):
+    dorm = normalize_dorm(dorm)
+
     if term in ["上學期", "下學期"]:
-        url = ATTENDANCE_SHEETS[term][dorm]
-    else:
-        url = custom_url.strip()
+        return ATTENDANCE_SHEETS[term][dorm]
+
+    if term in ["寒假", "暑假"]:
+        return VACATION_SHEETS[term][dorm]
+
+    return ""
+
+
+def load_attendance_students(term, dorm, floor):
+    dorm = normalize_dorm(dorm)
+
+    url = get_attendance_url(term, dorm)
 
     if url == "":
         return pd.DataFrame()
@@ -224,41 +287,6 @@ def save_rollcall(attendance_date, dorm, floor, data):
         ws.append_rows(rows)
 
 
-def get_dorm_gender(dorm):
-    dorm = str(dorm).replace("ㄧ", "一").strip()
-
-    if dorm.startswith("女"):
-        return "女生"
-
-    if dorm.startswith("男"):
-        return "男生"
-
-    return ""
-
-
-def get_login_dorm_options():
-    role = st.session_state.get("role", "")
-    dorm = st.session_state.get("dorm", "")
-    manage_dorms = st.session_state.get("manage_dorms", "")
-
-    if role == "樓長":
-
-        if manage_dorms:
-            dorms = [
-                d.strip().replace("ㄧ", "一")
-                for d in manage_dorms.replace("，", ",").split(",")
-                if d.strip()
-            ]
-        else:
-            dorms = [
-                str(dorm).strip().replace("ㄧ", "一")
-            ]
-
-        return list(dict.fromkeys(dorms))
-
-    return ["女一", "女二", "女三", "男一", "男三"]
-
-
 def show_attendance():
 
     st.header("點名系統")
@@ -300,22 +328,6 @@ def show_attendance():
         key="attendance_date"
     )
 
-    custom_url = ""
-
-    if term in ["寒假", "暑假"]:
-
-        folder_url = VACATION_FOLDERS[term][gender]
-
-        st.link_button(
-            "開啟雲端資料夾",
-            folder_url
-        )
-
-        custom_url = st.text_input(
-            "請貼上寒假 / 暑假的床位試算表網址",
-            key="attendance_custom_url"
-        )
-
     sheet_name = get_floor_sheet_name(dorm, floor)
 
     st.info(f"將讀取 Sheet：{sheet_name}")
@@ -325,8 +337,7 @@ def show_attendance():
         students = load_attendance_students(
             term,
             dorm,
-            floor,
-            custom_url
+            floor
         )
 
         st.session_state.attendance_students = students
