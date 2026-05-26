@@ -240,6 +240,34 @@ def get_attendance_url(term, dorm):
 
 
 # ==================================================
+# 建立唯一欄位名稱（修正 .str error）
+# ==================================================
+
+def build_unique_headers(headers):
+
+    result = []
+    used = {}
+
+    for h in headers:
+
+        h = str(h).strip()
+
+        if h in used:
+
+            used[h] += 1
+
+            h = f"{h}_{used[h]}"
+
+        else:
+
+            used[h] = 0
+
+        result.append(h)
+
+    return result
+
+
+# ==================================================
 # 載入資料
 # ==================================================
 
@@ -284,9 +312,17 @@ def load_attendance_students(
     if len(values) <= 1:
         return pd.DataFrame()
 
+    # ==================================================
+    # 修正重複欄位名稱
+    # ==================================================
+
+    headers = build_unique_headers(
+        values[0]
+    )
+
     df = pd.DataFrame(
         values[1:],
-        columns=values[0]
+        columns=headers
     )
 
     df.columns = (
