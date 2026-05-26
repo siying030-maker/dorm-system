@@ -289,10 +289,25 @@ def load_attendance_students(
     # ==================================================
     # 寒暑假
     # ==================================================
+if term in ["寒假", "暑假"]:
 
-    if term in ["寒假", "暑假"]:
+    worksheets = sh.worksheets()
 
-        ws = sh.sheet1
+    ws = None
+
+    for w in worksheets:
+
+        title = str(w.title)
+
+        if dorm in title:
+
+            ws = w
+            break
+
+    if ws is None:
+        ws = worksheets[0]
+
+    st.write("目前讀取 Sheet：", ws.title)
 
     # ==================================================
     # 上下學期
