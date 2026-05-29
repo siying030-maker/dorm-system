@@ -5,9 +5,10 @@ from datetime import date
 
 from core.google_api import open_sheet
 from core.config import (
-    ROLLCALL_SHEET_URL,
     UPPER_GATE_URL,
     LOWER_GATE_URL,
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
 )
 
 
@@ -449,8 +450,19 @@ def load_special_status(term, attendance_date):
 
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
-    ss = open_sheet(ROLLCALL_SHEET_URL)
-    sheet_name = str(attendance_date)
+
+    gender = get_dorm_gender(dorm)
+
+    if gender == "女生":
+        save_url = ROLLCALL_GIRL_URL
+    elif gender == "男生":
+        save_url = ROLLCALL_BOY_URL
+    else:
+        raise Exception("無法判斷宿舍性別")
+
+    ss = open_sheet(save_url)
+
+    sheet_name = str(attendance_date).replace("-", "/")
 
     try:
         ws = ss.worksheet(sheet_name)
