@@ -1,124 +1,147 @@
 import streamlit as st
+import pandas as pd
+
+from core.google_api import open_sheet
+from core.config import ADMIN_SHEET_URL
 
 
 def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
 
-def login_page(load_users):
+@st.cache_data(ttl=300)
+def load_users(role):
+    try:
+        ss = open_sheet(ADMIN_SHEET_URL)
+        ws = ss.worksheet(role)
 
-    role = st.selectbox("登入權限", ["舍監", "行政", "樓長"])
+        values = ws.get_all_values()
 
-    if role in ["舍監", "行政"]:
+        if len(values) <= 1:
+            return pd.DataFrame()
 
-        user_df = load_users(role)
+        df = pd.DataFrame(
+            values[1:],
+            columns=values[0]
+        )
 
-        if user_df.empty:
-            st.warning(f"{role} 沒有帳號資料")
-            return
+        df.columns = df.columns.astype(str).str.strip()
 
-        username = st.selectbox("使用者", user_df.iloc[:, 0].astype(str).tolist())
-        password = st.text_input("密碼", type="password")
+        return df
 
-        if st.button("登入"):
+    except Exception as e:
+        st.error(f"讀取 {role} 帳號失敗：{e}")
+        return pd.DataFrame()
 
-            match = user_df[
-                (user_df.iloc[:, 0].astype(str).str.strip() == username)
-                &
-                (user_df.iloc[:, 1].astype(str).str.strip() == password)
-            ]
 
-            if not match.empty:
-                st.session_state.update({
-                    "login": True,
-                    "role": role,
-                    "user": username,
-                    "dorm": "",
-                    "is_main": False,
-                    "manage_dorms": "",
-                    "winter_main": False,
-                    "winter_dorms": "",
-                    "summer_main": False,
-                    "summer_dorms": "",
-                })
-                st.rerun()
-            else:
-                st.error("密碼錯誤")
+def login_page():
+
+    role = st.selectbox(
+        "登入權限",
+        ["舍監", "行政", "樓長"]
+    )
+
+    user_df = load_users(role)
+
+    if user_df.empty:
+        st.warning(f"{role} 沒有帳號資料")
+        return
+
+    user_df.columns = user_df.columns.astype(str).str.strip()
 
     if role == "樓長":
 
-        user_df = load_users("樓長")
+        dorm_col = "宿舍別"
+        user_col = "使用者"
+        pwd_col = "密碼"
 
-        if user_df.empty:
-            st.warning("樓長 沒有帳號資料")
-            return
-
-        user_df.columns = user_df.columns.astype(str).str.strip()
-
-        dorm = st.selectbox("宿舍別", user_df.iloc[:, 0].astype(str).unique())
+        dorm = st.selectbox(
+            "宿舍別",
+            user_df[dorm_col].astype(str).unique()
+        )
 
         temp = user_df[
-            user_df.iloc[:, 0].astype(str).str.strip() == str(dorm).strip()
+            user_df[dorm_col].astype(str).str.strip()
+            ==
+            str(dorm).strip()
         ]
 
-        username = st.selectbox("使用者", temp.iloc[:, 1].astype(str).tolist())
-        password = st.text_input("密碼", type="password")
+        username = st.selectbox(
+            "使用者",
+            temp[user_col].astype(str).tolist()
+        )
+
+        password = st.text_input(
+            "密碼",
+            type="password"
+        )
 
         if st.button("登入"):
 
             match = temp[
-                (temp.iloc[:, 1].astype(str).str.strip() == username)
+                (temp[user_col].astype(str).str.strip() == username)
                 &
-                (temp.iloc[:, 2].astype(str).str.strip() == password)
+                (temp[pwd_col].astype(str).str.strip() == password)
             ]
 
-            if not match.empty:
-                row = match.iloc[0]
-
-                # 一般學期總樓
-                is_main = False
-                manage_dorms = ""
-
-                if "總樓" in user_df.columns:
-                    is_main = str(row.get("總樓", "")).strip() == "是"
-
-                if "宿舍" in user_df.columns:
-                    manage_dorms = str(row.get("宿舍", "")).strip()
-
-                # 寒假樓長
-                winter_main = False
-                winter_dorms = ""
-
-                if "寒假樓長" in user_df.columns:
-                    winter_main = str(row.get("寒假樓長", "")).strip() == "是"
-
-                if "寒假宿舍別" in user_df.columns:
-                    winter_dorms = str(row.get("寒假宿舍別", "")).strip()
-
-                # 暑假樓長
-                summer_main = False
-                summer_dorms = ""
-
-                if "暑假樓長" in user_df.columns:
-                    summer_main = str(row.get("暑假樓長", "")).strip() == "是"
-
-                if "暑假宿舍別" in user_df.columns:
-                    summer_dorms = str(row.get("暑假宿舍別", "")).strip()
-
-                st.session_state.update({
-                    "login": True,
-                    "role": "樓長",
-                    "user": username,
-                    "dorm": normalize_dorm(row.iloc[0]),
-                    "is_main": is_main,
-                    "manage_dorms": manage_dorms,
-                    "winter_main": winter_main,
-                    "winter_dorms": winter_dorms,
-                    "summer_main": summer_main,
-                    "summer_dorms": summer_dorms,
-                })
-
-                st.rerun()
-
-            else:
+            if match.empty:
                 st.error("密碼錯誤")
+                return
+
+            row = match.iloc[0]
+
+            st.session_state.login = True
+            st.session_state.role = "樓長"
+            st.session_state.user = username
+            st.session_state.dorm = normalize_dorm(row.get("宿舍別", ""))
+            st.session_state.is_main = str(row.get("總樓", "")).strip() == "是"
+            st.session_state.manage_dorms = str(row.get("宿舍", "")).strip()
+
+            st.session_state.winter_main = str(row.get("寒假樓長", "")).strip() == "是"
+            st.session_state.winter_dorms = str(row.get("寒假宿舍別", "")).strip()
+
+            st.session_state.summer_main = str(row.get("暑假樓長", "")).strip() == "是"
+            st.session_state.summer_dorms = str(row.get("暑假宿舍別", "")).strip()
+
+            st.rerun()
+
+    else:
+
+        user_col = "使用者"
+        pwd_col = "密碼"
+
+        username = st.selectbox(
+            "使用者",
+            user_df[user_col].astype(str).tolist()
+        )
+
+        password = st.text_input(
+            "密碼",
+            type="password"
+        )
+
+        if st.button("登入"):
+
+            match = user_df[
+                (user_df[user_col].astype(str).str.strip() == username)
+                &
+                (user_df[pwd_col].astype(str).str.strip() == password)
+            ]
+
+            if match.empty:
+                st.error("密碼錯誤")
+                return
+
+            st.session_state.login = True
+            st.session_state.role = role
+            st.session_state.user = username
+            st.session_state.dorm = ""
+            st.session_state.is_main = False
+            st.session_state.manage_dorms = ""
+
+            st.session_state.winter_main = False
+            st.session_state.winter_dorms = ""
+            st.session_state.summer_main = False
+            st.session_state.summer_dorms = ""
+
+            st.rerun()
