@@ -74,16 +74,28 @@ def normalize_value(value):
     return value
 
 
-def split_dorms(value):
-    dorms = []
+def split_items(value):
+    result = []
 
     for item in str(value).replace("，", ",").split(","):
         item = normalize_dorm(item)
 
         if item:
-            dorms.append(item)
+            result.append(item)
 
-    return list(dict.fromkeys(dorms))
+    return list(dict.fromkeys(result))
+
+
+def split_floors(value):
+    result = []
+
+    for item in str(value).replace("，", ",").split(","):
+        item = item.strip().upper()
+
+        if item:
+            result.append(item)
+
+    return list(dict.fromkeys(result))
 
 
 def get_dorm_gender(dorm):
@@ -148,35 +160,25 @@ def get_login_dorm_options(term):
 
         return ["女一", "女二", "女三", "男一", "男三"]
 
-    dorm = normalize_dorm(st.session_state.get("dorm", ""))
-    manage_dorms = st.session_state.get("manage_dorms", "")
-    winter_dorms = st.session_state.get("winter_dorms", "")
-    summer_dorms = st.session_state.get("summer_dorms", "")
-
     if term == "寒假":
-        dorms = split_dorms(winter_dorms)
-        return [d for d in dorms if d in VACATION_SHEETS["寒假"]]
+        return [
+            d for d in split_items(st.session_state.get("winter_dorms", ""))
+            if d in VACATION_SHEETS["寒假"]
+        ]
 
     if term == "暑假":
-        dorms = split_dorms(summer_dorms)
-        return [d for d in dorms if d in VACATION_SHEETS["暑假"]]
+        return [
+            d for d in split_items(st.session_state.get("summer_dorms", ""))
+            if d in VACATION_SHEETS["暑假"]
+        ]
+
+    manage_dorms = st.session_state.get("manage_dorms", "")
 
     if manage_dorms:
-        return split_dorms(manage_dorms)
+        return split_items(manage_dorms)
 
-    return [dorm]
-
-
-def split_floors(value):
-    floors = []
-
-    for item in str(value).replace("，", ",").split(","):
-        item = item.strip().upper()
-
-        if item:
-            floors.append(item)
-
-    return list(dict.fromkeys(floors))
+    dorm = normalize_dorm(st.session_state.get("dorm", ""))
+    return [dorm] if dorm else []
 
 
 def get_floor_options(term, dorm):
@@ -186,20 +188,14 @@ def get_floor_options(term, dorm):
         return ["全部"]
 
     if term == "寒假":
-        custom_floors = split_floors(
-            st.session_state.get("winter_floors", "")
-        )
-
-        if custom_floors:
-            return custom_floors
+        floors = split_floors(st.session_state.get("winter_floors", ""))
+        if floors:
+            return floors
 
     if term == "暑假":
-        custom_floors = split_floors(
-            st.session_state.get("summer_floors", "")
-        )
-
-        if custom_floors:
-            return custom_floors
+        floors = split_floors(st.session_state.get("summer_floors", ""))
+        if floors:
+            return floors
 
     return FLOOR_OPTIONS.get(dorm, [])
 
@@ -213,9 +209,7 @@ def get_sheet_names_for_attendance(term, dorm, floor):
             for f in FLOOR_OPTIONS.get(dorm, [])
         ]
 
-    return [
-        get_floor_sheet_name(dorm, floor)
-    ]
+    return [get_floor_sheet_name(dorm, floor)]
 
 
 def build_unique_headers(headers):
@@ -285,17 +279,15 @@ def find_col(df, keywords, exclude_keywords=None):
         for c in df.columns:
             c_str = str(c).strip()
 
-            if c_str == k:
-                if not any(ex in c_str for ex in exclude_keywords):
-                    return c
+            if c_str == k and not any(ex in c_str for ex in exclude_keywords):
+                return c
 
     for k in keywords:
         for c in df.columns:
             c_str = str(c).strip()
 
-            if k in c_str:
-                if not any(ex in c_str for ex in exclude_keywords):
-                    return c
+            if k in c_str and not any(ex in c_str for ex in exclude_keywords):
+                return c
 
     return None
 
@@ -304,7 +296,6 @@ def find_col(df, keywords, exclude_keywords=None):
 def load_attendance_students(term, dorm, floor):
     try:
         dorm = normalize_dorm(dorm)
-
         url = get_attendance_url(term, dorm)
 
         if url == "":
@@ -313,19 +304,12 @@ def load_attendance_students(term, dorm, floor):
         ss = open_sheet(url)
         result_list = []
 
-        sheet_names = get_sheet_names_for_attendance(
-            term,
-            dorm,
-            floor
-        )
+        sheet_names = get_sheet_names_for_attendance(term, dorm, floor)
 
         for sheet_name in sheet_names:
             time.sleep(0.2)
 
-            df = read_worksheet_df(
-                ss,
-                sheet_name
-            )
+            df = read_worksheet_df(ss, sheet_name)
 
             if df.empty:
                 continue
@@ -341,45 +325,22 @@ def load_attendance_students(term, dorm, floor):
             temp = pd.DataFrame()
 
             if bed_col:
-                temp["床位"] = (
-                    df[bed_col]
-                    .astype(str)
-                    .map(normalize_value)
-                )
-
-                temp["房號"] = (
-                    temp["床位"]
-                    .astype(str)
-                    .str.split("-")
-                    .str[0]
-                )
+                temp["床位"] = df[bed_col].astype(str).map(normalize_value)
+                temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
 
             elif room_col:
-                temp["房號"] = (
-                    df[room_col]
-                    .astype(str)
-                    .map(normalize_value)
-                )
+                temp["房號"] = df[room_col].astype(str).map(normalize_value)
                 temp["床位"] = temp["房號"]
 
             else:
                 continue
 
             if sid_col:
-                temp["學號"] = (
-                    df[sid_col]
-                    .astype(str)
-                    .map(normalize_value)
-                )
+                temp["學號"] = df[sid_col].astype(str).map(normalize_value)
             else:
                 temp["學號"] = ""
 
-            temp["姓名"] = (
-                df[name_col]
-                .astype(str)
-                .str.strip()
-            )
-
+            temp["姓名"] = df[name_col].astype(str).str.strip()
             temp["讀取Sheet"] = sheet_name
 
             temp = temp[temp["姓名"] != ""]
@@ -389,20 +350,8 @@ def load_attendance_students(term, dorm, floor):
                 result_list.append(temp)
 
         if result_list:
-            result = pd.concat(
-                result_list,
-                ignore_index=True
-            )
-
-            return result[
-                [
-                    "房號",
-                    "床位",
-                    "學號",
-                    "姓名",
-                    "讀取Sheet"
-                ]
-            ]
+            result = pd.concat(result_list, ignore_index=True)
+            return result[["房號", "床位", "學號", "姓名", "讀取Sheet"]]
 
         return pd.DataFrame()
 
@@ -492,7 +441,6 @@ def load_special_status(term, attendance_date):
 
     except Exception as e:
         st.warning(f"讀取外宿 / 晚歸資料失敗：{e}")
-
         return {
             "leave_ids": set(),
             "long_leave_ids": set(),
@@ -546,10 +494,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
 
 def color_text(text, color):
-    return (
-        f"<span style='color:{color}; "
-        f"font-weight:700'>{text}</span>"
-    )
+    return f"<span style='color:{color}; font-weight:700'>{text}</span>"
 
 
 def show_attendance():
@@ -602,33 +547,14 @@ def show_attendance():
         key="attendance_date"
     )
 
-    sheet_names = get_sheet_names_for_attendance(
-        term,
-        dorm,
-        floor
-    )
+    sheet_names = get_sheet_names_for_attendance(term, dorm, floor)
 
-    st.info(
-        "目前讀取 Sheet："
-        +
-        "、".join(sheet_names)
-    )
+    st.info("目前讀取 Sheet：" + "、".join(sheet_names))
 
-    if st.button(
-        "載入點名名單",
-        key="load_attendance"
-    ):
+    if st.button("載入點名名單", key="load_attendance"):
 
-        students = load_attendance_students(
-            term,
-            dorm,
-            floor
-        )
-
-        special_status = load_special_status(
-            term,
-            attendance_date
-        )
+        students = load_attendance_students(term, dorm, floor)
+        special_status = load_special_status(term, attendance_date)
 
         st.session_state["attendance_students"] = students
         st.session_state["attendance_special_status"] = special_status
@@ -671,6 +597,7 @@ def show_attendance():
     final_rows = []
 
     for i, row in students.iterrows():
+
         sid = normalize_value(row["學號"])
 
         if sid in leave_ids:
@@ -754,6 +681,7 @@ def show_attendance():
     )
 
     if st.button("儲存點名結果", key="save_attendance"):
+
         try:
             save_rollcall_result(
                 attendance_date,

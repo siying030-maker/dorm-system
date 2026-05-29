@@ -5,6 +5,10 @@ from core.google_api import open_sheet
 from core.config import ADMIN_SHEET_URL
 
 
+def clean_text(value):
+    return str(value).strip()
+
+
 def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
@@ -14,6 +18,7 @@ def load_users(role):
     try:
         ss = open_sheet(ADMIN_SHEET_URL)
         ws = ss.worksheet(role)
+
         values = ws.get_all_values()
 
         if len(values) <= 1:
@@ -44,35 +49,30 @@ def login_page():
 
     user_df.columns = user_df.columns.astype(str).str.strip()
 
-    user_col = "使用者"
-    pwd_col = "密碼"
-
-    if user_col not in user_df.columns or pwd_col not in user_df.columns:
+    if "使用者" not in user_df.columns or "密碼" not in user_df.columns:
         st.error("帳號表缺少「使用者」或「密碼」欄位")
         return
 
     if role == "樓長":
 
-        dorm_col = "宿舍別"
-
-        if dorm_col not in user_df.columns:
+        if "宿舍別" not in user_df.columns:
             st.error("樓長帳號表缺少「宿舍別」欄位")
             return
 
         dorm = st.selectbox(
             "宿舍別",
-            user_df[dorm_col].astype(str).unique()
+            user_df["宿舍別"].astype(str).unique()
         )
 
         temp = user_df[
-            user_df[dorm_col].astype(str).str.strip()
+            user_df["宿舍別"].astype(str).str.strip()
             ==
             str(dorm).strip()
         ]
 
         username = st.selectbox(
             "使用者",
-            temp[user_col].astype(str).tolist()
+            temp["使用者"].astype(str).tolist()
         )
 
         password = st.text_input(
@@ -83,9 +83,9 @@ def login_page():
         if st.button("登入"):
 
             match = temp[
-                (temp[user_col].astype(str).str.strip() == username)
+                (temp["使用者"].astype(str).str.strip() == username)
                 &
-                (temp[pwd_col].astype(str).str.strip() == password)
+                (temp["密碼"].astype(str).str.strip() == password)
             ]
 
             if match.empty:
@@ -103,30 +103,28 @@ def login_page():
             )
 
             st.session_state.is_main = (
-                str(row.get("總樓", "")).strip() == "是"
+                clean_text(row.get("總樓", "")) == "是"
             )
 
-            st.session_state.manage_dorms = str(
+            st.session_state.manage_dorms = clean_text(
                 row.get("宿舍", "")
-            ).strip()
+            )
 
-            # 寒假權限：判斷「寒假宿舍別」是否有值
-            st.session_state.winter_dorms = str(
+            st.session_state.winter_dorms = clean_text(
                 row.get("寒假宿舍別", "")
-            ).strip()
+            )
 
-            st.session_state.winter_floors = str(
+            st.session_state.winter_floors = clean_text(
                 row.get("寒假樓層", "")
-            ).strip()
+            )
 
-            # 暑假權限：判斷「暑假宿舍別」是否有值
-            st.session_state.summer_dorms = str(
+            st.session_state.summer_dorms = clean_text(
                 row.get("暑假宿舍別", "")
-            ).strip()
+            )
 
-            st.session_state.summer_floors = str(
+            st.session_state.summer_floors = clean_text(
                 row.get("暑假樓層", "")
-            ).strip()
+            )
 
             st.rerun()
 
@@ -134,7 +132,7 @@ def login_page():
 
         username = st.selectbox(
             "使用者",
-            user_df[user_col].astype(str).tolist()
+            user_df["使用者"].astype(str).tolist()
         )
 
         password = st.text_input(
@@ -145,9 +143,9 @@ def login_page():
         if st.button("登入"):
 
             match = user_df[
-                (user_df[user_col].astype(str).str.strip() == username)
+                (user_df["使用者"].astype(str).str.strip() == username)
                 &
-                (user_df[pwd_col].astype(str).str.strip() == password)
+                (user_df["密碼"].astype(str).str.strip() == password)
             ]
 
             if match.empty:
@@ -164,7 +162,6 @@ def login_page():
 
             st.session_state.winter_dorms = ""
             st.session_state.winter_floors = ""
-
             st.session_state.summer_dorms = ""
             st.session_state.summer_floors = ""
 
