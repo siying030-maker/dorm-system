@@ -9,26 +9,17 @@ def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
 
-def normalize_yes(value):
-    return str(value).strip() == "是"
-
-
 @st.cache_data(ttl=300)
 def load_users(role):
     try:
         ss = open_sheet(ADMIN_SHEET_URL)
         ws = ss.worksheet(role)
-
         values = ws.get_all_values()
 
         if len(values) <= 1:
             return pd.DataFrame()
 
-        df = pd.DataFrame(
-            values[1:],
-            columns=values[0]
-        )
-
+        df = pd.DataFrame(values[1:], columns=values[0])
         df.columns = df.columns.astype(str).str.strip()
 
         return df
@@ -53,11 +44,20 @@ def login_page():
 
     user_df.columns = user_df.columns.astype(str).str.strip()
 
+    user_col = "使用者"
+    pwd_col = "密碼"
+
+    if user_col not in user_df.columns or pwd_col not in user_df.columns:
+        st.error("帳號表缺少「使用者」或「密碼」欄位")
+        return
+
     if role == "樓長":
 
         dorm_col = "宿舍別"
-        user_col = "使用者"
-        pwd_col = "密碼"
+
+        if dorm_col not in user_df.columns:
+            st.error("樓長帳號表缺少「宿舍別」欄位")
+            return
 
         dorm = st.selectbox(
             "宿舍別",
@@ -98,43 +98,39 @@ def login_page():
             st.session_state.role = "樓長"
             st.session_state.user = username
 
-            # 一般學期
             st.session_state.dorm = normalize_dorm(
                 row.get("宿舍別", "")
             )
 
-            st.session_state.is_main = normalize_yes(
-                row.get("總樓", "")
+            st.session_state.is_main = (
+                str(row.get("總樓", "")).strip() == "是"
             )
 
             st.session_state.manage_dorms = str(
                 row.get("宿舍", "")
             ).strip()
 
-            # 寒假樓長
-            st.session_state.winter_main = normalize_yes(
-                row.get("寒假樓長", "")
-            )
-
+            # 寒假權限：判斷「寒假宿舍別」是否有值
             st.session_state.winter_dorms = str(
                 row.get("寒假宿舍別", "")
             ).strip()
 
-            # 暑假樓長
-            st.session_state.summer_main = normalize_yes(
-                row.get("暑假樓長", "")
-            )
+            st.session_state.winter_floors = str(
+                row.get("寒假樓層", "")
+            ).strip()
 
+            # 暑假權限：判斷「暑假宿舍別」是否有值
             st.session_state.summer_dorms = str(
                 row.get("暑假宿舍別", "")
+            ).strip()
+
+            st.session_state.summer_floors = str(
+                row.get("暑假樓層", "")
             ).strip()
 
             st.rerun()
 
     else:
-
-        user_col = "使用者"
-        pwd_col = "密碼"
 
         username = st.selectbox(
             "使用者",
@@ -166,10 +162,10 @@ def login_page():
             st.session_state.is_main = False
             st.session_state.manage_dorms = ""
 
-            st.session_state.winter_main = False
             st.session_state.winter_dorms = ""
+            st.session_state.winter_floors = ""
 
-            st.session_state.summer_main = False
             st.session_state.summer_dorms = ""
+            st.session_state.summer_floors = ""
 
             st.rerun()
