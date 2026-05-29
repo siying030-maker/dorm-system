@@ -148,7 +148,7 @@ def show_daily(data, dates, search):
     if not found:
         st.info("本月無資料")
 
-
+'''
 def show_three_days(data, dates, search):
 
     st.header("連三天不假外宿")
@@ -223,3 +223,4 @@ def show_three_days(data, dates, search):
 
     if not found:
         st.info("無連續三天不假外宿")
+'''
