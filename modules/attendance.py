@@ -13,10 +13,6 @@ from core.config import (
 )
 
 
-# ==================================================
-# 點名試算表
-# ==================================================
-
 ATTENDANCE_SHEETS = {
     "上學期": {
         "女一": "https://docs.google.com/spreadsheets/d/1U9bdg8CWASheYE7XxLt5p-otLDxKiotju4s72Car9rk/edit",
@@ -47,11 +43,6 @@ VACATION_SHEETS = {
     },
 }
 
-
-# ==================================================
-# 樓層與宿舍代碼
-# ==================================================
-
 FLOOR_OPTIONS = {
     "女一": ["1F", "2F", "3F", "5F", "6F", "7F"],
     "女二": ["1F", "2F", "3F"],
@@ -68,10 +59,6 @@ DORM_PREFIX = {
     "男三": "83",
 }
 
-
-# ==================================================
-# 工具
-# ==================================================
 
 def normalize_dorm(dorm):
     return str(dorm).strip().replace("ㄧ", "一")
@@ -119,19 +106,11 @@ def get_login_dorm_options():
                 if d.strip()
             ]
         else:
-            dorms = [
-                normalize_dorm(dorm)
-            ]
+            dorms = [normalize_dorm(dorm)]
 
         return list(dict.fromkeys(dorms))
 
-    return [
-        "女一",
-        "女二",
-        "女三",
-        "男一",
-        "男三"
-    ]
+    return ["女一", "女二", "女三", "男一", "男三"]
 
 
 def get_floor_sheet_name(dorm, floor):
@@ -185,10 +164,8 @@ def find_header_index(values):
 
         if "學號" in row_text and (
             "姓名" in row_text
-            or
-            "申請日期" in row_text
-            or
-            "結束日期" in row_text
+            or "申請日期" in row_text
+            or "結束日期" in row_text
         ):
             return i
 
@@ -250,10 +227,6 @@ def find_col(df, keywords, exclude_keywords=None):
     return None
 
 
-# ==================================================
-# 載入點名名單
-# ==================================================
-
 @st.cache_data(ttl=300)
 def load_attendance_students(term, dorm, floor):
     try:
@@ -266,17 +239,11 @@ def load_attendance_students(term, dorm, floor):
 
         ss = open_sheet(url)
 
-        sheet_name = get_floor_sheet_name(
-            dorm,
-            floor
-        )
+        sheet_name = get_floor_sheet_name(dorm, floor)
 
         time.sleep(0.3)
 
-        df = read_worksheet_df(
-            ss,
-            sheet_name
-        )
+        df = read_worksheet_df(ss, sheet_name)
 
         if df.empty:
             return pd.DataFrame()
@@ -292,71 +259,30 @@ def load_attendance_students(term, dorm, floor):
         result = pd.DataFrame()
 
         if bed_col:
-            result["床位"] = (
-                df[bed_col]
-                .astype(str)
-                .map(normalize_value)
-            )
-
-            result["房號"] = (
-                result["床位"]
-                .astype(str)
-                .str.split("-")
-                .str[0]
-            )
-
+            result["床位"] = df[bed_col].astype(str).map(normalize_value)
+            result["房號"] = result["床位"].astype(str).str.split("-").str[0]
         elif room_col:
-            result["房號"] = (
-                df[room_col]
-                .astype(str)
-                .map(normalize_value)
-            )
+            result["房號"] = df[room_col].astype(str).map(normalize_value)
             result["床位"] = result["房號"]
-
         else:
             return pd.DataFrame()
 
         if sid_col:
-            result["學號"] = (
-                df[sid_col]
-                .astype(str)
-                .map(normalize_value)
-            )
+            result["學號"] = df[sid_col].astype(str).map(normalize_value)
         else:
             result["學號"] = ""
 
-        result["姓名"] = (
-            df[name_col]
-            .astype(str)
-            .str.strip()
-        )
+        result["姓名"] = df[name_col].astype(str).str.strip()
 
-        result = result[
-            result["姓名"] != ""
-        ]
+        result = result[result["姓名"] != ""]
+        result = result[result["房號"] != ""]
 
-        result = result[
-            result["房號"] != ""
-        ]
-
-        return result[
-            [
-                "房號",
-                "床位",
-                "學號",
-                "姓名"
-            ]
-        ]
+        return result[["房號", "床位", "學號", "姓名"]]
 
     except Exception as e:
         st.error(f"讀取點名名單失敗：{e}")
         return pd.DataFrame()
 
-
-# ==================================================
-# 載入外宿 / 晚歸資料
-# 完全用學號判斷
-# ==================================================
 
 @st.cache_data(ttl=300)
 def load_special_status(term, attendance_date):
@@ -370,10 +296,11 @@ def load_special_status(term, attendance_date):
 
         target_date = pd.to_datetime(attendance_date).date()
 
-        outside_ids = set()
+        leave_ids = set()
         late_ids = set()
+        long_leave_ids = set()
 
-        # 外宿申請
+        # 外宿申請：紅色
         if not leave_df.empty:
             sid_col = find_col(leave_df, ["學號"])
             start_col = find_col(leave_df, ["申請日期"])
@@ -395,27 +322,25 @@ def load_special_status(term, attendance_date):
 
                     if (
                         sid
-                        and
-                        pd.notna(start_date)
-                        and
-                        pd.notna(end_date)
+                        and pd.notna(start_date)
+                        and pd.notna(end_date)
                     ):
                         if start_date.date() <= target_date <= end_date.date():
-                            outside_ids.add(sid)
+                            leave_ids.add(sid)
 
-        # 長期外宿
+        # 長期外宿：藍色
         if not long_leave_df.empty:
             sid_col = find_col(long_leave_df, ["學號"])
 
             if sid_col:
-                outside_ids.update(
+                long_leave_ids.update(
                     long_leave_df[sid_col]
                     .astype(str)
                     .map(normalize_value)
                     .tolist()
                 )
 
-        # 長期晚歸
+        # 長期晚歸：黃色
         if not late_df.empty:
             sid_col = find_col(late_df, ["學號"])
 
@@ -428,9 +353,14 @@ def load_special_status(term, attendance_date):
                 )
 
         return {
-            "outside_ids": {
+            "leave_ids": {
                 normalize_value(x)
-                for x in outside_ids
+                for x in leave_ids
+                if normalize_value(x) != ""
+            },
+            "long_leave_ids": {
+                normalize_value(x)
+                for x in long_leave_ids
                 if normalize_value(x) != ""
             },
             "late_ids": {
@@ -444,14 +374,11 @@ def load_special_status(term, attendance_date):
         st.warning(f"讀取外宿 / 晚歸資料失敗：{e}")
 
         return {
-            "outside_ids": set(),
+            "leave_ids": set(),
+            "long_leave_ids": set(),
             "late_ids": set(),
         }
 
-
-# ==================================================
-# 儲存點名結果
-# ==================================================
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
     ss = open_sheet(ROLLCALL_SHEET_URL)
@@ -459,7 +386,6 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
     try:
         ws = ss.worksheet(sheet_name)
-
     except:
         ws = ss.add_worksheet(
             title=sheet_name,
@@ -501,10 +427,6 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
 
-
-# ==================================================
-# 點名主畫面
-# ==================================================
 
 def show_attendance():
     st.header("點名系統")
@@ -556,24 +478,14 @@ def show_attendance():
         key="attendance_date"
     )
 
-    sheet_name = get_floor_sheet_name(
-        dorm,
-        floor
-    )
+    sheet_name = get_floor_sheet_name(dorm, floor)
 
     st.info(f"目前讀取 Sheet：{sheet_name}")
 
     if st.button("載入點名名單", key="load_attendance"):
-        students = load_attendance_students(
-            term,
-            dorm,
-            floor
-        )
+        students = load_attendance_students(term, dorm, floor)
 
-        special_status = load_special_status(
-            term,
-            attendance_date
-        )
+        special_status = load_special_status(term, attendance_date)
 
         st.session_state["attendance_students"] = students
         st.session_state["attendance_special_status"] = special_status
@@ -583,19 +495,18 @@ def show_attendance():
         else:
             st.success(f"成功載入 {len(students)} 筆資料")
             st.caption(
-                f"外宿 {len(special_status['outside_ids'])} 筆，"
-                f"晚歸 {len(special_status['late_ids'])} 筆"
+                f"外宿申請 {len(special_status['leave_ids'])} 筆，"
+                f"長期外宿 {len(special_status['long_leave_ids'])} 筆，"
+                f"長期晚歸 {len(special_status['late_ids'])} 筆"
             )
 
-    students = st.session_state.get(
-        "attendance_students",
-        pd.DataFrame()
-    )
+    students = st.session_state.get("attendance_students", pd.DataFrame())
 
     special_status = st.session_state.get(
         "attendance_special_status",
         {
-            "outside_ids": set(),
+            "leave_ids": set(),
+            "long_leave_ids": set(),
             "late_ids": set(),
         }
     )
@@ -603,31 +514,35 @@ def show_attendance():
     if students.empty:
         return
 
-    outside_ids = special_status.get("outside_ids", set())
+    leave_ids = special_status.get("leave_ids", set())
+    long_leave_ids = special_status.get("long_leave_ids", set())
     late_ids = special_status.get("late_ids", set())
 
     st.divider()
     st.subheader("點名名單")
-
-    st.caption("紅色：外宿　黃色：晚歸")
+    st.caption("紅色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
 
     final_rows = []
 
     for i, row in students.iterrows():
         sid = normalize_value(row["學號"])
 
-        is_outside = sid in outside_ids
-        is_late = sid in late_ids
-
-        if is_outside:
+        if sid in leave_ids:
             color = "red"
-            mark = "外宿"
-        elif is_late:
+            mark = "外宿申請"
+            default_status = "缺"
+        elif sid in long_leave_ids:
+            color = "blue"
+            mark = "長期外宿"
+            default_status = "缺"
+        elif sid in late_ids:
             color = "#b58900"
-            mark = "晚歸"
+            mark = "長期晚歸"
+            default_status = "在"
         else:
             color = "black"
             mark = ""
+            default_status = "在"
 
         cols = st.columns([1, 1, 1, 1, 1, 1])
 
@@ -655,11 +570,6 @@ def show_attendance():
             )
         else:
             cols[3].write("")
-
-        default_status = "在"
-
-        if is_outside:
-            default_status = "缺"
 
         status = cols[4].selectbox(
             "狀態",
