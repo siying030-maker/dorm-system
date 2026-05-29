@@ -51,13 +51,7 @@ if "點名系統" in tab_names:
     with tabs[tab_names.index("點名系統")]:
         show_attendance()
 
-if "連三天不假外宿" in tab_names:
-    with tabs[tab_names.index("連三天不假外宿")]:
-        rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
-        show_rollcall(
-            rollcall_ss,
-            mode="three_days"
-        )
+
 
 if "每日缺席名單" in tab_names:
     with tabs[tab_names.index("每日缺席名單")]:

@@ -80,12 +80,12 @@ def show_rollcall(rollcall_ss, mode="daily"):
         "月份",
         all_months,
         index=default_index,
-        key=f"{mode}_month"
+        key="daily_month"
     )
 
     search = st.text_input(
         "搜尋學號 / 姓名",
-        key=f"{mode}_search"
+        key="daily_search"
     )
 
     dates = sorted(
@@ -93,11 +93,7 @@ def show_rollcall(rollcall_ss, mode="daily"):
         reverse=True
     )
 
-    if mode == "daily":
-        show_daily(data, dates, search)
-
-    elif mode == "three_days":
-        show_three_days(data, dates, search)
+    show_daily(data, dates, search)
 
 
 def show_daily(data, dates, search):
@@ -147,80 +143,3 @@ def show_daily(data, dates, search):
 
     if not found:
         st.info("本月無資料")
-
-'''
-def show_three_days(data, dates, search):
-
-    st.header("連三天不假外宿")
-
-    found = False
-
-    for i in range(len(dates) - 2):
-
-        group = dates[i:i + 3]
-
-        dfs = []
-
-        for d in group:
-            df = data[d].copy()
-            df["日期"] = d
-            dfs.append(df)
-
-        total = pd.concat(dfs)
-
-        res = (
-            total.groupby(
-                ["房號", "學號", "姓名"]
-            )["日期"]
-            .nunique()
-            .reset_index()
-        )
-
-        res = res[res["日期"] == 3]
-
-        if search:
-            res = res[
-                res["學號"].astype(str).str.contains(search, na=False)
-                |
-                res["姓名"].astype(str).str.contains(search, na=False)
-            ]
-
-        if res.empty:
-            continue
-
-        found = True
-
-        show = res[["房號", "學號", "姓名"]]
-
-        st.subheader(f"{group[0]} ~ {group[-1]}")
-
-        unlive_ids = []
-
-        for d in group:
-            temp = data[d]
-            temp = temp[temp["狀態"] == "未入住"]
-
-            unlive_ids.extend(
-                temp["學號"]
-                .astype(str)
-                .tolist()
-            )
-
-        style_df = show.style.apply(
-            lambda row: [
-                "color:red;font-weight:bold"
-                if str(row["學號"]) in unlive_ids
-                else ""
-                for _ in row
-            ],
-            axis=1
-        )
-
-        st.dataframe(
-            style_df,
-            use_container_width=True
-        )
-
-    if not found:
-        st.info("無連續三天不假外宿")
-'''
