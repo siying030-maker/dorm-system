@@ -9,6 +9,10 @@ def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
 
+def normalize_yes(value):
+    return str(value).strip() == "是"
+
+
 @st.cache_data(ttl=300)
 def load_users(role):
     try:
@@ -93,15 +97,37 @@ def login_page():
             st.session_state.login = True
             st.session_state.role = "樓長"
             st.session_state.user = username
-            st.session_state.dorm = normalize_dorm(row.get("宿舍別", ""))
-            st.session_state.is_main = str(row.get("總樓", "")).strip() == "是"
-            st.session_state.manage_dorms = str(row.get("宿舍", "")).strip()
 
-            st.session_state.winter_main = str(row.get("寒假樓長", "")).strip() == "是"
-            st.session_state.winter_dorms = str(row.get("寒假宿舍別", "")).strip()
+            # 一般學期
+            st.session_state.dorm = normalize_dorm(
+                row.get("宿舍別", "")
+            )
 
-            st.session_state.summer_main = str(row.get("暑假樓長", "")).strip() == "是"
-            st.session_state.summer_dorms = str(row.get("暑假宿舍別", "")).strip()
+            st.session_state.is_main = normalize_yes(
+                row.get("總樓", "")
+            )
+
+            st.session_state.manage_dorms = str(
+                row.get("宿舍", "")
+            ).strip()
+
+            # 寒假樓長
+            st.session_state.winter_main = normalize_yes(
+                row.get("寒假樓長", "")
+            )
+
+            st.session_state.winter_dorms = str(
+                row.get("寒假宿舍別", "")
+            ).strip()
+
+            # 暑假樓長
+            st.session_state.summer_main = normalize_yes(
+                row.get("暑假樓長", "")
+            )
+
+            st.session_state.summer_dorms = str(
+                row.get("暑假宿舍別", "")
+            ).strip()
 
             st.rerun()
 
@@ -135,12 +161,14 @@ def login_page():
             st.session_state.login = True
             st.session_state.role = role
             st.session_state.user = username
+
             st.session_state.dorm = ""
             st.session_state.is_main = False
             st.session_state.manage_dorms = ""
 
             st.session_state.winter_main = False
             st.session_state.winter_dorms = ""
+
             st.session_state.summer_main = False
             st.session_state.summer_dorms = ""
 
