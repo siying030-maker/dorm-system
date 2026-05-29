@@ -4,7 +4,6 @@ def build_tabs(role, is_main):
 
     if role in ["舍監", "行政"]:
         tab_names += [
-            "連三天不假外宿",
             "每日缺席名單"
         ]
 
