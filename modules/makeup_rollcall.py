@@ -4,10 +4,10 @@ from datetime import datetime
 
 from core.google_api import open_sheet
 from core.config import (
+    NEED_MAKEUP_GIRL_URL,
+    NEED_MAKEUP_BOY_URL,
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
-    MAKEUP_GIRL_DONE_URL,
-    MAKEUP_BOY_DONE_URL,
 )
 
 
