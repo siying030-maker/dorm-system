@@ -1,43 +1,78 @@
 import pandas as pd
 import streamlit as st
-from datetime import datetime
 
+from datetime import datetime
 from core.google_api import rate_limit
 
 
 @st.cache_data(ttl=1800)
-def load_rollcall_data(_rollcall_ss):
+def load_rollcall_data(_rollcall_source):
 
     data = {}
 
-    for ws in _rollcall_ss.worksheets():
+    if not isinstance(_rollcall_source, list):
+        rollcall_sources = [_rollcall_source]
+    else:
+        rollcall_sources = _rollcall_source
 
-        try:
-            datetime.strptime(ws.title, "%Y-%m-%d")
+    for rollcall_ss in rollcall_sources:
 
-            rate_limit()
-            values = ws.get_all_values()
+        for ws in rollcall_ss.worksheets():
 
-            if len(values) <= 1:
+            try:
+                try:
+                    datetime.strptime(ws.title, "%Y-%m-%d")
+                except:
+                    datetime.strptime(ws.title, "%Y/%m/%d")
+
+                rate_limit()
+                values = ws.get_all_values()
+
+                if len(values) <= 1:
+                    continue
+
+                df = pd.DataFrame(
+                    values[1:],
+                    columns=values[0]
+                )
+
+                df.columns = df.columns.astype(str).str.strip()
+
+                if "狀態" not in df.columns:
+                    continue
+
+                df["狀態"] = (
+                    df["狀態"]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                df = df[
+                    df["狀態"].isin(["缺", "未入住"])
+                ].copy()
+
+                if "姓名" in df.columns:
+                    df = df[
+                        df["姓名"]
+                        .astype(str)
+                        .str.strip() != ""
+                    ]
+
+                if df.empty:
+                    continue
+
+                key = ws.title.replace("/", "-")
+
+                if key in data:
+                    data[key] = pd.concat(
+                        [data[key], df],
+                        ignore_index=True
+                    )
+                else:
+                    data[key] = df
+
+            except:
                 continue
-
-            df = pd.DataFrame(values[1:], columns=values[0])
-            df.columns = df.columns.astype(str).str.strip()
-
-            if "狀態" not in df.columns:
-                continue
-
-            df["狀態"] = df["狀態"].astype(str).str.strip()
-
-            df = df[df["狀態"].isin(["缺", "未入住"])].copy()
-
-            if "姓名" in df.columns:
-                df = df[df["姓名"].astype(str).str.strip() != ""]
-
-            data[ws.title] = df
-
-        except:
-            continue
 
     return data
 
@@ -58,6 +93,7 @@ def show_rollcall(rollcall_ss, mode="daily"):
     current_month = datetime.now().strftime("%Y-%m")
 
     default_index = 0
+
     if current_month in all_months:
         default_index = all_months.index(current_month)
 
@@ -74,16 +110,24 @@ def show_rollcall(rollcall_ss, mode="daily"):
     )
 
     dates = sorted(
-        [d for d in data.keys() if d.startswith(month)],
+        [
+            d
+            for d in data.keys()
+            if d.startswith(month)
+        ],
         reverse=True
     )
 
-    show_daily(data, dates, search)
+    show_daily(
+        data,
+        dates,
+        search
+    )
 
 
 def show_daily(data, dates, search):
 
-    st.header("每日缺席名單")
+    st.header("每日點名未到名單")
 
     found = False
 
@@ -93,34 +137,67 @@ def show_daily(data, dates, search):
 
         if search:
             df = df[
-                df["學號"].astype(str).str.contains(search, na=False)
+                df["學號"]
+                .astype(str)
+                .str.contains(search, na=False)
                 |
-                df["姓名"].astype(str).str.contains(search, na=False)
+                df["姓名"]
+                .astype(str)
+                .str.contains(search, na=False)
             ]
 
         if df.empty:
             continue
 
         found = True
+
         st.subheader(d)
 
-        show = df[["房號", "學號", "姓名"]]
+        show_cols = [
+            c for c in [
+                "宿舍",
+                "樓層",
+                "房號",
+                "床位",
+                "學號",
+                "姓名",
+                "狀態"
+            ]
+            if c in df.columns
+        ]
 
-        unlive_ids = df[
-            df["狀態"] == "未入住"
-        ]["學號"].astype(str).tolist()
+        show = df[show_cols]
 
-        style_df = show.style.apply(
-            lambda row: [
-                "color:red;font-weight:bold"
-                if str(row["學號"]) in unlive_ids
-                else ""
-                for _ in row
-            ],
-            axis=1
-        )
+        if "學號" in df.columns and "狀態" in df.columns:
 
-        st.dataframe(style_df, use_container_width=True)
+            unlive_ids = df[
+                df["狀態"] == "未入住"
+            ]["學號"].astype(str).tolist()
+
+            style_df = show.style.apply(
+                lambda row: [
+                    "color:red;font-weight:bold"
+                    if (
+                        "學號" in row.index
+                        and str(row["學號"]) in unlive_ids
+                    )
+                    else ""
+                    for _ in row
+                ],
+                axis=1
+            )
+
+            st.dataframe(
+                style_df,
+                use_container_width=True
+            )
+
+        else:
+
+            st.dataframe(
+                show,
+                use_container_width=True
+            )
 
     if not found:
         st.info("本月無資料")

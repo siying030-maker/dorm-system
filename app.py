@@ -46,7 +46,6 @@ tab_names = build_tabs(
     st.session_state.is_main
 )
 
-# 確保新增功能一定出現
 extra_tabs = [
     "補點名單",
     "獎懲查詢"
@@ -56,7 +55,6 @@ for t in extra_tabs:
     if t not in tab_names:
         tab_names.append(t)
 
-# 移除連三天不假外宿
 tab_names = [
     t for t in tab_names
     if t != "連三天不假外宿"
@@ -74,49 +72,78 @@ if "點名系統" in tab_names:
         show_attendance()
 
 
-if "每日缺席名單" in tab_names:
-    with tabs[tab_names.index("每日缺席名單")]:
+if "每日點名未到名單" in tab_names:
+    with tabs[tab_names.index("每日點名未到名單")]:
 
         role = st.session_state.get("role", "")
-        supervisor_type = st.session_state.get("supervisor_type", "")
-        dorm = st.session_state.get("dorm", "")
+        supervisor_type = st.session_state.get(
+            "supervisor_type",
+            ""
+        )
+        dorm = st.session_state.get(
+            "dorm",
+            ""
+        )
 
+        # 行政：全部顯示，但畫面不分男女
         if role == "行政":
 
-            st.subheader("女生缺席名單")
             girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-            show_rollcall(girl_ss, mode="daily_girl")
-
-            st.divider()
-
-            st.subheader("男生缺席名單")
             boy_ss = open_sheet(ROLLCALL_BOY_URL)
-            show_rollcall(boy_ss, mode="daily_boy")
 
+            show_rollcall(
+                [girl_ss, boy_ss],
+                mode="daily_all"
+            )
+
+        # 舍監：依男舍監 / 女舍監限制
         elif role == "舍監":
 
             if supervisor_type == "男舍監":
+
                 rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
-                show_rollcall(rollcall_ss, mode="daily_boy")
+
+                show_rollcall(
+                    rollcall_ss,
+                    mode="daily_boy"
+                )
 
             elif supervisor_type == "女舍監":
+
                 rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
-                show_rollcall(rollcall_ss, mode="daily_girl")
+
+                show_rollcall(
+                    rollcall_ss,
+                    mode="daily_girl"
+                )
 
             else:
+
                 st.warning("無法判斷舍監性別")
 
+        # 樓長：依宿舍別限制
         elif role == "樓長":
 
             if str(dorm).startswith("男"):
+
                 rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
-                show_rollcall(rollcall_ss, mode="daily_boy")
+
+                show_rollcall(
+                    rollcall_ss,
+                    mode="daily_boy"
+                )
 
             elif str(dorm).startswith("女"):
+
                 rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
-                show_rollcall(rollcall_ss, mode="daily_girl")
+
+                show_rollcall(
+                    rollcall_ss,
+                    mode="daily_girl"
+                )
 
             else:
+
                 st.warning("無法判斷樓長宿舍性別")
 
 
@@ -132,6 +159,7 @@ if "獎懲查詢" in tab_names:
 
 if "上學期門禁" in tab_names:
     with tabs[tab_names.index("上學期門禁")]:
+
         upper_ss = open_sheet(UPPER_GATE_URL)
 
         show_gate(
@@ -143,6 +171,7 @@ if "上學期門禁" in tab_names:
 
 if "下學期門禁" in tab_names:
     with tabs[tab_names.index("下學期門禁")]:
+
         lower_ss = open_sheet(LOWER_GATE_URL)
 
         show_gate(
