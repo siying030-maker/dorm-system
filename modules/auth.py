@@ -173,8 +173,8 @@ def login_page():
 
             if "男" in supervisor_type:
                 supervisor_type = "男舍監"
-                elif "女" in supervisor_type:
-            supervisor_type = "女舍監"
+            elif "女" in supervisor_type:
+                supervisor_type = "女舍監"
 
             st.session_state.supervisor_type = supervisor_type
 
