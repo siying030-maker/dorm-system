@@ -471,22 +471,47 @@ def append_rows_to_sheet(url, sheet_name, headers, rows):
         ws.append_rows(rows)
 
 
+def append_rows_to_sheet(url, sheet_name, headers, rows):
+
+    ss = open_sheet(url)
+
+    try:
+        ws = ss.worksheet(sheet_name)
+
+    except:
+
+        ws = ss.add_worksheet(
+            title=sheet_name,
+            rows=3000,
+            cols=len(headers) + 5
+        )
+
+        ws.append_row(headers)
+
+    if rows:
+
+        ws.append_rows(rows)
+
+
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
     gender = get_dorm_gender(dorm)
 
     if gender == "女生":
+
         need_makeup_url = NEED_MAKEUP_GIRL_URL
-        total_url = ROLLCALL_GIRL_URL
+        rollcall_url = ROLLCALL_GIRL_URL
 
     elif gender == "男生":
+
         need_makeup_url = NEED_MAKEUP_BOY_URL
-        total_url = ROLLCALL_BOY_URL
+        rollcall_url = ROLLCALL_BOY_URL
 
     else:
+
         raise Exception("無法判斷宿舍性別")
 
-    sheet_name = str(attendance_date).replace("-", "/")
+    sheet_name = str(attendance_date)
 
     headers = [
         "日期",
@@ -501,10 +526,13 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     ]
 
     all_rows = []
-
     absent_rows = []
 
     for _, r in final_df.iterrows():
+
+        status = str(
+            r.get("狀態", "")
+        ).strip()
 
         row_data = [
             str(attendance_date),
@@ -514,15 +542,16 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("床位", ""),
             r.get("學號", ""),
             r.get("姓名", ""),
-            r.get("狀態", ""),
+            status,
             r.get("備註", "")
         ]
 
-        # 1. 完整點名名單 → 需補點名單
+        # 完整名單 → 需補點名單
         all_rows.append(row_data)
 
-        # 2. 狀態是缺 → 點名總表
-        if str(r.get("狀態", "")).strip() == "缺":
+        # 狀態=缺 → 點名總表
+        if status == "缺":
+
             absent_rows.append(row_data)
 
     append_rows_to_sheet(
@@ -533,7 +562,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     )
 
     append_rows_to_sheet(
-        total_url,
+        rollcall_url,
         sheet_name,
         headers,
         absent_rows
