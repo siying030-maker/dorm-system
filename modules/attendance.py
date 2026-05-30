@@ -9,6 +9,8 @@ from core.config import (
     LOWER_GATE_URL,
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
+    NEED_MAKEUP_GIRL_URL,
+    NEED_MAKEUP_BOY_URL,
 )
 
 
@@ -449,20 +451,9 @@ def load_special_status(term, attendance_date):
         }
 
 
-def save_rollcall_result(attendance_date, dorm, floor, final_df):
+def append_rows_to_sheet(url, sheet_name, headers, rows):
 
-    gender = get_dorm_gender(dorm)
-
-    if gender == "女生":
-        save_url = ROLLCALL_GIRL_URL
-    elif gender == "男生":
-        save_url = ROLLCALL_BOY_URL
-    else:
-        raise Exception("無法判斷宿舍性別")
-
-    ss = open_sheet(save_url)
-
-    sheet_name = str(attendance_date).replace("-", "/")
+    ss = open_sheet(url)
 
     try:
         ws = ss.worksheet(sheet_name)
@@ -471,25 +462,51 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         ws = ss.add_worksheet(
             title=sheet_name,
             rows=3000,
-            cols=20
+            cols=len(headers) + 5
         )
 
-        ws.append_row([
-            "日期",
-            "宿舍",
-            "樓層",
-            "房號",
-            "床位",
-            "學號",
-            "姓名",
-            "狀態",
-            "備註"
-        ])
+        ws.append_row(headers)
 
-    rows = []
+    if rows:
+        ws.append_rows(rows)
+
+
+def save_rollcall_result(attendance_date, dorm, floor, final_df):
+
+    gender = get_dorm_gender(dorm)
+
+    if gender == "女生":
+        need_makeup_url = NEED_MAKEUP_GIRL_URL
+        total_url = ROLLCALL_GIRL_URL
+
+    elif gender == "男生":
+        need_makeup_url = NEED_MAKEUP_BOY_URL
+        total_url = ROLLCALL_BOY_URL
+
+    else:
+        raise Exception("無法判斷宿舍性別")
+
+    sheet_name = str(attendance_date).replace("-", "/")
+
+    headers = [
+        "日期",
+        "宿舍",
+        "樓層",
+        "房號",
+        "床位",
+        "學號",
+        "姓名",
+        "狀態",
+        "備註"
+    ]
+
+    all_rows = []
+
+    absent_rows = []
 
     for _, r in final_df.iterrows():
-        rows.append([
+
+        row_data = [
             str(attendance_date),
             dorm,
             floor,
@@ -499,10 +516,28 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("姓名", ""),
             r.get("狀態", ""),
             r.get("備註", "")
-        ])
+        ]
 
-    if rows:
-        ws.append_rows(rows)
+        # 1. 完整點名名單 → 需補點名單
+        all_rows.append(row_data)
+
+        # 2. 狀態是缺 → 點名總表
+        if str(r.get("狀態", "")).strip() == "缺":
+            absent_rows.append(row_data)
+
+    append_rows_to_sheet(
+        need_makeup_url,
+        sheet_name,
+        headers,
+        all_rows
+    )
+
+    append_rows_to_sheet(
+        total_url,
+        sheet_name,
+        headers,
+        absent_rows
+    )
 
 
 def color_text(text, color):
