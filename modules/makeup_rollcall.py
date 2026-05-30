@@ -38,7 +38,7 @@ def get_allowed_genders():
 @st.cache_data(ttl=1800)
 def load_makeup_source(gender):
 
-    source_url = ROLLCALL_GIRL_URL if gender == "女生" else ROLLCALL_BOY_URL
+    source_url = NEED_MAKEUP_GIRL_URL if gender == "女生" else NEED_MAKEUP_BOY_URL
     ss = open_sheet(source_url)
 
     dfs = []
@@ -80,7 +80,7 @@ def load_makeup_source(gender):
 
 def save_makeup_done(gender, row, note):
 
-    done_url = MAKEUP_GIRL_DONE_URL if gender == "女生" else MAKEUP_BOY_DONE_URL
+    done_url = ROLLCALL_GIRL_URL if gender == "女生" else ROLLCALL_BOY_URL
     ss = open_sheet(done_url)
 
     sheet_name = datetime.now().strftime("%Y-%m-%d")
