@@ -17,10 +17,6 @@ ROLLCALL_GIRL_URL = "https://docs.google.com/spreadsheets/d/1g61t00V8bryJ4DpCmr9
 
 ROLLCALL_BOY_URL = "https://docs.google.com/spreadsheets/d/1ubmLRHdHebjKtVKx60e8rIdq_tI4SGwQq6eCW06uME0/edit?usp=sharing"
 
-MAKEUP_GIRL_SOURCE_URL = "https://docs.google.com/spreadsheets/d/1g61t00V8bryJ4DpCmr9bnjpk1e3rUAP3xHbRPlomirM/edit?usp=sharing"
-
-MAKEUP_BOY_SOURCE_URL = "https://docs.google.com/spreadsheets/d/1ubmLRHdHebjKtVKx60e8rIdq_tI4SGwQq6eCW06uME0/edit?usp=sharing"
-
 MAKEUP_GIRL_DONE_URL = "https://docs.google.com/spreadsheets/d/1XZClFI-8ffBtTWB47nVyRYqWDFRGZxzKhYcdwwpCJQs/edit?usp=sharing"
 
 MAKEUP_BOY_DONE_URL = "https://docs.google.com/spreadsheets/d/1_9kKWqOmFPBvN1FWA4aP_lSAuPbP8ppk6ILJBTJdelA/edit?usp=sharing"

@@ -4,26 +4,58 @@ from datetime import datetime
 
 from core.google_api import open_sheet
 from core.config import (
-    MAKEUP_GIRL_SOURCE_URL,
-    MAKEUP_BOY_SOURCE_URL,
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
     MAKEUP_GIRL_DONE_URL,
     MAKEUP_BOY_DONE_URL,
 )
 
 
-def read_all_sheets(url):
-    ss = open_sheet(url)
+@st.cache_data(ttl=300)
+def load_makeup_source(gender):
+
+    source_url = (
+        ROLLCALL_GIRL_URL
+        if gender == "女生"
+        else ROLLCALL_BOY_URL
+    )
+
+    ss = open_sheet(source_url)
+
     dfs = []
 
     for ws in ss.worksheets():
+
         try:
             values = ws.get_all_values()
 
             if len(values) <= 1:
                 continue
 
-            df = pd.DataFrame(values[1:], columns=values[0])
+            df = pd.DataFrame(
+                values[1:],
+                columns=values[0]
+            )
+
             df.columns = df.columns.astype(str).str.strip()
+
+            if "狀態" not in df.columns:
+                continue
+
+            df["狀態"] = (
+                df["狀態"]
+                .astype(str)
+                .str.strip()
+            )
+
+            # 只顯示缺
+            df = df[
+                df["狀態"] == "缺"
+            ].copy()
+
+            if df.empty:
+                continue
+
             df["來源Sheet"] = ws.title
 
             dfs.append(df)
@@ -32,26 +64,39 @@ def read_all_sheets(url):
             continue
 
     if dfs:
-        return pd.concat(dfs, ignore_index=True)
+        return pd.concat(
+            dfs,
+            ignore_index=True
+        )
 
     return pd.DataFrame()
 
 
-def save_done(gender, row, note):
-    if gender == "女生":
-        ss = open_sheet(MAKEUP_GIRL_DONE_URL)
-    else:
-        ss = open_sheet(MAKEUP_BOY_DONE_URL)
+def save_makeup_done(gender, row, note):
+
+    done_url = (
+        MAKEUP_GIRL_DONE_URL
+        if gender == "女生"
+        else MAKEUP_BOY_DONE_URL
+    )
+
+    ss = open_sheet(done_url)
 
     sheet_name = datetime.now().strftime("%Y-%m-%d")
 
     try:
         ws = ss.worksheet(sheet_name)
+
     except:
-        ws = ss.add_worksheet(title=sheet_name, rows=2000, cols=20)
+        ws = ss.add_worksheet(
+            title=sheet_name,
+            rows=3000,
+            cols=20
+        )
+
         ws.append_row([
             "補點完成時間",
-            "日期",
+            "原點名日期",
             "宿舍",
             "樓層",
             "房號",
@@ -81,6 +126,7 @@ def save_done(gender, row, note):
 
 
 def show_makeup_rollcall():
+
     st.header("補點名單")
 
     gender = st.selectbox(
@@ -89,18 +135,11 @@ def show_makeup_rollcall():
         key="makeup_gender"
     )
 
-    source_url = MAKEUP_GIRL_SOURCE_URL if gender == "女生" else MAKEUP_BOY_SOURCE_URL
-
-    df = read_all_sheets(source_url)
+    df = load_makeup_source(gender)
 
     if df.empty:
-        st.warning("沒有須補點資料")
+        st.warning("目前沒有須補點資料")
         return
-
-    if "狀態" in df.columns:
-        df = df[
-            df["狀態"].astype(str).str.strip().isin(["缺", "未入住"])
-        ]
 
     keyword = st.text_input(
         "搜尋學號 / 姓名 / 房號",
@@ -114,16 +153,33 @@ def show_makeup_rollcall():
 
         for col in ["學號", "姓名", "房號", "床位"]:
             if col in df.columns:
-                condition = condition | df[col].astype(str).str.contains(keyword, na=False)
+                condition = (
+                    condition
+                    |
+                    df[col]
+                    .astype(str)
+                    .str.contains(keyword, na=False)
+                )
 
         df = df[condition]
 
     if df.empty:
-        st.info("查無須補點資料")
+        st.info("查無符合條件的補點名資料")
         return
 
     show_cols = [
-        c for c in ["日期", "宿舍", "樓層", "房號", "床位", "學號", "姓名", "狀態", "備註", "來源Sheet"]
+        c for c in [
+            "日期",
+            "宿舍",
+            "樓層",
+            "房號",
+            "床位",
+            "學號",
+            "姓名",
+            "狀態",
+            "備註",
+            "來源Sheet"
+        ]
         if c in df.columns
     ]
 
@@ -133,22 +189,31 @@ def show_makeup_rollcall():
     )
 
     st.divider()
-    st.subheader("補點完成登記")
+
+    st.subheader("補點完成回報")
 
     options = []
 
     for i, row in df.iterrows():
-        label = f'{row.get("日期", "")}｜{row.get("房號", "")}｜{row.get("學號", "")}｜{row.get("姓名", "")}'
+
+        label = (
+            f'{row.get("日期", "")}｜'
+            f'{row.get("房號", "")}｜'
+            f'{row.get("學號", "")}｜'
+            f'{row.get("姓名", "")}'
+        )
+
         options.append((i, label))
 
     selected_label = st.selectbox(
-        "選擇要補點完成的學生",
+        "選擇已補點學生",
         [x[1] for x in options],
         key="makeup_selected"
     )
 
     selected_index = [
-        x[0] for x in options
+        x[0]
+        for x in options
         if x[1] == selected_label
     ][0]
 
@@ -157,11 +222,23 @@ def show_makeup_rollcall():
         key="makeup_note"
     )
 
-    if st.button("送出補點完成", key="submit_makeup"):
-        row = df.loc[selected_index].to_dict()
+    if st.button(
+        "送出補點完成",
+        key="submit_makeup"
+    ):
 
         try:
-            save_done(gender, row, note)
-            st.success("補點完成已回傳至新的試算表")
+            row = df.loc[selected_index].to_dict()
+
+            save_makeup_done(
+                gender,
+                row,
+                note
+            )
+
+            st.success("補點完成已回傳")
+
+            st.cache_data.clear()
+
         except Exception as e:
-            st.error(f"儲存失敗：{e}")
+            st.error(f"回傳失敗：{e}")
