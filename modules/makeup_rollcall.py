@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+from datetime import date
 from core.google_api import open_sheet
 from core.config import (
     NEED_MAKEUP_GIRL_URL,
@@ -10,6 +11,13 @@ from core.config import (
 )
 
 
+# ==================================================
+# 權限判斷
+# 行政：沒有補點權限
+# 男舍監 / 男樓長：只能補男生
+# 女舍監 / 女樓長：只能補女生
+# ==================================================
+
 def get_allowed_genders():
 
     role = st.session_state.get("role", "")
@@ -17,7 +25,7 @@ def get_allowed_genders():
     dorm = st.session_state.get("dorm", "")
 
     if role == "行政":
-        return ["女生", "男生"]
+        return []
 
     if role == "舍監":
 
@@ -38,6 +46,10 @@ def get_allowed_genders():
     return []
 
 
+# ==================================================
+# 只讀取今天的需補點名單 Sheet
+# ==================================================
+
 @st.cache_data(ttl=300)
 def load_need_makeup_source(gender):
 
@@ -49,57 +61,58 @@ def load_need_makeup_source(gender):
 
     ss = open_sheet(source_url)
 
-    dfs = []
+    today1 = str(date.today())
+    today2 = today1.replace("-", "/")
 
-    for ws in ss.worksheets():
+    ws = None
+
+    for sheet_name in [today1, today2]:
 
         try:
-
-            values = ws.get_all_values()
-
-            if len(values) <= 1:
-                continue
-
-            df = pd.DataFrame(
-                values[1:],
-                columns=values[0]
-            )
-
-            df.columns = df.columns.astype(str).str.strip()
-
-            if "狀態" not in df.columns:
-                continue
-
-            df["狀態"] = (
-                df["狀態"]
-                .astype(str)
-                .str.strip()
-            )
-
-            # 只抓樓長點名為缺的人
-            df = df[
-                df["狀態"] == "缺"
-            ].copy()
-
-            if df.empty:
-                continue
-
-            df["性別"] = gender
-            df["來源Sheet"] = ws.title
-
-            dfs.append(df)
+            ws = ss.worksheet(sheet_name)
+            break
 
         except:
-            continue
+            pass
 
-    if dfs:
-        return pd.concat(
-            dfs,
-            ignore_index=True
-        )
+    if ws is None:
+        return pd.DataFrame()
 
-    return pd.DataFrame()
+    values = ws.get_all_values()
 
+    if len(values) <= 1:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(
+        values[1:],
+        columns=values[0]
+    )
+
+    df.columns = df.columns.astype(str).str.strip()
+
+    if "狀態" not in df.columns:
+        return pd.DataFrame()
+
+    df["狀態"] = (
+        df["狀態"]
+        .astype(str)
+        .str.strip()
+    )
+
+    df = df[df["狀態"] == "缺"].copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    df["性別"] = gender
+    df["來源Sheet"] = ws.title
+
+    return df
+
+
+# ==================================================
+# 欄位位置
+# ==================================================
 
 def find_col_index(headers, col_name):
 
@@ -111,6 +124,10 @@ def find_col_index(headers, col_name):
     return None
 
 
+# ==================================================
+# 更新點名總表：缺 -> 已補點
+# ==================================================
+
 def update_rollcall_status_to_makeup(gender, target_row):
 
     rollcall_url = (
@@ -121,27 +138,15 @@ def update_rollcall_status_to_makeup(gender, target_row):
 
     ss = open_sheet(rollcall_url)
 
-    sheet_name = str(
-        target_row.get("來源Sheet", "")
-    ).strip()
-
-    sid = str(
-        target_row.get("學號", "")
-    ).strip()
-
-    rollcall_date = str(
-        target_row.get("日期", "")
-    ).strip()
+    sheet_name = str(target_row.get("來源Sheet", "")).strip()
+    sid = str(target_row.get("學號", "")).strip()
+    rollcall_date = str(target_row.get("日期", "")).strip()
 
     try:
-
         ws = ss.worksheet(sheet_name)
 
     except:
-
-        raise Exception(
-            f"點名總表找不到 Sheet：{sheet_name}"
-        )
+        raise Exception(f"點名總表找不到 Sheet：{sheet_name}")
 
     values = ws.get_all_values()
 
@@ -150,20 +155,9 @@ def update_rollcall_status_to_makeup(gender, target_row):
 
     headers = values[0]
 
-    sid_col = find_col_index(
-        headers,
-        "學號"
-    )
-
-    status_col = find_col_index(
-        headers,
-        "狀態"
-    )
-
-    date_col = find_col_index(
-        headers,
-        "日期"
-    )
+    sid_col = find_col_index(headers, "學號")
+    status_col = find_col_index(headers, "狀態")
+    date_col = find_col_index(headers, "日期")
 
     if sid_col is None:
         raise Exception("點名總表找不到「學號」欄位")
@@ -174,11 +168,10 @@ def update_rollcall_status_to_makeup(gender, target_row):
     for row_index, row in enumerate(values[1:], start=2):
 
         row_sid = ""
+        row_date = ""
 
         if len(row) >= sid_col:
             row_sid = str(row[sid_col - 1]).strip()
-
-        row_date = ""
 
         if date_col and len(row) >= date_col:
             row_date = str(row[date_col - 1]).strip()
@@ -195,10 +188,13 @@ def update_rollcall_status_to_makeup(gender, target_row):
 
                 return True
 
-    raise Exception(
-        f"點名總表找不到此學生：{sid}"
-    )
+    raise Exception(f"點名總表找不到此學生：{sid}")
 
+
+# ==================================================
+# 更新需補點名單：缺 -> 已補點
+# 避免補完後還一直顯示
+# ==================================================
 
 def update_need_makeup_status_to_done(gender, target_row):
 
@@ -210,27 +206,15 @@ def update_need_makeup_status_to_done(gender, target_row):
 
     ss = open_sheet(source_url)
 
-    sheet_name = str(
-        target_row.get("來源Sheet", "")
-    ).strip()
-
-    sid = str(
-        target_row.get("學號", "")
-    ).strip()
-
-    rollcall_date = str(
-        target_row.get("日期", "")
-    ).strip()
+    sheet_name = str(target_row.get("來源Sheet", "")).strip()
+    sid = str(target_row.get("學號", "")).strip()
+    rollcall_date = str(target_row.get("日期", "")).strip()
 
     try:
-
         ws = ss.worksheet(sheet_name)
 
     except:
-
-        raise Exception(
-            f"需補點名單找不到 Sheet：{sheet_name}"
-        )
+        raise Exception(f"需補點名單找不到 Sheet：{sheet_name}")
 
     values = ws.get_all_values()
 
@@ -249,11 +233,10 @@ def update_need_makeup_status_to_done(gender, target_row):
     for row_index, row in enumerate(values[1:], start=2):
 
         row_sid = ""
+        row_date = ""
 
         if len(row) >= sid_col:
             row_sid = str(row[sid_col - 1]).strip()
-
-        row_date = ""
 
         if date_col and len(row) >= date_col:
             row_date = str(row[date_col - 1]).strip()
@@ -271,6 +254,10 @@ def update_need_makeup_status_to_done(gender, target_row):
                 return
 
 
+# ==================================================
+# 主畫面
+# ==================================================
+
 def show_makeup_rollcall():
 
     st.header("補點名單")
@@ -278,8 +265,7 @@ def show_makeup_rollcall():
     allowed_genders = get_allowed_genders()
 
     if not allowed_genders:
-
-        st.warning("沒有補點名單權限")
+        st.info("您沒有補點權限")
         return
 
     dfs = []
@@ -292,8 +278,7 @@ def show_makeup_rollcall():
             dfs.append(df)
 
     if not dfs:
-
-        st.warning("目前沒有須補點資料")
+        st.warning("目前沒有當日須補點資料")
         return
 
     df = pd.concat(
@@ -304,16 +289,12 @@ def show_makeup_rollcall():
     role = st.session_state.get("role", "")
     dorm = st.session_state.get("dorm", "")
 
-    # 樓長只看自己宿舍
     if role == "樓長" and "宿舍" in df.columns:
 
         df = df[
             df["宿舍"]
             .astype(str)
-            .str.contains(
-                str(dorm),
-                na=False
-            )
+            .str.contains(str(dorm), na=False)
         ]
 
     keyword = st.text_input(
@@ -339,16 +320,12 @@ def show_makeup_rollcall():
                     |
                     df[col]
                     .astype(str)
-                    .str.contains(
-                        keyword,
-                        na=False
-                    )
+                    .str.contains(keyword, na=False)
                 )
 
         df = df[condition]
 
     if df.empty:
-
         st.info("查無符合條件的補點名資料")
         return
 
@@ -390,9 +367,7 @@ def show_makeup_rollcall():
             f'{row.get("姓名", "")}'
         )
 
-        options.append(
-            (i, label)
-        )
+        options.append((i, label))
 
     selected_label = st.selectbox(
         "選擇已補點學生",
@@ -406,29 +381,18 @@ def show_makeup_rollcall():
         if x[1] == selected_label
     ][0]
 
-    if st.button(
-        "確認補點完成",
-        key="submit_makeup"
-    ):
+    if st.button("確認補點完成", key="submit_makeup"):
 
         try:
+            target_row = df.loc[selected_index].to_dict()
 
-            target_row = df.loc[
-                selected_index
-            ].to_dict()
+            gender = target_row.get("性別", "")
 
-            gender = target_row.get(
-                "性別",
-                ""
-            )
-
-            # 1. 點名總表：缺 → 已補點
             update_rollcall_status_to_makeup(
                 gender,
                 target_row
             )
 
-            # 2. 需補點名單也改成已補點，避免重複顯示
             update_need_makeup_status_to_done(
                 gender,
                 target_row
@@ -439,5 +403,4 @@ def show_makeup_rollcall():
             st.success("已將狀態更新為：已補點")
 
         except Exception as e:
-
             st.error(f"更新失敗：{e}")
