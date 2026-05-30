@@ -77,21 +77,47 @@ if "點名系統" in tab_names:
 if "每日缺席名單" in tab_names:
     with tabs[tab_names.index("每日缺席名單")]:
 
-        gender = st.selectbox(
-            "選擇點名資料",
-            ["女生", "男生"],
-            key="daily_absent_gender"
-        )
+        role = st.session_state.get("role", "")
+        supervisor_type = st.session_state.get("supervisor_type", "")
+        dorm = st.session_state.get("dorm", "")
 
-        if gender == "女生":
-            rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
-        else:
-            rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
+        if role == "行政":
 
-        show_rollcall(
-            rollcall_ss,
-            mode="daily"
-        )
+            st.subheader("女生缺席名單")
+            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
+            show_rollcall(girl_ss, mode="daily_girl")
+
+            st.divider()
+
+            st.subheader("男生缺席名單")
+            boy_ss = open_sheet(ROLLCALL_BOY_URL)
+            show_rollcall(boy_ss, mode="daily_boy")
+
+        elif role == "舍監":
+
+            if supervisor_type == "男舍監":
+                rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
+                show_rollcall(rollcall_ss, mode="daily_boy")
+
+            elif supervisor_type == "女舍監":
+                rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
+                show_rollcall(rollcall_ss, mode="daily_girl")
+
+            else:
+                st.warning("無法判斷舍監性別")
+
+        elif role == "樓長":
+
+            if str(dorm).startswith("男"):
+                rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
+                show_rollcall(rollcall_ss, mode="daily_boy")
+
+            elif str(dorm).startswith("女"):
+                rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
+                show_rollcall(rollcall_ss, mode="daily_girl")
+
+            else:
+                st.warning("無法判斷樓長宿舍性別")
 
 
 if "補點名單" in tab_names:

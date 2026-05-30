@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
-
 from datetime import datetime
+
 from core.google_api import rate_limit
 
 
@@ -21,32 +21,18 @@ def load_rollcall_data(_rollcall_ss):
             if len(values) <= 1:
                 continue
 
-            df = pd.DataFrame(
-                values[1:],
-                columns=values[0]
-            )
-
-            df.columns = df.columns.str.strip()
+            df = pd.DataFrame(values[1:], columns=values[0])
+            df.columns = df.columns.astype(str).str.strip()
 
             if "狀態" not in df.columns:
                 continue
 
-            df["狀態"] = (
-                df["狀態"]
-                .astype(str)
-                .str.strip()
-            )
+            df["狀態"] = df["狀態"].astype(str).str.strip()
 
-            df = df[
-                df["狀態"].isin(["缺", "未入住"])
-            ].copy()
+            df = df[df["狀態"].isin(["缺", "未入住"])].copy()
 
             if "姓名" in df.columns:
-                df = df[
-                    df["姓名"]
-                    .astype(str)
-                    .str.strip() != ""
-                ]
+                df = df[df["姓名"].astype(str).str.strip() != ""]
 
             data[ws.title] = df
 
@@ -72,7 +58,6 @@ def show_rollcall(rollcall_ss, mode="daily"):
     current_month = datetime.now().strftime("%Y-%m")
 
     default_index = 0
-
     if current_month in all_months:
         default_index = all_months.index(current_month)
 
@@ -80,12 +65,12 @@ def show_rollcall(rollcall_ss, mode="daily"):
         "月份",
         all_months,
         index=default_index,
-        key="daily_month"
+        key=f"{mode}_month"
     )
 
     search = st.text_input(
         "搜尋學號 / 姓名",
-        key="daily_search"
+        key=f"{mode}_search"
     )
 
     dates = sorted(
@@ -117,7 +102,6 @@ def show_daily(data, dates, search):
             continue
 
         found = True
-
         st.subheader(d)
 
         show = df[["房號", "學號", "姓名"]]
@@ -136,10 +120,7 @@ def show_daily(data, dates, search):
             axis=1
         )
 
-        st.dataframe(
-            style_df,
-            use_container_width=True
-        )
+        st.dataframe(style_df, use_container_width=True)
 
     if not found:
         st.info("本月無資料")
