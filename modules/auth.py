@@ -34,7 +34,11 @@ def load_users(role):
 
 def login_page():
 
-    role = st.selectbox("登入權限", ["舍監", "行政", "樓長"])
+    role = st.selectbox(
+        "登入權限",
+        ["舍監", "行政", "樓長"]
+    )
+
     user_df = load_users(role)
 
     if user_df.empty:
@@ -43,61 +47,134 @@ def login_page():
 
     user_df.columns = user_df.columns.astype(str).str.strip()
 
-    username = st.selectbox(
-        "使用者",
-        user_df["使用者"].astype(str).tolist()
-    )
+    if "使用者" not in user_df.columns or "密碼" not in user_df.columns:
+        st.error("帳號表缺少「使用者」或「密碼」欄位")
+        return
 
-    password = st.text_input("密碼", type="password")
+    # =========================
+    # 樓長登入：保留宿舍別選擇
+    # =========================
+    if role == "樓長":
 
-    if st.button("登入"):
-
-        match = user_df[
-            (user_df["使用者"].astype(str).str.strip() == username)
-            &
-            (user_df["密碼"].astype(str).str.strip() == password)
-        ]
-
-        if match.empty:
-            st.error("密碼錯誤")
+        if "宿舍別" not in user_df.columns:
+            st.error("樓長帳號表缺少「宿舍別」欄位")
             return
 
-        row = match.iloc[0]
-
-        st.session_state.login = True
-        st.session_state.role = role
-        st.session_state.user = username
-
-        st.session_state.supervisor_type = clean_text(
-            row.get("男女舍監", "")
+        dorm_selected = st.selectbox(
+            "宿舍別",
+            user_df["宿舍別"].astype(str).str.strip().unique()
         )
 
-        st.session_state.dorm = normalize_dorm(
-            row.get("宿舍別", "")
+        temp = user_df[
+            user_df["宿舍別"].astype(str).str.strip()
+            ==
+            str(dorm_selected).strip()
+        ]
+
+        username = st.selectbox(
+            "使用者",
+            temp["使用者"].astype(str).tolist()
         )
 
-        st.session_state.is_main = (
-            clean_text(row.get("總樓", "")) == "是"
+        password = st.text_input(
+            "密碼",
+            type="password"
         )
 
-        st.session_state.manage_dorms = clean_text(
-            row.get("宿舍", "")
+        if st.button("登入"):
+
+            match = temp[
+                (temp["使用者"].astype(str).str.strip() == username)
+                &
+                (temp["密碼"].astype(str).str.strip() == password)
+            ]
+
+            if match.empty:
+                st.error("密碼錯誤")
+                return
+
+            row = match.iloc[0]
+
+            st.session_state.login = True
+            st.session_state.role = "樓長"
+            st.session_state.user = username
+
+            st.session_state.supervisor_type = ""
+
+            st.session_state.dorm = normalize_dorm(
+                row.get("宿舍別", "")
+            )
+
+            st.session_state.is_main = (
+                clean_text(row.get("總樓", "")) == "是"
+            )
+
+            st.session_state.manage_dorms = clean_text(
+                row.get("宿舍", "")
+            )
+
+            st.session_state.winter_dorms = clean_text(
+                row.get("寒假宿舍別", "")
+            )
+
+            st.session_state.winter_floors = clean_text(
+                row.get("寒假樓層", "")
+            )
+
+            st.session_state.summer_dorms = clean_text(
+                row.get("暑假宿舍別", "")
+            )
+
+            st.session_state.summer_floors = clean_text(
+                row.get("暑假樓層", "")
+            )
+
+            st.rerun()
+
+    # =========================
+    # 舍監 / 行政登入
+    # =========================
+    else:
+
+        username = st.selectbox(
+            "使用者",
+            user_df["使用者"].astype(str).tolist()
         )
 
-        st.session_state.winter_dorms = clean_text(
-            row.get("寒假宿舍別", "")
+        password = st.text_input(
+            "密碼",
+            type="password"
         )
 
-        st.session_state.winter_floors = clean_text(
-            row.get("寒假樓層", "")
-        )
+        if st.button("登入"):
 
-        st.session_state.summer_dorms = clean_text(
-            row.get("暑假宿舍別", "")
-        )
+            match = user_df[
+                (user_df["使用者"].astype(str).str.strip() == username)
+                &
+                (user_df["密碼"].astype(str).str.strip() == password)
+            ]
 
-        st.session_state.summer_floors = clean_text(
-            row.get("暑假樓層", "")
-        )
+            if match.empty:
+                st.error("密碼錯誤")
+                return
 
-        st.rerun()
+            row = match.iloc[0]
+
+            st.session_state.login = True
+            st.session_state.role = role
+            st.session_state.user = username
+
+            st.session_state.supervisor_type = clean_text(
+                row.get("男女舍監", "")
+            )
+
+            st.session_state.dorm = ""
+            st.session_state.is_main = False
+            st.session_state.manage_dorms = ""
+
+            st.session_state.winter_dorms = ""
+            st.session_state.winter_floors = ""
+            st.session_state.summer_dorms = ""
+            st.session_state.summer_floors = ""
+
+            st.rerun()
