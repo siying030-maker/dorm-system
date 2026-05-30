@@ -164,9 +164,19 @@ def login_page():
             st.session_state.role = role
             st.session_state.user = username
 
-            st.session_state.supervisor_type = clean_text(
-                row.get("男女舍監", "")
-            )
+            supervisor_type = ""
+
+        for col in ["男女舍監", "舍監類型", "性別", "宿舍別"]:
+            if col in user_df.columns:
+                supervisor_type = clean_text(row.get(col, ""))
+            break
+
+            if "男" in supervisor_type:
+                supervisor_type = "男舍監"
+                elif "女" in supervisor_type:
+            supervisor_type = "女舍監"
+
+            st.session_state.supervisor_type = supervisor_type
 
             st.session_state.dorm = ""
             st.session_state.is_main = False
