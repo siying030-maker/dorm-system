@@ -13,6 +13,18 @@ def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
 
+def normalize_supervisor_type(value):
+    value = str(value).strip()
+
+    if "男" in value:
+        return "男舍監"
+
+    if "女" in value:
+        return "女舍監"
+
+    return ""
+
+
 @st.cache_data(ttl=1800)
 def load_users(role):
     try:
@@ -23,8 +35,13 @@ def load_users(role):
         if len(values) <= 1:
             return pd.DataFrame()
 
-        df = pd.DataFrame(values[1:], columns=values[0])
+        df = pd.DataFrame(
+            values[1:],
+            columns=values[0]
+        )
+
         df.columns = df.columns.astype(str).str.strip()
+
         return df
 
     except Exception as e:
@@ -51,9 +68,6 @@ def login_page():
         st.error("帳號表缺少「使用者」或「密碼」欄位")
         return
 
-    # =========================
-    # 樓長登入：保留宿舍別選擇
-    # =========================
     if role == "樓長":
 
         if "宿舍別" not in user_df.columns:
@@ -62,7 +76,8 @@ def login_page():
 
         dorm_selected = st.selectbox(
             "宿舍別",
-            user_df["宿舍別"].astype(str).str.strip().unique()
+            user_df["宿舍別"].astype(str).str.strip().unique(),
+            key="login_leader_dorm"
         )
 
         temp = user_df[
@@ -73,15 +88,17 @@ def login_page():
 
         username = st.selectbox(
             "使用者",
-            temp["使用者"].astype(str).tolist()
+            temp["使用者"].astype(str).tolist(),
+            key="login_leader_user"
         )
 
         password = st.text_input(
             "密碼",
-            type="password"
+            type="password",
+            key="login_leader_password"
         )
 
-        if st.button("登入"):
+        if st.button("登入", key="login_leader_btn"):
 
             match = temp[
                 (temp["使用者"].astype(str).str.strip() == username)
@@ -131,22 +148,21 @@ def login_page():
 
             st.rerun()
 
-    # =========================
-    # 舍監 / 行政登入
-    # =========================
     else:
 
         username = st.selectbox(
             "使用者",
-            user_df["使用者"].astype(str).tolist()
+            user_df["使用者"].astype(str).tolist(),
+            key="login_user"
         )
 
         password = st.text_input(
             "密碼",
-            type="password"
+            type="password",
+            key="login_password"
         )
 
-        if st.button("登入"):
+        if st.button("登入", key="login_btn"):
 
             match = user_df[
                 (user_df["使用者"].astype(str).str.strip() == username)
@@ -164,19 +180,12 @@ def login_page():
             st.session_state.role = role
             st.session_state.user = username
 
-            supervisor_type = ""
-
-        for col in ["男女舍監", "舍監類型", "性別", "宿舍別"]:
-            if col in user_df.columns:
-                supervisor_type = clean_text(row.get(col, ""))
-            break
-
-            if "男" in supervisor_type:
-                supervisor_type = "男舍監"
-            elif "女" in supervisor_type:
-                supervisor_type = "女舍監"
-
-            st.session_state.supervisor_type = supervisor_type
+            if role == "舍監":
+                st.session_state.supervisor_type = normalize_supervisor_type(
+                    row.get("男女舍監", "")
+                )
+            else:
+                st.session_state.supervisor_type = ""
 
             st.session_state.dorm = ""
             st.session_state.is_main = False
