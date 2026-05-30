@@ -3,16 +3,20 @@ import streamlit as st
 from core.session import init_session
 from core.google_api import open_sheet
 from core.config import (
-    ROLLCALL_SHEET_URL,
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
     UPPER_GATE_URL,
     LOWER_GATE_URL,
 )
+
 from modules.auth import login_page
 from modules.tab import build_tabs
 from modules.rollcall import show_rollcall
 from modules.gate import show_gate
 from modules.clean import show_clean, show_clean_view
 from modules.attendance import show_attendance
+from modules.makeup_rollcall import show_makeup_rollcall
+from modules.reward_punishment import show_reward_punishment
 
 
 st.set_page_config(
@@ -36,10 +40,27 @@ if st.button("登出", key="logout_btn"):
     st.session_state.clear()
     st.rerun()
 
+
 tab_names = build_tabs(
     st.session_state.role,
     st.session_state.is_main
 )
+
+# 確保新增功能一定出現
+extra_tabs = [
+    "補點名單",
+    "獎懲查詢"
+]
+
+for t in extra_tabs:
+    if t not in tab_names:
+        tab_names.append(t)
+
+# 移除連三天不假外宿
+tab_names = [
+    t for t in tab_names
+    if t != "連三天不假外宿"
+]
 
 if not tab_names:
     st.warning("目前沒有可用功能")
@@ -47,41 +68,68 @@ if not tab_names:
 
 tabs = st.tabs(tab_names)
 
+
 if "點名系統" in tab_names:
     with tabs[tab_names.index("點名系統")]:
         show_attendance()
 
 
-
 if "每日缺席名單" in tab_names:
     with tabs[tab_names.index("每日缺席名單")]:
-        rollcall_ss = open_sheet(ROLLCALL_SHEET_URL)
+
+        gender = st.selectbox(
+            "選擇點名資料",
+            ["女生", "男生"],
+            key="daily_absent_gender"
+        )
+
+        if gender == "女生":
+            rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
+        else:
+            rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
+
         show_rollcall(
             rollcall_ss,
             mode="daily"
         )
 
+
+if "補點名單" in tab_names:
+    with tabs[tab_names.index("補點名單")]:
+        show_makeup_rollcall()
+
+
+if "獎懲查詢" in tab_names:
+    with tabs[tab_names.index("獎懲查詢")]:
+        show_reward_punishment()
+
+
 if "上學期門禁" in tab_names:
     with tabs[tab_names.index("上學期門禁")]:
         upper_ss = open_sheet(UPPER_GATE_URL)
+
         show_gate(
             "上學期門禁",
             upper_ss,
             "upper_gate"
         )
 
+
 if "下學期門禁" in tab_names:
     with tabs[tab_names.index("下學期門禁")]:
         lower_ss = open_sheet(LOWER_GATE_URL)
+
         show_gate(
             "下學期門禁",
             lower_ss,
             "lower_gate"
         )
 
+
 if "整潔比賽" in tab_names:
     with tabs[tab_names.index("整潔比賽")]:
         show_clean()
+
 
 if "整潔比賽(檢視)" in tab_names:
     with tabs[tab_names.index("整潔比賽(檢視)")]:

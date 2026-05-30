@@ -16,3 +16,15 @@ ADMIN_SHEET_URL = "https://docs.google.com/spreadsheets/d/1eZgdlelXQWcO3ZRxeXRjX
 ROLLCALL_GIRL_URL = "https://docs.google.com/spreadsheets/d/1g61t00V8bryJ4DpCmr9bnjpk1e3rUAP3xHbRPlomirM/edit?usp=sharing"
 
 ROLLCALL_BOY_URL = "https://docs.google.com/spreadsheets/d/1ubmLRHdHebjKtVKx60e8rIdq_tI4SGwQq6eCW06uME0/edit?usp=sharing"
+
+MAKEUP_GIRL_SOURCE_URL = "https://docs.google.com/spreadsheets/d/1g61t00V8bryJ4DpCmr9bnjpk1e3rUAP3xHbRPlomirM/edit?usp=sharing"
+
+MAKEUP_BOY_SOURCE_URL = "https://docs.google.com/spreadsheets/d/1ubmLRHdHebjKtVKx60e8rIdq_tI4SGwQq6eCW06uME0/edit?usp=sharing"
+
+MAKEUP_GIRL_DONE_URL = "https://docs.google.com/spreadsheets/d/1XZClFI-8ffBtTWB47nVyRYqWDFRGZxzKhYcdwwpCJQs/edit?usp=sharing"
+
+MAKEUP_BOY_DONE_URL = "https://docs.google.com/spreadsheets/d/1_9kKWqOmFPBvN1FWA4aP_lSAuPbP8ppk6ILJBTJdelA/edit?usp=sharing"
+
+REWARD_UPPER_URL = "https://docs.google.com/spreadsheets/d/18FrgMjyb6bo0apiAKpOfTkr7fQQSQlbW6al8G6y_AYk/edit?usp=sharing"
+
+REWARD_LOWER_URL = "https://docs.google.com/spreadsheets/d/1kymMcZ7M69he0ZkE7pCQnbDsWJ4qawQdO730nUuHn3M/edit?usp=sharing"
