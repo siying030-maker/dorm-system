@@ -127,13 +127,16 @@ def show_reward_punishment():
 
         # 只顯示指定欄位
 
+    # 只顯示指定欄位
+
     column_mapping = {
         "學號": ["學號"],
+        "姓名": ["姓名", "學生姓名"],
         "日期": ["日期"],
-        "獎懲原因": ["獎懲詳細原因", "原因"],
+        "獎懲原因": ["獎懲原因", "原因"],
         "獎懲": ["獎懲"],
         "數量": ["數量", "次數"]
-    }
+        }
 
     show_df = pd.DataFrame()
 
@@ -143,15 +146,45 @@ def show_reward_punishment():
 
             if col in df.columns:
 
-                show_df[new_col] = df[col]
-                break
+             show_df[new_col] = (
+                df[col]
+                .astype(str)
+                .str.strip()
+            )
+
+            break
 
     if show_df.empty:
 
         st.warning("找不到指定欄位")
-        return
+     return
 
-    st.dataframe(
-        show_df,
-        use_container_width=True
-    )
+# 移除全部空白列
+
+show_df = show_df.replace(
+        ["", "nan", "None"],
+        pd.NA
+)
+
+show_df = show_df.dropna(
+    how="all"
+)
+
+# 移除學號姓名都空白
+
+if "學號" in show_df.columns and "姓名" in show_df.columns:
+
+    show_df = show_df[
+        ~(
+            show_df["學號"].isna()
+            &
+            show_df["姓名"].isna()
+        )
+    ]
+
+show_df = show_df.fillna("")
+
+st.dataframe(
+    show_df,
+    use_container_width=True
+)
