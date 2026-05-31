@@ -125,7 +125,34 @@ def show_reward_punishment():
 
         df = df[condition]
 
+        # 只顯示指定欄位
+
+    column_mapping = {
+        "學號": ["學號"],
+        "姓名": ["姓名", "學生姓名"],
+        "日期": ["日期"],
+        "獎懲原因": ["獎懲原因", "原因"],
+        "獎懲": ["獎懲"],
+        "數量": ["數量", "次數"]
+    }
+
+    show_df = pd.DataFrame()
+
+    for new_col, possible_cols in column_mapping.items():
+
+        for col in possible_cols:
+
+            if col in df.columns:
+
+                show_df[new_col] = df[col]
+                break
+
+    if show_df.empty:
+
+        st.warning("找不到指定欄位")
+        return
+
     st.dataframe(
-        df,
+        show_df,
         use_container_width=True
     )
