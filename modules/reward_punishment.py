@@ -8,6 +8,9 @@ from core.config import (
 )
 
 
+TARGET_SHEET_NAME = "輸入_懲處_男女"
+
+
 def make_unique_columns(columns):
 
     result = []
@@ -23,7 +26,6 @@ def make_unique_columns(columns):
         if col in used:
             used[col] += 1
             col = f"{col}_{used[col]}"
-
         else:
             used[col] = 0
 
@@ -35,56 +37,45 @@ def make_unique_columns(columns):
 @st.cache_data(ttl=1800)
 def read_reward(url):
 
-    ss = open_sheet(url)
+    try:
+        ss = open_sheet(url)
+        ws = ss.worksheet(TARGET_SHEET_NAME)
 
-    dfs = []
+        values = ws.get_all_values()
 
-    for ws in ss.worksheets():
+        if len(values) <= 1:
+            return pd.DataFrame()
 
-        try:
-            values = ws.get_all_values()
+        headers = make_unique_columns(values[0])
 
-            if len(values) <= 1:
-                continue
-
-            headers = make_unique_columns(values[0])
-
-            df = pd.DataFrame(
-                values[1:],
-                columns=headers
-            )
-
-            df.columns = make_unique_columns(df.columns)
-
-            df["來源Sheet"] = ws.title
-
-            df = df.loc[
-                :,
-                ~df.columns.duplicated()
-            ]
-
-            dfs.append(df)
-
-        except:
-            continue
-
-    if dfs:
-
-        clean_dfs = []
-
-        for df in dfs:
-            df = df.copy()
-            df.columns = make_unique_columns(df.columns)
-            df = df.loc[:, ~df.columns.duplicated()]
-            clean_dfs.append(df)
-
-        return pd.concat(
-            clean_dfs,
-            ignore_index=True,
-            sort=False
+        df = pd.DataFrame(
+            values[1:],
+            columns=headers
         )
 
-    return pd.DataFrame()
+        df.columns = make_unique_columns(df.columns)
+
+        df = df.loc[
+            :,
+            ~df.columns.duplicated()
+        ]
+
+        empty_cols = []
+
+        for col in df.columns:
+            if df[col].astype(str).str.strip().eq("").all():
+                empty_cols.append(col)
+
+        df = df.drop(
+            columns=empty_cols,
+            errors="ignore"
+        )
+
+        return df
+
+    except Exception as e:
+        st.warning(f"讀取獎懲資料失敗：{e}")
+        return pd.DataFrame()
 
 
 def show_reward_punishment():
@@ -133,17 +124,6 @@ def show_reward_punishment():
                 )
 
         df = df[condition]
-
-    empty_cols = []
-
-    for col in df.columns:
-        if df[col].astype(str).str.strip().eq("").all():
-            empty_cols.append(col)
-
-    df = df.drop(
-        columns=empty_cols,
-        errors="ignore"
-    )
 
     st.dataframe(
         df,
