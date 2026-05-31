@@ -127,6 +127,9 @@ def get_attendance_url(term, dorm):
     if term in ["寒假", "暑假"]:
         return VACATION_SHEETS[term].get(dorm, "")
 
+    if term == "假日點名單":
+        return ATTENDANCE_SHEETS["下學期"].get(dorm, "")
+
     return ""
 
 
@@ -141,9 +144,9 @@ def get_available_terms():
     role = st.session_state.get("role", "")
 
     if role in ["舍監", "行政"]:
-        return ["上學期", "下學期", "寒假", "暑假"]
+        return ["上學期", "下學期", "寒假", "暑假", "假日點名單"]
 
-    terms = ["上學期", "下學期"]
+    terms = ["上學期", "下學期", "假日點名單"]
 
     if st.session_state.get("winter_dorms", ""):
         terms.append("寒假")
@@ -187,6 +190,9 @@ def get_login_dorm_options(term):
 def get_floor_options(term, dorm):
     dorm = normalize_dorm(dorm)
 
+    if term == "假日點名單":
+        return ["全部"]
+
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return ["全部"]
 
@@ -205,6 +211,12 @@ def get_floor_options(term, dorm):
 
 def get_sheet_names_for_attendance(term, dorm, floor):
     dorm = normalize_dorm(dorm)
+
+    if term == "假日點名單":
+        return [
+            get_floor_sheet_name(dorm, f)
+            for f in FLOOR_OPTIONS.get(dorm, [])
+        ]
 
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return [
@@ -346,6 +358,22 @@ def load_attendance_students(term, dorm, floor):
             temp["姓名"] = df[name_col].astype(str).str.strip()
             temp["讀取Sheet"] = sheet_name
 
+            if term == "假日點名單":
+                if len(df.columns) < 43:
+                    continue
+
+                aq_col = df.columns[42]
+
+                temp["本地境外"] = (
+                    df[aq_col]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp = temp[temp["本地境外"] == "境外"]
+            else:
+                temp["本地境外"] = ""
+
             temp = temp[temp["姓名"] != ""]
             temp = temp[temp["房號"] != ""]
 
@@ -354,7 +382,17 @@ def load_attendance_students(term, dorm, floor):
 
         if result_list:
             result = pd.concat(result_list, ignore_index=True)
-            return result[["房號", "床位", "學號", "姓名", "讀取Sheet"]]
+
+            return result[
+                [
+                    "房號",
+                    "床位",
+                    "學號",
+                    "姓名",
+                    "本地境外",
+                    "讀取Sheet"
+                ]
+            ]
 
         return pd.DataFrame()
 
@@ -452,7 +490,6 @@ def load_special_status(term, attendance_date):
 
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):
-
     ss = open_sheet(url)
 
     try:
@@ -468,47 +505,21 @@ def append_rows_to_sheet(url, sheet_name, headers, rows):
         ws.append_row(headers)
 
     if rows:
-        ws.append_rows(rows)
-
-
-def append_rows_to_sheet(url, sheet_name, headers, rows):
-
-    ss = open_sheet(url)
-
-    try:
-        ws = ss.worksheet(sheet_name)
-
-    except:
-
-        ws = ss.add_worksheet(
-            title=sheet_name,
-            rows=3000,
-            cols=len(headers) + 5
-        )
-
-        ws.append_row(headers)
-
-    if rows:
-
         ws.append_rows(rows)
 
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
-
     gender = get_dorm_gender(dorm)
 
     if gender == "女生":
-
         need_makeup_url = NEED_MAKEUP_GIRL_URL
         rollcall_url = ROLLCALL_GIRL_URL
 
     elif gender == "男生":
-
         need_makeup_url = NEED_MAKEUP_BOY_URL
         rollcall_url = ROLLCALL_BOY_URL
 
     else:
-
         raise Exception("無法判斷宿舍性別")
 
     sheet_name = str(attendance_date)
@@ -521,6 +532,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "床位",
         "學號",
         "姓名",
+        "本地境外",
         "狀態",
         "備註"
     ]
@@ -529,10 +541,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     absent_rows = []
 
     for _, r in final_df.iterrows():
-
-        status = str(
-            r.get("狀態", "")
-        ).strip()
+        status = str(r.get("狀態", "")).strip()
 
         row_data = [
             str(attendance_date),
@@ -542,16 +551,14 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("床位", ""),
             r.get("學號", ""),
             r.get("姓名", ""),
+            r.get("本地境外", ""),
             status,
             r.get("備註", "")
         ]
 
-        # 完整名單 → 需補點名單
         all_rows.append(row_data)
 
-        # 狀態=缺 → 點名總表
         if status == "缺":
-
             absent_rows.append(row_data)
 
     append_rows_to_sheet(
@@ -611,11 +618,15 @@ def show_attendance():
         st.warning("此宿舍沒有樓層設定")
         return
 
-    floor = st.selectbox(
-        "樓層",
-        floors,
-        key="attendance_floor"
-    )
+    if term == "假日點名單":
+        floor = "全部"
+        st.info("假日點名單：只分宿舍，不分樓層，僅顯示 AQ 欄為「境外」的學生")
+    else:
+        floor = st.selectbox(
+            "樓層",
+            floors,
+            key="attendance_floor"
+        )
 
     attendance_date = st.date_input(
         "點名日期",
@@ -628,9 +639,16 @@ def show_attendance():
     st.info("目前讀取 Sheet：" + "、".join(sheet_names))
 
     if st.button("載入點名名單", key="load_attendance"):
-
         students = load_attendance_students(term, dorm, floor)
-        special_status = load_special_status(term, attendance_date)
+
+        if term == "假日點名單":
+            special_status = {
+                "leave_ids": set(),
+                "long_leave_ids": set(),
+                "late_ids": set(),
+            }
+        else:
+            special_status = load_special_status(term, attendance_date)
 
         st.session_state["attendance_students"] = students
         st.session_state["attendance_special_status"] = special_status
@@ -639,11 +657,13 @@ def show_attendance():
             st.warning("查無學生資料")
         else:
             st.success(f"成功載入 {len(students)} 筆資料")
-            st.caption(
-                f"外宿申請 {len(special_status['leave_ids'])} 筆，"
-                f"長期外宿 {len(special_status['long_leave_ids'])} 筆，"
-                f"長期晚歸 {len(special_status['late_ids'])} 筆"
-            )
+
+            if term != "假日點名單":
+                st.caption(
+                    f"外宿申請 {len(special_status['leave_ids'])} 筆，"
+                    f"長期外宿 {len(special_status['long_leave_ids'])} 筆，"
+                    f"長期晚歸 {len(special_status['late_ids'])} 筆"
+                )
 
     students = st.session_state.get(
         "attendance_students",
@@ -668,29 +688,33 @@ def show_attendance():
 
     st.divider()
     st.subheader("點名名單")
-    st.caption("紅色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
+
+    if term == "假日點名單":
+        st.caption("假日點名單：AQ 欄為境外")
+    else:
+        st.caption("紅色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
 
     final_rows = []
 
     for i, row in students.iterrows():
-
         sid = normalize_value(row["學號"])
 
-        if sid in leave_ids:
+        if term == "假日點名單":
+            color = "black"
+            mark = row.get("本地境外", "")
+            default_status = "在"
+        elif sid in leave_ids:
             color = "red"
             mark = "外宿申請"
             default_status = "缺"
-
         elif sid in long_leave_ids:
             color = "blue"
             mark = "長期外宿"
             default_status = "缺"
-
         elif sid in late_ids:
             color = "#b58900"
             mark = "長期晚歸"
             default_status = "在"
-
         else:
             color = "black"
             mark = ""
@@ -743,6 +767,7 @@ def show_attendance():
             "床位": row["床位"],
             "學號": row["學號"],
             "姓名": row["姓名"],
+            "本地境外": row.get("本地境外", ""),
             "狀態": status,
             "備註": note
         })
@@ -757,7 +782,6 @@ def show_attendance():
     )
 
     if st.button("儲存點名結果", key="save_attendance"):
-
         try:
             save_rollcall_result(
                 attendance_date,
