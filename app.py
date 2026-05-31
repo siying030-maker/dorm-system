@@ -46,15 +46,6 @@ tab_names = build_tabs(
     st.session_state.is_main
 )
 
-extra_tabs = [
-    "補點名單",
-    "獎懲查詢"
-]
-
-for t in extra_tabs:
-    if t not in tab_names:
-        tab_names.append(t)
-
 tab_names = [
     t for t in tab_names
     if t != "連三天不假外宿"
@@ -76,16 +67,9 @@ if "每日點名未到名單" in tab_names:
     with tabs[tab_names.index("每日點名未到名單")]:
 
         role = st.session_state.get("role", "")
-        supervisor_type = st.session_state.get(
-            "supervisor_type",
-            ""
-        )
-        dorm = st.session_state.get(
-            "dorm",
-            ""
-        )
+        supervisor_type = st.session_state.get("supervisor_type", "")
+        dorm = st.session_state.get("dorm", "")
 
-        # 行政：全部顯示，但畫面不分男女
         if role == "行政":
 
             girl_ss = open_sheet(ROLLCALL_GIRL_URL)
@@ -96,7 +80,6 @@ if "每日點名未到名單" in tab_names:
                 mode="daily_all"
             )
 
-        # 舍監：依男舍監 / 女舍監限制
         elif role == "舍監":
 
             if supervisor_type == "男舍監":
@@ -118,10 +101,8 @@ if "每日點名未到名單" in tab_names:
                 )
 
             else:
-
                 st.warning("無法判斷舍監性別")
 
-        # 樓長：依宿舍別限制
         elif role == "樓長":
 
             if str(dorm).startswith("男"):
@@ -143,7 +124,6 @@ if "每日點名未到名單" in tab_names:
                 )
 
             else:
-
                 st.warning("無法判斷樓長宿舍性別")
 
 
