@@ -127,8 +127,7 @@ def get_attendance_url(term, dorm):
     if term in ["寒假", "暑假"]:
         return VACATION_SHEETS[term].get(dorm, "")
 
-    if term == "假日點名單":
-        return ATTENDANCE_SHEETS["下學期"].get(dorm, "")
+    
 
     return ""
 
@@ -190,9 +189,7 @@ def get_login_dorm_options(term):
 def get_floor_options(term, dorm):
     dorm = normalize_dorm(dorm)
 
-    if term == "假日點名單":
-        return ["全部"]
-
+   
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return ["全部"]
 
@@ -212,11 +209,7 @@ def get_floor_options(term, dorm):
 def get_sheet_names_for_attendance(term, dorm, floor):
     dorm = normalize_dorm(dorm)
 
-    if term == "假日點名單":
-        return [
-            get_floor_sheet_name(dorm, f)
-            for f in FLOOR_OPTIONS.get(dorm, [])
-        ]
+    
 
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return [
@@ -357,25 +350,6 @@ def load_attendance_students(term, dorm, floor):
 
             temp["姓名"] = df[name_col].astype(str).str.strip()
             temp["讀取Sheet"] = sheet_name
-
-            if term == "假日點名單":
-                if len(df.columns) < 43:
-                    continue
-
-                aq_col = df.columns[42]
-
-                temp["本地境外"] = (
-                    df[aq_col]
-                    .astype(str)
-                    .str.strip()
-                )
-
-                temp = temp[temp["本地境外"] == "境外"]
-            else:
-                temp["本地境外"] = ""
-
-            temp = temp[temp["姓名"] != ""]
-            temp = temp[temp["房號"] != ""]
 
             if not temp.empty:
                 result_list.append(temp)
@@ -618,9 +592,7 @@ def show_attendance():
         st.warning("此宿舍沒有樓層設定")
         return
 
-    if term == "假日點名單":
-        floor = "全部"
-        st.info("假日點名單：只分宿舍，不分樓層，僅顯示 AQ 欄為「境外」的學生")
+    
     else:
         floor = st.selectbox(
             "樓層",
@@ -641,14 +613,7 @@ def show_attendance():
     if st.button("載入點名名單", key="load_attendance"):
         students = load_attendance_students(term, dorm, floor)
 
-        if term == "假日點名單":
-            special_status = {
-                "leave_ids": set(),
-                "long_leave_ids": set(),
-                "late_ids": set(),
-            }
-        else:
-            special_status = load_special_status(term, attendance_date)
+        
 
         st.session_state["attendance_students"] = students
         st.session_state["attendance_special_status"] = special_status
