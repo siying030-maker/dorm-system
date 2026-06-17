@@ -351,21 +351,53 @@ def load_attendance_students(term, dorm, floor):
             temp["姓名"] = df[name_col].astype(str).str.strip()
             temp["讀取Sheet"] = sheet_name
 
+            # 清除空白資料：床位有值但沒有學號/姓名的空列不要顯示
+            temp = temp[
+                (temp["房號"].astype(str).str.strip() != "")
+                &
+                (temp["學號"].astype(str).str.strip() != "")
+                &
+                (temp["姓名"].astype(str).str.strip() != "")
+            ].copy()
+
+            temp = temp[
+                ~temp["學號"].astype(str).str.upper().isin(
+                    ["NAN", "NONE", "NA"]
+                )
+            ].copy()
+
+            temp = temp[
+                ~temp["姓名"].astype(str).str.upper().isin(
+                    ["NAN", "NONE", "NA"]
+                )
+            ].copy()
+
             if not temp.empty:
                 result_list.append(temp)
 
         if result_list:
-            result = pd.concat(result_list, ignore_index=True)
+            result = pd.concat(
+                result_list,
+                ignore_index=True
+            )
+
+            result = result[
+                (result["房號"].astype(str).str.strip() != "")
+                &
+                (result["學號"].astype(str).str.strip() != "")
+                &
+                (result["姓名"].astype(str).str.strip() != "")
+            ].copy()
 
             return result[
-        [
-             "房號",
-            "床位",
-            "學號",
-            "姓名",
-            "讀取Sheet"
-        ]
-    ]
+                [
+                    "房號",
+                    "床位",
+                    "學號",
+                    "姓名",
+                    "讀取Sheet"
+                ]
+            ]
 
         return pd.DataFrame()
 
@@ -498,16 +530,16 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     sheet_name = str(attendance_date)
 
     headers = [
-    "日期",
-    "宿舍",
-    "樓層",
-    "房號",
-    "床位",
-    "學號",
-    "姓名",
-    "狀態",
-    "備註"
-]
+        "日期",
+        "宿舍",
+        "樓層",
+        "房號",
+        "床位",
+        "學號",
+        "姓名",
+        "狀態",
+        "備註"
+    ]
 
     all_rows = []
     absent_rows = []
@@ -646,6 +678,17 @@ def show_attendance():
     )
 
     if students.empty:
+        return
+
+    # 再保險過濾一次，避免畫面顯示只有床位、沒有學號姓名的空白列
+    students = students[
+        (students["學號"].astype(str).str.strip() != "")
+        &
+        (students["姓名"].astype(str).str.strip() != "")
+    ].copy()
+
+    if students.empty:
+        st.warning("查無有效學生資料")
         return
 
     leave_ids = special_status.get("leave_ids", set())
