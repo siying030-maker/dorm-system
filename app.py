@@ -17,6 +17,7 @@ from modules.clean import show_clean, show_clean_view
 from modules.attendance import show_attendance
 from modules.makeup_rollcall import show_makeup_rollcall
 from modules.reward_punishment import show_reward_punishment
+from modules.holiday_rollcall import show_holiday_rollcall
 
 
 st.set_page_config(
@@ -169,3 +170,11 @@ if "整潔比賽" in tab_names:
 if "整潔比賽(檢視)" in tab_names:
     with tabs[tab_names.index("整潔比賽(檢視)")]:
         show_clean_view()
+
+if "上學期假日點名單" in tab_names:
+    with tabs[tab_names.index("上學期假日點名單")]:
+        show_holiday_rollcall("上學期")
+
+if "下學期假日點名單" in tab_names:
+    with tabs[tab_names.index("下學期假日點名單")]:
+        show_holiday_rollcall("下學期")
