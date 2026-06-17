@@ -1,7 +1,6 @@
 streamlit
 pandas
 gspread
-gspread_dataframe
 google-auth
 openpyxl
 schedule
