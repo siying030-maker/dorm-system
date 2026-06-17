@@ -358,15 +358,14 @@ def load_attendance_students(term, dorm, floor):
             result = pd.concat(result_list, ignore_index=True)
 
             return result[
-                [
-                    "房號",
-                    "床位",
-                    "學號",
-                    "姓名",
-                    "本地境外",
-                    "讀取Sheet"
-                ]
-            ]
+        [
+             "房號",
+            "床位",
+            "學號",
+            "姓名",
+            "讀取Sheet"
+        ]
+    ]
 
         return pd.DataFrame()
 
@@ -613,14 +612,17 @@ def show_attendance():
     if st.button("載入點名名單", key="load_attendance"):
         students = load_attendance_students(term, dorm, floor)
 
-        
+        special_status = load_special_status(
+            term,
+            attendance_date
+    )
 
-        st.session_state["attendance_students"] = students
-        st.session_state["attendance_special_status"] = special_status
+    st.session_state["attendance_students"] = students
+    st.session_state["attendance_special_status"] = special_status
 
-        if students.empty:
+    if students.empty:
             st.warning("查無學生資料")
-        else:
+    else:
             st.success(f"成功載入 {len(students)} 筆資料")
 
             
@@ -645,6 +647,73 @@ def show_attendance():
     leave_ids = special_status.get("leave_ids", set())
     long_leave_ids = special_status.get("long_leave_ids", set())
     late_ids = special_status.get("late_ids", set())
+
+    st.divider()
+st.subheader("點名名單")
+st.caption("紅色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
+
+final_rows = []
+
+for i, row in students.iterrows():
+
+    sid = normalize_value(row["學號"])
+
+    if sid in leave_ids:
+        color = "red"
+        mark = "外宿申請"
+        default_status = "缺"
+
+    elif sid in long_leave_ids:
+        color = "blue"
+        mark = "長期外宿"
+        default_status = "缺"
+
+    elif sid in late_ids:
+        color = "#b58900"
+        mark = "長期晚歸"
+        default_status = "在"
+
+    else:
+        color = "black"
+        mark = ""
+        default_status = "在"
+
+    cols = st.columns([1, 1, 1, 1, 1, 1])
+
+    bed_show = row["床位"] if row["床位"] else row["房號"]
+
+    cols[0].markdown(color_text(bed_show, color), unsafe_allow_html=True)
+    cols[1].markdown(color_text(row["學號"], color), unsafe_allow_html=True)
+    cols[2].markdown(color_text(row["姓名"], color), unsafe_allow_html=True)
+
+    if mark:
+        cols[3].markdown(color_text(mark, color), unsafe_allow_html=True)
+    else:
+        cols[3].write("")
+
+    status = cols[4].selectbox(
+        "狀態",
+        ["在", "缺", "未入住"],
+        index=["在", "缺", "未入住"].index(default_status),
+        key=f"attendance_status_{term}_{dorm}_{floor}_{i}"
+    )
+
+    note = cols[5].text_input(
+        "備註",
+        key=f"attendance_note_{term}_{dorm}_{floor}_{i}"
+    )
+
+    final_rows.append({
+        "日期": str(attendance_date),
+        "宿舍": dorm,
+        "樓層": floor,
+        "房號": row["房號"],
+        "床位": row["床位"],
+        "學號": row["學號"],
+        "姓名": row["姓名"],
+        "狀態": status,
+        "備註": note
+    })
 
     
 
