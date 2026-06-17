@@ -498,17 +498,16 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     sheet_name = str(attendance_date)
 
     headers = [
-        "日期",
-        "宿舍",
-        "樓層",
-        "房號",
-        "床位",
-        "學號",
-        "姓名",
-        "本地境外",
-        "狀態",
-        "備註"
-    ]
+    "日期",
+    "宿舍",
+    "樓層",
+    "房號",
+    "床位",
+    "學號",
+    "姓名",
+    "狀態",
+    "備註"
+]
 
     all_rows = []
     absent_rows = []
@@ -524,7 +523,6 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("床位", ""),
             r.get("學號", ""),
             r.get("姓名", ""),
-            r.get("本地境外", ""),
             status,
             r.get("備註", "")
         ]
@@ -610,15 +608,28 @@ def show_attendance():
     st.info("目前讀取 Sheet：" + "、".join(sheet_names))
 
     if st.button("載入點名名單", key="load_attendance"):
-        students = load_attendance_students(term, dorm, floor)
 
-        special_status = load_special_status(
-            term,
-            attendance_date
+    students = load_attendance_students(
+        term,
+        dorm,
+        floor
+    )
+
+    special_status = load_special_status(
+        term,
+        attendance_date
     )
 
     st.session_state["attendance_students"] = students
     st.session_state["attendance_special_status"] = special_status
+
+    if students.empty:
+        st.warning("查無學生資料")
+
+    else:
+        st.success(
+            f"成功載入 {len(students)} 筆資料"
+        )
 
     if students.empty:
             st.warning("查無學生資料")
