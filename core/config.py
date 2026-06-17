@@ -21,16 +21,15 @@ ADMIN_SHEET_URL = "https://docs.google.com/spreadsheets/d/1eZgdlelXQWcO3ZRxeXRjX
 
 #男女生補點名單
 
-NEED_MAKEUP_GIRL_URL = "https://docs.google.com/spreadsheets/d/1g61t00V8bryJ4DpCmr9bnjpk1e3rUAP3xHbRPlomirM/edit?usp=sharing"
+NEED_MAKEUP_GIRL_URL = "https://docs.google.com/spreadsheets/d/1OkrM2LkqO_TBZPZS5XPwM4AxMRqn2Lty9_4gnXSbd2g/edit?usp=sharing"
 
-NEED_MAKEUP_BOY_URL = "https://docs.google.com/spreadsheets/d/1ubmLRHdHebjKtVKx60e8rIdq_tI4SGwQq6eCW06uME0/edit?usp=sharing"
+NEED_MAKEUP_BOY_URL = "https://docs.google.com/spreadsheets/d/13TuG3Fnd1LZeRG3wIBlg8cjzUh6ToKEZSjOR8LYrXZI/edit?usp=sharing"
 
 #點名總表(男/女)
 
-ROLLCALL_GIRL_URL = "https://docs.google.com/spreadsheets/d/1XZClFI-8ffBtTWB47nVyRYqWDFRGZxzKhYcdwwpCJQs/edit?usp=sharing"
+ROLLCALL_GIRL_URL = "https://docs.google.com/spreadsheets/d/1ixckDJgDovDLFYcNUEcwHoFbbj6o-A4jxKpmjN6W4yM/edit?usp=sharing"
 
-ROLLCALL_BOY_URL = "https://docs.google.com/spreadsheets/d/1_9kKWqOmFPBvN1FWA4aP_lSAuPbP8ppk6ILJBTJdelA/edit?usp=sharing"
-
+ROLLCALL_BOY_URL = "https://docs.google.com/spreadsheets/d/1a93wUnnVo8OUACB1lLrTdqaL-59INpixcY73pVu_29U/edit?usp=sharing"
 #獎懲
 
 REWARD_UPPER_URL = "https://docs.google.com/spreadsheets/d/18FrgMjyb6bo0apiAKpOfTkr7fQQSQlbW6al8G6y_AYk/edit?usp=sharing"
