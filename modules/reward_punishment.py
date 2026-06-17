@@ -34,7 +34,7 @@ def make_unique_columns(columns):
     return result
 
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=3600, show_spinner=False)
 def read_reward(url):
 
     try:
