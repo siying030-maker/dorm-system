@@ -552,6 +552,7 @@ def color_text(text, color):
 
 
 def show_attendance():
+
     st.header("點名系統")
 
     term_options = get_available_terms()
@@ -589,13 +590,11 @@ def show_attendance():
         st.warning("此宿舍沒有樓層設定")
         return
 
-    
-    else:
-        floor = st.selectbox(
-            "樓層",
-            floors,
-            key="attendance_floor"
-        )
+    floor = st.selectbox(
+        "樓層",
+        floors,
+        key="attendance_floor"
+    )
 
     attendance_date = st.date_input(
         "點名日期",
@@ -603,40 +602,34 @@ def show_attendance():
         key="attendance_date"
     )
 
-    sheet_names = get_sheet_names_for_attendance(term, dorm, floor)
-
-    st.info("目前讀取 Sheet：" + "、".join(sheet_names))
-
-    if st.button("載入點名名單", key="load_attendance"):
-
-    students = load_attendance_students(
+    sheet_names = get_sheet_names_for_attendance(
         term,
         dorm,
         floor
     )
 
-    special_status = load_special_status(
-        term,
-        attendance_date
-    )
+    st.info("目前讀取 Sheet：" + "、".join(sheet_names))
 
-    st.session_state["attendance_students"] = students
-    st.session_state["attendance_special_status"] = special_status
+    if st.button("載入點名名單", key="load_attendance"):
 
-    if students.empty:
-        st.warning("查無學生資料")
-
-    else:
-        st.success(
-            f"成功載入 {len(students)} 筆資料"
+        students = load_attendance_students(
+            term,
+            dorm,
+            floor
         )
 
-    if students.empty:
-            st.warning("查無學生資料")
-    else:
-            st.success(f"成功載入 {len(students)} 筆資料")
+        special_status = load_special_status(
+            term,
+            attendance_date
+        )
 
-            
+        st.session_state["attendance_students"] = students
+        st.session_state["attendance_special_status"] = special_status
+
+        if students.empty:
+            st.warning("查無學生資料")
+        else:
+            st.success(f"成功載入 {len(students)} 筆資料")
 
     students = st.session_state.get(
         "attendance_students",
@@ -693,12 +686,26 @@ def show_attendance():
 
         bed_show = row["床位"] if row["床位"] else row["房號"]
 
-        cols[0].markdown(color_text(bed_show, color), unsafe_allow_html=True)
-        cols[1].markdown(color_text(row["學號"], color), unsafe_allow_html=True)
-        cols[2].markdown(color_text(row["姓名"], color), unsafe_allow_html=True)
+        cols[0].markdown(
+            color_text(bed_show, color),
+            unsafe_allow_html=True
+        )
+
+        cols[1].markdown(
+            color_text(row["學號"], color),
+            unsafe_allow_html=True
+        )
+
+        cols[2].markdown(
+            color_text(row["姓名"], color),
+            unsafe_allow_html=True
+        )
 
         if mark:
-            cols[3].markdown(color_text(mark, color), unsafe_allow_html=True)
+            cols[3].markdown(
+                color_text(mark, color),
+                unsafe_allow_html=True
+            )
         else:
             cols[3].write("")
 
@@ -726,9 +733,6 @@ def show_attendance():
             "備註": note
         })
 
-    
-
-
     final_df = pd.DataFrame(final_rows)
 
     st.divider()
@@ -739,6 +743,7 @@ def show_attendance():
     )
 
     if st.button("儲存點名結果", key="save_attendance"):
+
         try:
             save_rollcall_result(
                 attendance_date,
