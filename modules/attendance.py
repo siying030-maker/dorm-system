@@ -810,63 +810,83 @@ def show_attendance():
 
     final_rows = []
 
-    for i, row in students.iterrows():
+for i, row in students.iterrows():
 
-        sid = normalize_value(row["學號"])
+    sid = normalize_value(row["學號"])
 
-        if sid in leave_ids:
-            color = "red"
-            mark = "外宿申請"
-            default_status = "缺"
+    if sid in leave_ids:
+        color = "red"
+        mark = "外宿申請"
+        default_status = "缺"
 
-        elif sid in long_leave_ids:
-            color = "blue"
-            mark = "長期外宿"
-            default_status = "缺"
+    elif sid in long_leave_ids:
+        color = "blue"
+        mark = "長期外宿"
+        default_status = "缺"
 
-        elif sid in late_ids:
-            color = "#b58900"
-            mark = "長期晚歸"
-            default_status = "在"
+    elif sid in late_ids:
+        color = "#b58900"
+        mark = "長期晚歸"
+        default_status = "在"
 
-        else:
-            color = "black"
-            mark = ""
-            default_status = "在"
+    else:
+        color = "black"
+        mark = ""
+        default_status = "在"
 
-            st.markdown(
-            f"""
-            <div style="font-size:18px;font-weight:700;margin-bottom:6px;">
-                {color_text(row["床位"], color)}
-                &nbsp;&nbsp;
-                {color_text(row["學號"], color)}
-                &nbsp;&nbsp;
-                {color_text(row["姓名"], color)}
+    # 只顯示：床位 學號 姓名
+    st.markdown(
+        f"""
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">
+            {color_text(row["床位"], color)}
+            &nbsp;&nbsp;&nbsp;
+            {color_text(row["學號"], color)}
+            &nbsp;&nbsp;&nbsp;
+            {color_text(row["姓名"], color)}
         </div>
         """,
         unsafe_allow_html=True
+    )
+
+    if mark:
+        st.markdown(
+            color_text(mark, color),
+            unsafe_allow_html=True
         )
 
     status = st.selectbox(
-    st.write(
-    f"{row['床位']}\t{row['學號']}\t{row['姓名']}"
+        "狀態",
+        ["在", "缺", "未入住"],
+        index=["在", "缺", "未入住"].index(default_status),
+        key=f"attendance_status_{term}_{dorm}_{floor}_{i}"
     )
 
-status = st.selectbox(
-    "狀態",
-    ["在", "缺", "未入住"],
-    ...
+    note = st.text_input(
+        "備註",
+        key=f"attendance_note_{term}_{dorm}_{floor}_{i}"
     )
 
-note = st.text_input(
-    "備註",
-    ...
-    )
+    final_rows.append({
+        "日期": str(attendance_date),
+        "性別": row.get("性別", gender.replace("生", "")),
+        "宿舍": dorm,
+        "樓層": floor,
+        "房號": row["房號"],
+        "床位": row["床位"],
+        "學號": row["學號"],
+        "姓名": row["姓名"],
+        "狀態": status,
+        "備註": note
+    })
+
+st.divider()
+
+final_df = pd.DataFrame(final_rows)
+
+st.dataframe(
+    final_df,
+    use_container_width=True
 )
-
-    st.divider()
-
-    final_df = pd.DataFrame(final_rows)
 
     st.divider()
 
