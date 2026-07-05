@@ -337,26 +337,45 @@ def load_attendance_students(term, dorm, floor):
             if df.empty:
                 continue
 
-            bed_col = find_col(df, ["床位"])
-            room_col = find_col(df, ["房號", "寢室"])
-            sid_col = find_col(df, ["學號"], exclude_keywords=["替代"])
-            name_col = find_col(df, ["姓名", "名字"])
+            sid_col = find_col(
+            df,
+            ["學號"],
+            exclude_keywords=["替代"]
+        )
+
+            name_col = find_col(
+            df,
+            ["姓名", "名字"]
+        )
 
             if name_col is None:
                 continue
 
             temp = pd.DataFrame()
 
-            if bed_col:
-                temp["床位"] = df[bed_col].astype(str).map(normalize_value)
-                temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
+            # ======================
+# 固定抓 B 欄 (第二欄)
+# ======================
 
-            elif room_col:
-                temp["房號"] = df[room_col].astype(str).map(normalize_value)
-                temp["床位"] = temp["房號"]
+        if len(df.columns) < 2:
+            continue
 
-            else:
-                continue
+# 第二欄(B欄)
+        bed_col = df.columns[1]
+
+# 床位
+        temp["床位"] = (
+            df[bed_col]
+            .astype(str)
+            .map(normalize_value)
+        )
+
+# 房號
+        temp["房號"] = (
+        temp["床位"]
+        .str.split("-")
+        .str[0]
+        )
 
             if sid_col:
                 temp["學號"] = df[sid_col].astype(str).map(normalize_value)
