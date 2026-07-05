@@ -392,17 +392,21 @@ def load_attendance_students(term, dorm, floor):
             sid_col = df.columns[3]
             name_col = df.columns[5]
 
+            bed_col = find_col(df, ["床位"])
+            sid_col = find_col(df, ["學號"], exclude_keywords=["替代"])
+            name_col = find_col(df, ["姓名"])
+
             temp = pd.DataFrame()
 
+            # B欄
             temp["床位"] = (
-                df[bed_col]
+                df[df.columns[1]]
                 .astype(str)
                 .map(normalize_value)
             )
 
             temp["房號"] = (
                 temp["床位"]
-                .astype(str)
                 .str.split("-")
                 .str[0]
             )
@@ -830,30 +834,37 @@ def show_attendance():
             mark = ""
             default_status = "在"
 
-    st.markdown(
-        f"""
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px;">
-            {color_text(row["床位"], color)}
-            &nbsp;&nbsp;
-            {color_text(row["學號"], color)}
-            &nbsp;&nbsp;
-            {color_text(row["姓名"], color)}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+            st.markdown(
+            f"""
+            <div style="font-size:18px;font-weight:700;margin-bottom:6px;">
+                {color_text(row["床位"], color)}
+                &nbsp;&nbsp;
+                {color_text(row["學號"], color)}
+                &nbsp;&nbsp;
+                {color_text(row["姓名"], color)}
+        </div>
+        """,
+        unsafe_allow_html=True
+        )
 
     status = st.selectbox(
-        "狀態",
-        ["在", "缺", "未入住"],
-        index=["在", "缺", "未入住"].index(default_status),
-        key=f"attendance_status_{term}_{dorm}_{floor}_{i}"
+    st.write(
+    f"{row['床位']}\t{row['學號']}\t{row['姓名']}"
+    )
+
+status = st.selectbox(
+    "狀態",
+    ["在", "缺", "未入住"],
+    ...
+    )
+
+note = st.text_input(
+    "備註",
+    ...
+    )
 )
 
-    note = st.text_input(
-        "備註",
-        key=f"attendance_note_{term}_{dorm}_{floor}_{i}"
-)
+    st.divider()
 
     final_df = pd.DataFrame(final_rows)
 
@@ -878,5 +889,7 @@ def show_attendance():
 
         except Exception as e:
             st.error(f"儲存失敗：{e}")
+
+    
 
             
