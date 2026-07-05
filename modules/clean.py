@@ -553,7 +553,7 @@ def get_current_clean_setting():
 
     try:
         ss = open_sheet(CLEAN_RESULT_URL)
-        ws = ss.worksheet("整潔比賽判斷")
+        ws = ss.worksheet("整潔比賽時間判斷")
 
         values = []
 
