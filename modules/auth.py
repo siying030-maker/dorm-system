@@ -13,6 +13,18 @@ def normalize_dorm(value):
     return str(value).strip().replace("ㄧ", "一")
 
 
+def normalize_gender(value):
+    value = str(value).strip()
+
+    if "男" in value:
+        return "男"
+
+    if "女" in value:
+        return "女"
+
+    return ""
+
+
 def normalize_supervisor_type(value):
     value = str(value).strip()
 
@@ -25,7 +37,7 @@ def normalize_supervisor_type(value):
     return ""
 
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_users(role):
     try:
         ss = open_sheet(ADMIN_SHEET_URL)
@@ -47,6 +59,17 @@ def load_users(role):
     except Exception as e:
         st.error(f"讀取 {role} 帳號失敗：{e}")
         return pd.DataFrame()
+
+
+def get_row_gender(row):
+    for col in ["性別", "男女舍監", "宿舍別", "寒假宿舍別", "暑假宿舍別"]:
+        value = row.get(col, "")
+        gender = normalize_gender(value)
+
+        if gender:
+            return gender
+
+    return ""
 
 
 def login_page():
@@ -122,6 +145,8 @@ def login_page():
                 row.get("宿舍別", "")
             )
 
+            st.session_state.gender = get_row_gender(row)
+
             st.session_state.is_main = (
                 clean_text(row.get("總樓", "")) == "是"
             )
@@ -186,6 +211,8 @@ def login_page():
                 )
             else:
                 st.session_state.supervisor_type = ""
+
+            st.session_state.gender = get_row_gender(row)
 
             st.session_state.dorm = ""
             st.session_state.is_main = False
