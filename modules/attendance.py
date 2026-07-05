@@ -337,57 +337,50 @@ def load_attendance_students(term, dorm, floor):
             if df.empty:
                 continue
 
-            sid_col = find_col(
-            df,
-            ["學號"],
-            exclude_keywords=["替代"]
-        )
-
-            name_col = find_col(
-            df,
-            ["姓名", "名字"]
-        )
-
-            if name_col is None:
+            if len(df.columns) < 6:
                 continue
+
+            # 固定欄位：
+            # B欄 = 床位，例如 82113-1
+            # D欄 = 學號
+            # F欄 = 姓名
+            bed_col = df.columns[1]
+            sid_col = df.columns[3]
+            name_col = df.columns[5]
 
             temp = pd.DataFrame()
 
-            # ======================
-# 固定抓 B 欄 (第二欄)
-# ======================
+            temp["床位"] = (
+                df[bed_col]
+                .astype(str)
+                .map(normalize_value)
+            )
 
-        if len(df.columns) < 2:
-            continue
+            temp["房號"] = (
+                temp["床位"]
+                .astype(str)
+                .str.split("-")
+                .str[0]
+            )
 
-# 第二欄(B欄)
-        bed_col = df.columns[1]
+            temp["學號"] = (
+                df[sid_col]
+                .astype(str)
+                .map(normalize_value)
+            )
 
-# 床位
-        temp["床位"] = (
-            df[bed_col]
-            .astype(str)
-            .map(normalize_value)
-        )
+            temp["姓名"] = (
+                df[name_col]
+                .astype(str)
+                .str.strip()
+            )
 
-# 房號
-        temp["房號"] = (
-        temp["床位"]
-        .str.split("-")
-        .str[0]
-        )
-
-            if sid_col:
-                temp["學號"] = df[sid_col].astype(str).map(normalize_value)
-            else:
-                temp["學號"] = ""
-
-            temp["姓名"] = df[name_col].astype(str).str.strip()
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
 
-            # 清除空白資料：床位有值但沒有學號/姓名的空列不要顯示
             temp = temp[
+                (temp["床位"].astype(str).str.strip() != "")
+                &
                 (temp["房號"].astype(str).str.strip() != "")
                 &
                 (temp["學號"].astype(str).str.strip() != "")
@@ -416,24 +409,16 @@ def load_attendance_students(term, dorm, floor):
                 ignore_index=True
             )
 
-            result = result[
-                (result["房號"].astype(str).str.strip() != "")
-                &
-                (result["學號"].astype(str).str.strip() != "")
-                &
-                (result["姓名"].astype(str).str.strip() != "")
-            ].copy()
-
             return result[
-            [
-                "房號",
-                "床位",
-                "學號",
-                "姓名",
-                "性別",
-                "讀取Sheet"
+                [
+                    "房號",
+                    "床位",
+                    "學號",
+                    "姓名",
+                    "性別",
+                    "讀取Sheet"
+                ]
             ]
-        ]
 
         return pd.DataFrame()
 
