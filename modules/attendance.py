@@ -830,57 +830,30 @@ def show_attendance():
             mark = ""
             default_status = "在"
 
-        cols = st.columns([1, 1, 1, 1, 1, 1])
+    st.markdown(
+        f"""
+        <div style="font-size:18px;font-weight:700;margin-bottom:6px;">
+            {color_text(row["床位"], color)}
+            &nbsp;&nbsp;
+            {color_text(row["學號"], color)}
+            &nbsp;&nbsp;
+            {color_text(row["姓名"], color)}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-        bed_show = row["床位"] if row["床位"] else row["房號"]
+    status = st.selectbox(
+        "狀態",
+        ["在", "缺", "未入住"],
+        index=["在", "缺", "未入住"].index(default_status),
+        key=f"attendance_status_{term}_{dorm}_{floor}_{i}"
+)
 
-        cols[0].markdown(
-            color_text(bed_show, color),
-            unsafe_allow_html=True
-        )
-
-        cols[1].markdown(
-            color_text(row["學號"], color),
-            unsafe_allow_html=True
-        )
-
-        cols[2].markdown(
-            color_text(row["姓名"], color),
-            unsafe_allow_html=True
-        )
-
-        if mark:
-            cols[3].markdown(
-                color_text(mark, color),
-                unsafe_allow_html=True
-            )
-        else:
-            cols[3].write("")
-
-        status = cols[4].selectbox(
-            "狀態",
-            ["在", "缺", "未入住"],
-            index=["在", "缺", "未入住"].index(default_status),
-            key=f"attendance_status_{term}_{dorm}_{floor}_{i}"
-        )
-
-        note = cols[5].text_input(
-            "備註",
-            key=f"attendance_note_{term}_{dorm}_{floor}_{i}"
-        )
-
-        final_rows.append({
-            "日期": str(attendance_date),
-            "性別": row.get("性別", gender.replace("生", "")),
-            "宿舍": dorm,
-            "樓層": floor,
-            "房號": row["房號"],
-            "床位": row["床位"],
-            "學號": row["學號"],
-            "姓名": row["姓名"],
-            "狀態": status,
-            "備註": note
-        })
+    note = st.text_input(
+        "備註",
+        key=f"attendance_note_{term}_{dorm}_{floor}_{i}"
+)
 
     final_df = pd.DataFrame(final_rows)
 
