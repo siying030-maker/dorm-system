@@ -234,6 +234,9 @@ def get_floor_options(term, dorm):
         floors = split_floors(st.session_state.get("summer_floors", ""))
         if floors:
             return floors
+    
+    if is_holiday_term(term):
+        return ["全部"]
 
     return FLOOR_OPTIONS.get(dorm, [])
 
@@ -241,7 +244,11 @@ def get_floor_options(term, dorm):
 def get_sheet_names_for_attendance(term, dorm, floor):
     dorm = normalize_dorm(dorm)
 
-    
+    if is_holiday_term(term):
+        return [
+            get_floor_sheet_name(dorm, f)
+            for f in FLOOR_OPTIONS.get(dorm, [])
+        ]
 
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return [
@@ -330,6 +337,24 @@ def find_col(df, keywords, exclude_keywords=None):
                 return c
 
     return None
+def get_overseas_col(df):
+
+    col = find_col(
+        df,
+        [
+            "本地/境外",
+            "本地境外",
+            "原始資料備註"
+        ]
+    )
+
+    if col:
+        return col
+
+    if len(df.columns) >= 43:
+        return df.columns[42]
+
+    return None
 
 
 @st.cache_data(ttl=300)
@@ -391,6 +416,24 @@ def load_attendance_students(term, dorm, floor):
                 .astype(str)
                 .str.strip()
             )
+            if is_holiday_term(term):
+
+                overseas_col = get_overseas_col(df)
+
+                if overseas_col is None:
+                    continue
+
+                temp["本地境外"] = (
+                    df[overseas_col]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp = temp[
+                    temp["本地境外"]
+                    .astype(str)
+                    .str.contains("境外", na=False)
+                ].copy()
 
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
@@ -427,15 +470,19 @@ def load_attendance_students(term, dorm, floor):
             )
 
             return result[
-                [
-                    "房號",
-                    "床位",
-                    "學號",
-                    "姓名",
-                    "性別",
-                    "讀取Sheet"
-                ]
-            ]
+    [
+        c for c in [
+            "房號",
+            "床位",
+            "學號",
+            "姓名",
+            "性別",
+            "本地境外",
+            "讀取Sheet"
+        ]
+        if c in result.columns
+    ]
+]
 
         return pd.DataFrame()
 
@@ -673,11 +720,16 @@ def show_attendance():
         st.warning("此宿舍沒有樓層設定")
         return
 
+    if is_holiday_term(term):
+        floor = "全部"
+    st.info("假日點名：不分樓層，只顯示境外生")
+    else:
     floor = st.selectbox(
         "樓層",
         floors,
         key="attendance_floor"
     )
+    
 
     attendance_date = st.date_input(
         "點名日期",
@@ -851,3 +903,7 @@ def show_attendance():
 
         except Exception as e:
             st.error(f"儲存失敗：{e}")
+
+            
+def is_holiday_term(term):
+    return term in ["上學期假日", "下學期假日"]
