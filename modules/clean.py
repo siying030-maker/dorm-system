@@ -550,7 +550,7 @@ def show_clean_view():
 def get_current_clean_setting():
 
     ss = open_sheet(CLEAN_RESULT_URL)
-    ws = ss.worksheet("整潔比賽判斷")
+    ws = ss.worksheet("整潔比賽時判斷")
 
     values = ws.get_all_values()
 
