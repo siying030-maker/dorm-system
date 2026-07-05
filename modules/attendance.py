@@ -7,6 +7,8 @@ from core.google_api import open_sheet
 from core.config import (
     UPPER_GATE_URL,
     LOWER_GATE_URL,
+    WINTER_URL,
+    SUMMER_URL,
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
@@ -137,27 +139,36 @@ def get_attendance_url(term, dorm):
 
 
 def get_gate_sheet_url(term):
-    if term in ["上學期", "寒假"]:
+
+    if term == "上學期":
         return UPPER_GATE_URL
+
+    if term == "下學期":
+        return LOWER_GATE_URL
+
+    if term == "寒假":
+        return WINTER_URL
+
+    if term == "暑假":
+        return SUMMER_URL
 
     return LOWER_GATE_URL
 
 
 def get_available_terms():
+
     role = st.session_state.get("role", "")
 
     if role in ["舍監", "行政"]:
         return ["上學期", "下學期", "寒假", "暑假"]
 
-    terms = ["上學期", "下學期"]
-
     if st.session_state.get("winter_dorms", ""):
-        terms.append("寒假")
+        return ["寒假"]
 
     if st.session_state.get("summer_dorms", ""):
-        terms.append("暑假")
+        return ["暑假"]
 
-    return terms
+    return ["上學期", "下學期"]
 
 
 def get_login_dorm_options(term):

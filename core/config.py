@@ -15,6 +15,14 @@ UPPER_GATE_URL = "https://docs.google.com/spreadsheets/d/1Pr1fQYH35KgXMkl6igxqc-
 
 LOWER_GATE_URL = "https://docs.google.com/spreadsheets/d/1ivjA_-voyNAUGbvbc5o5BULu_MgU2AqbNokvQJ5dfe4/edit"
 
+#J暑假外宿晚歸
+
+SUMMER_URL = "https://docs.google.com/spreadsheets/d/17nBz-Q4XSb2csKVrvWF7TheHBkgqWFuSPj1Y5axmX1U/edit"
+
+#寒假外宿晚歸
+
+WINTER_URL = "https://docs.google.com/spreadsheets/d/1OztfFffM6wc3irlbnYISXhkUtpSKXjBrzpykilqZqOU/edit"
+
 #宿舍管理員
 
 ADMIN_SHEET_URL = "https://docs.google.com/spreadsheets/d/1eZgdlelXQWcO3ZRxeXRjXNTI1g1I6RUZPGtJoC9iRes/edit"
