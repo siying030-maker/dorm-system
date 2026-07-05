@@ -353,6 +353,7 @@ def load_attendance_students(term, dorm, floor):
                 temp["學號"] = ""
 
             temp["姓名"] = df[name_col].astype(str).str.strip()
+            temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
 
             # 清除空白資料：床位有值但沒有學號/姓名的空列不要顯示
@@ -394,14 +395,15 @@ def load_attendance_students(term, dorm, floor):
             ].copy()
 
             return result[
-                [
-                    "房號",
-                    "床位",
-                    "學號",
-                    "姓名",
-                    "讀取Sheet"
-                ]
+            [
+                "房號",
+                "床位",
+                "學號",
+                "姓名",
+                "性別",
+                "讀取Sheet"
             ]
+        ]
 
         return pd.DataFrame()
 
@@ -535,6 +537,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
     headers = [
         "日期",
+        "性別",
         "宿舍",
         "樓層",
         "房號",
@@ -553,6 +556,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
         row_data = [
             str(attendance_date),
+            r.get("性別", gender.replace("生", "")),
             dorm,
             floor,
             r.get("房號", ""),
@@ -770,6 +774,7 @@ def show_attendance():
 
         final_rows.append({
             "日期": str(attendance_date),
+            "性別": row.get("性別", gender.replace("生", "")),
             "宿舍": dorm,
             "樓層": floor,
             "房號": row["房號"],

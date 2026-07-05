@@ -11,46 +11,91 @@ from core.config import (
 )
 
 
-# ==================================================
-# 權限判斷
-# 行政：沒有補點權限
-# 男舍監 / 男樓長：只能補男生
-# 女舍監 / 女樓長：只能補女生
-# ==================================================
+def normalize_gender(value):
+
+    value = str(value).strip()
+
+    if value in ["男", "男生"]:
+        return "男"
+
+    if value in ["女", "女生"]:
+        return "女"
+
+    if "男" in value:
+        return "男"
+
+    if "女" in value:
+        return "女"
+
+    return ""
+
+
+def gender_to_label(gender):
+
+    gender = normalize_gender(gender)
+
+    if gender == "男":
+        return "男生"
+
+    if gender == "女":
+        return "女生"
+
+    return ""
+
+
+def get_login_gender():
+
+    gender = st.session_state.get("gender", "")
+
+    gender = normalize_gender(gender)
+
+    if gender:
+        return gender
+
+    supervisor_type = st.session_state.get(
+        "supervisor_type",
+        ""
+    )
+
+    gender = normalize_gender(supervisor_type)
+
+    if gender:
+        return gender
+
+    dorm = st.session_state.get("dorm", "")
+
+    gender = normalize_gender(dorm)
+
+    if gender:
+        return gender
+
+    return ""
+
 
 def get_allowed_genders():
 
     role = st.session_state.get("role", "")
-    supervisor_type = st.session_state.get("supervisor_type", "")
-    dorm = st.session_state.get("dorm", "")
 
     if role == "行政":
         return []
 
-    if role == "舍監":
+    login_gender = get_login_gender()
 
-        if supervisor_type == "男舍監":
-            return ["男生"]
+    if login_gender == "男":
+        return ["男生"]
 
-        if supervisor_type == "女舍監":
-            return ["女生"]
-
-    if role == "樓長":
-
-        if str(dorm).startswith("男"):
-            return ["男生"]
-
-        if str(dorm).startswith("女"):
-            return ["女生"]
+    if login_gender == "女":
+        return ["女生"]
 
     return []
 
 
-# ==================================================
-# 只讀取今天的需補點名單 Sheet
-# ==================================================
+def normalize_text(value):
 
-@st.cache_data(ttl=300)
+    return str(value).strip()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def load_need_makeup_source(gender):
 
     source_url = (
@@ -99,20 +144,51 @@ def load_need_makeup_source(gender):
         .str.strip()
     )
 
-    df = df[df["狀態"] == "缺"].copy()
+    df = df[
+        df["狀態"] == "缺"
+    ].copy()
 
     if df.empty:
         return pd.DataFrame()
 
-    df["性別"] = gender
+    if "性別" in df.columns:
+
+        df["性別"] = (
+            df["性別"]
+            .astype(str)
+            .map(normalize_gender)
+        )
+
+        target_gender = normalize_gender(gender)
+
+        df = df[
+            df["性別"] == target_gender
+        ].copy()
+
+        df["性別"] = df["性別"].map(
+            lambda x: "男生" if x == "男" else "女生"
+        )
+
+    else:
+
+        df["性別"] = gender
+
     df["來源Sheet"] = ws.title
+
+    df = df[
+        df["學號"]
+        .astype(str)
+        .str.strip() != ""
+    ]
+
+    df = df[
+        df["姓名"]
+        .astype(str)
+        .str.strip() != ""
+    ]
 
     return df
 
-
-# ==================================================
-# 欄位位置
-# ==================================================
 
 def find_col_index(headers, col_name):
 
@@ -124,23 +200,49 @@ def find_col_index(headers, col_name):
     return None
 
 
-# ==================================================
-# 更新點名總表：缺 -> 已補點
-# ==================================================
+def get_rollcall_url_by_gender(gender):
+
+    gender = normalize_gender(gender)
+
+    if gender == "女":
+        return ROLLCALL_GIRL_URL
+
+    if gender == "男":
+        return ROLLCALL_BOY_URL
+
+    raise Exception("無法判斷性別")
+
+
+def get_need_makeup_url_by_gender(gender):
+
+    gender = normalize_gender(gender)
+
+    if gender == "女":
+        return NEED_MAKEUP_GIRL_URL
+
+    if gender == "男":
+        return NEED_MAKEUP_BOY_URL
+
+    raise Exception("無法判斷性別")
+
 
 def update_rollcall_status_to_makeup(gender, target_row):
 
-    rollcall_url = (
-        ROLLCALL_GIRL_URL
-        if gender == "女生"
-        else ROLLCALL_BOY_URL
-    )
+    rollcall_url = get_rollcall_url_by_gender(gender)
 
     ss = open_sheet(rollcall_url)
 
-    sheet_name = str(target_row.get("來源Sheet", "")).strip()
-    sid = str(target_row.get("學號", "")).strip()
-    rollcall_date = str(target_row.get("日期", "")).strip()
+    sheet_name = str(
+        target_row.get("來源Sheet", "")
+    ).strip()
+
+    sid = str(
+        target_row.get("學號", "")
+    ).strip()
+
+    rollcall_date = str(
+        target_row.get("日期", "")
+    ).strip()
 
     try:
         ws = ss.worksheet(sheet_name)
@@ -191,24 +293,23 @@ def update_rollcall_status_to_makeup(gender, target_row):
     raise Exception(f"點名總表找不到此學生：{sid}")
 
 
-# ==================================================
-# 更新需補點名單：缺 -> 已補點
-# 避免補完後還一直顯示
-# ==================================================
-
 def update_need_makeup_status_to_done(gender, target_row):
 
-    source_url = (
-        NEED_MAKEUP_GIRL_URL
-        if gender == "女生"
-        else NEED_MAKEUP_BOY_URL
-    )
+    source_url = get_need_makeup_url_by_gender(gender)
 
     ss = open_sheet(source_url)
 
-    sheet_name = str(target_row.get("來源Sheet", "")).strip()
-    sid = str(target_row.get("學號", "")).strip()
-    rollcall_date = str(target_row.get("日期", "")).strip()
+    sheet_name = str(
+        target_row.get("來源Sheet", "")
+    ).strip()
+
+    sid = str(
+        target_row.get("學號", "")
+    ).strip()
+
+    rollcall_date = str(
+        target_row.get("日期", "")
+    ).strip()
 
     try:
         ws = ss.worksheet(sheet_name)
@@ -254,9 +355,75 @@ def update_need_makeup_status_to_done(gender, target_row):
                 return
 
 
-# ==================================================
-# 主畫面
-# ==================================================
+def filter_by_leader_scope(df):
+
+    role = st.session_state.get("role", "")
+
+    if role != "樓長":
+        return df
+
+    dorm = normalize_text(
+        st.session_state.get("dorm", "")
+    )
+
+    manage_dorms = normalize_text(
+        st.session_state.get("manage_dorms", "")
+    )
+
+    winter_dorms = normalize_text(
+        st.session_state.get("winter_dorms", "")
+    )
+
+    summer_dorms = normalize_text(
+        st.session_state.get("summer_dorms", "")
+    )
+
+    allowed_keywords = []
+
+    for value in [
+        dorm,
+        manage_dorms,
+        winter_dorms,
+        summer_dorms,
+        "寒假",
+        "暑假"
+    ]:
+
+        for item in str(value).replace("，", ",").split(","):
+
+            item = item.strip()
+
+            if item:
+                allowed_keywords.append(item)
+
+    allowed_keywords = list(dict.fromkeys(allowed_keywords))
+
+    if not allowed_keywords:
+        return df
+
+    if "宿舍" not in df.columns:
+        return df
+
+    condition = pd.Series(
+        False,
+        index=df.index
+    )
+
+    for keyword in allowed_keywords:
+
+        condition = (
+            condition
+            |
+            df["宿舍"]
+            .astype(str)
+            .str.contains(
+                keyword,
+                na=False
+            )
+        )
+
+    return df[condition]
+
 
 def show_makeup_rollcall():
 
@@ -286,16 +453,7 @@ def show_makeup_rollcall():
         ignore_index=True
     )
 
-    role = st.session_state.get("role", "")
-    dorm = st.session_state.get("dorm", "")
-
-    if role == "樓長" and "宿舍" in df.columns:
-
-        df = df[
-            df["宿舍"]
-            .astype(str)
-            .str.contains(str(dorm), na=False)
-        ]
+    df = filter_by_leader_scope(df)
 
     keyword = st.text_input(
         "搜尋學號 / 姓名 / 房號",
@@ -320,7 +478,10 @@ def show_makeup_rollcall():
                     |
                     df[col]
                     .astype(str)
-                    .str.contains(keyword, na=False)
+                    .str.contains(
+                        keyword,
+                        na=False
+                    )
                 )
 
         df = df[condition]
@@ -348,7 +509,8 @@ def show_makeup_rollcall():
 
     st.dataframe(
         df[show_cols],
-        use_container_width=True
+        use_container_width=True,
+        hide_index=True
     )
 
     st.divider()
@@ -362,6 +524,7 @@ def show_makeup_rollcall():
         label = (
             f'{row.get("性別", "")}｜'
             f'{row.get("日期", "")}｜'
+            f'{row.get("宿舍", "")}｜'
             f'{row.get("房號", "")}｜'
             f'{row.get("學號", "")}｜'
             f'{row.get("姓名", "")}'
@@ -384,9 +547,14 @@ def show_makeup_rollcall():
     if st.button("確認補點完成", key="submit_makeup"):
 
         try:
-            target_row = df.loc[selected_index].to_dict()
+            target_row = df.loc[
+                selected_index
+            ].to_dict()
 
-            gender = target_row.get("性別", "")
+            gender = target_row.get(
+                "性別",
+                ""
+            )
 
             update_rollcall_status_to_makeup(
                 gender,

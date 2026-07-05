@@ -2,84 +2,225 @@ import pandas as pd
 import streamlit as st
 
 from datetime import datetime
-from core.google_api import rate_limit
+from core.google_api import open_sheet, rate_limit
+from core.config import (
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
+)
 
 
-@st.cache_data(ttl=1800)
-def load_rollcall_data(_rollcall_source):
+def normalize_gender(value):
+    value = str(value).strip()
+
+    if value in ["男", "男生"]:
+        return "男"
+
+    if value in ["女", "女生"]:
+        return "女"
+
+    if "男" in value:
+        return "男"
+
+    if "女" in value:
+        return "女"
+
+    return ""
+
+
+def get_login_gender():
+    gender = normalize_gender(st.session_state.get("gender", ""))
+
+    if gender:
+        return gender
+
+    supervisor_type = st.session_state.get("supervisor_type", "")
+    gender = normalize_gender(supervisor_type)
+
+    if gender:
+        return gender
+
+    dorm = st.session_state.get("dorm", "")
+    gender = normalize_gender(dorm)
+
+    return gender
+
+
+def is_date_sheet(title):
+    for fmt in ["%Y-%m-%d", "%Y/%m/%d"]:
+        try:
+            datetime.strptime(str(title), fmt)
+            return True
+        except:
+            pass
+
+    return False
+
+
+def normalize_sheet_date(title):
+    return str(title).replace("/", "-")
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_rollcall_data():
 
     data = {}
 
-    if not isinstance(_rollcall_source, list):
-        rollcall_sources = [_rollcall_source]
-    else:
-        rollcall_sources = _rollcall_source
+    sources = [
+        ("女", "女生", ROLLCALL_GIRL_URL),
+        ("男", "男生", ROLLCALL_BOY_URL),
+    ]
 
-    for rollcall_ss in rollcall_sources:
+    for gender_value, gender_label, url in sources:
 
-        for ws in rollcall_ss.worksheets():
+        try:
+            rollcall_ss = open_sheet(url)
 
-            try:
+            for ws in rollcall_ss.worksheets():
+
                 try:
-                    datetime.strptime(ws.title, "%Y-%m-%d")
-                except:
-                    datetime.strptime(ws.title, "%Y/%m/%d")
+                    if not is_date_sheet(ws.title):
+                        continue
 
-                rate_limit()
-                values = ws.get_all_values()
+                    rate_limit()
+                    values = ws.get_all_values()
 
-                if len(values) <= 1:
-                    continue
+                    if len(values) <= 1:
+                        continue
 
-                df = pd.DataFrame(
-                    values[1:],
-                    columns=values[0]
-                )
+                    df = pd.DataFrame(
+                        values[1:],
+                        columns=values[0]
+                    )
 
-                df.columns = df.columns.astype(str).str.strip()
+                    df.columns = df.columns.astype(str).str.strip()
 
-                if "狀態" not in df.columns:
-                    continue
+                    if "狀態" not in df.columns:
+                        continue
 
-                df["狀態"] = (
-                    df["狀態"]
-                    .astype(str)
-                    .str.strip()
-                )
+                    df["狀態"] = (
+                        df["狀態"]
+                        .astype(str)
+                        .str.strip()
+                    )
 
-                df = df[
-                    df["狀態"].isin(["缺", "未入住"])
-                ].copy()
-
-                if "姓名" in df.columns:
                     df = df[
-                        df["姓名"]
+                        ~df["狀態"].isin(["已補點", "補"])
+                    ].copy()
+
+                    df = df[
+                        df["狀態"]
                         .astype(str)
                         .str.strip() != ""
                     ]
 
-                if df.empty:
+                    if "性別" in df.columns:
+                        df["性別"] = (
+                            df["性別"]
+                            .astype(str)
+                            .map(normalize_gender)
+                        )
+
+                        df = df[
+                            df["性別"] == gender_value
+                        ].copy()
+
+                        df["性別"] = gender_label
+
+                    else:
+                        df["性別"] = gender_label
+
+                    if "姓名" in df.columns:
+                        df = df[
+                            df["姓名"]
+                            .astype(str)
+                            .str.strip() != ""
+                        ]
+
+                    if "學號" in df.columns:
+                        df = df[
+                            df["學號"]
+                            .astype(str)
+                            .str.strip() != ""
+                        ]
+
+                    if df.empty:
+                        continue
+
+                    key = normalize_sheet_date(ws.title)
+
+                    if key in data:
+                        data[key] = pd.concat(
+                            [data[key], df],
+                            ignore_index=True
+                        )
+                    else:
+                        data[key] = df
+
+                except:
                     continue
 
-                key = ws.title.replace("/", "-")
-
-                if key in data:
-                    data[key] = pd.concat(
-                        [data[key], df],
-                        ignore_index=True
-                    )
-                else:
-                    data[key] = df
-
-            except:
-                continue
+        except Exception as e:
+            st.warning(f"{gender_label}點名總表讀取失敗：{e}")
 
     return data
 
 
-def show_rollcall(rollcall_ss, mode="daily"):
+def filter_by_permission(df):
 
-    data = load_rollcall_data(rollcall_ss)
+    role = st.session_state.get("role", "")
+
+    if role == "行政":
+        return df
+
+    login_gender = get_login_gender()
+
+    if login_gender:
+        gender_label = "男生" if login_gender == "男" else "女生"
+
+        if "性別" in df.columns:
+            df = df[
+                df["性別"].astype(str).str.strip() == gender_label
+            ]
+
+    if role == "樓長":
+
+        allowed_keywords = []
+
+        for value in [
+            st.session_state.get("dorm", ""),
+            st.session_state.get("manage_dorms", ""),
+            st.session_state.get("winter_dorms", ""),
+            st.session_state.get("summer_dorms", ""),
+            "寒假",
+            "暑假"
+        ]:
+            for item in str(value).replace("，", ",").split(","):
+                item = item.strip()
+                if item:
+                    allowed_keywords.append(item)
+
+        allowed_keywords = list(dict.fromkeys(allowed_keywords))
+
+        if allowed_keywords and "宿舍" in df.columns:
+            condition = pd.Series(False, index=df.index)
+
+            for keyword in allowed_keywords:
+                condition = (
+                    condition
+                    |
+                    df["宿舍"]
+                    .astype(str)
+                    .str.contains(keyword, na=False)
+                )
+
+            df = df[condition]
+
+    return df
+
+
+def show_rollcall(_unused=None, mode="daily"):
+
+    data = load_rollcall_data()
 
     if len(data) == 0:
         st.warning("沒有資料")
@@ -135,16 +276,24 @@ def show_daily(data, dates, search):
 
         df = data[d].copy()
 
+        df = filter_by_permission(df)
+
         if search:
-            df = df[
-                df["學號"]
-                .astype(str)
-                .str.contains(search, na=False)
-                |
-                df["姓名"]
-                .astype(str)
-                .str.contains(search, na=False)
-            ]
+            search = str(search).strip()
+
+            condition = pd.Series(False, index=df.index)
+
+            for col in ["學號", "姓名"]:
+                if col in df.columns:
+                    condition = (
+                        condition
+                        |
+                        df[col]
+                        .astype(str)
+                        .str.contains(search, na=False)
+                    )
+
+            df = df[condition]
 
         if df.empty:
             continue
@@ -155,49 +304,51 @@ def show_daily(data, dates, search):
 
         show_cols = [
             c for c in [
+                "性別",
                 "宿舍",
                 "樓層",
                 "房號",
                 "床位",
                 "學號",
                 "姓名",
-                "狀態"
+                "狀態",
+                "備註"
             ]
             if c in df.columns
         ]
 
-        show = df[show_cols]
+        show = df[show_cols].copy()
 
-        if "學號" in df.columns and "狀態" in df.columns:
+        def highlight_row(row):
+            status = str(row.get("狀態", "")).strip()
 
-            unlive_ids = df[
-                df["狀態"] == "未入住"
-            ]["學號"].astype(str).tolist()
-
-            style_df = show.style.apply(
-                lambda row: [
+            if status == "未入住":
+                return [
                     "color:red;font-weight:bold"
-                    if (
-                        "學號" in row.index
-                        and str(row["學號"]) in unlive_ids
-                    )
-                    else ""
                     for _ in row
-                ],
-                axis=1
-            )
+                ]
 
-            st.dataframe(
-                style_df,
-                use_container_width=True
-            )
+            if status == "缺":
+                return [
+                    "color:#b58900;font-weight:bold"
+                    for _ in row
+                ]
 
-        else:
+            return [
+                ""
+                for _ in row
+            ]
 
-            st.dataframe(
-                show,
-                use_container_width=True
-            )
+        style_df = show.style.apply(
+            highlight_row,
+            axis=1
+        )
+
+        st.dataframe(
+            style_df,
+            use_container_width=True,
+            hide_index=True
+        )
 
     if not found:
         st.info("本月無資料")

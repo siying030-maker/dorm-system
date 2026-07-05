@@ -66,10 +66,9 @@ if "點名系統" in tab_names:
 
 if "每日點名未到名單" in tab_names:
     with tabs[tab_names.index("每日點名未到名單")]:
-
-        role = st.session_state.get("role", "")
-        supervisor_type = st.session_state.get("supervisor_type", "")
-        dorm = st.session_state.get("dorm", "")
+        show_rollcall(
+            mode="daily"
+        )
 
         if role == "行政":
 
