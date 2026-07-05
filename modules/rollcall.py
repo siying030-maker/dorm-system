@@ -317,11 +317,11 @@ def show_daily(data, dates, search):
 
         show = df[show_cols].copy()
 
-    st.dataframe(
-        show,
-        use_container_width=True,
-        hide_index=True
-    )
+        st.dataframe(
+            show,
+            use_container_width=True,
+            hide_index=True
+        )
 
     if not found:
         st.info("本月無資料")
