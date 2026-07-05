@@ -70,62 +70,6 @@ if "每日點名未到名單" in tab_names:
             mode="daily"
         )
 
-        if role == "行政":
-
-            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-            boy_ss = open_sheet(ROLLCALL_BOY_URL)
-
-            show_rollcall(
-                [girl_ss, boy_ss],
-                mode="daily_all"
-            )
-
-        elif role == "舍監":
-
-            if supervisor_type == "男舍監":
-
-                rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
-
-                show_rollcall(
-                    rollcall_ss,
-                    mode="daily_boy"
-                )
-
-            elif supervisor_type == "女舍監":
-
-                rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
-
-                show_rollcall(
-                    rollcall_ss,
-                    mode="daily_girl"
-                )
-
-            else:
-                st.warning("無法判斷舍監性別")
-
-        elif role == "樓長":
-
-            if str(dorm).startswith("男"):
-
-                rollcall_ss = open_sheet(ROLLCALL_BOY_URL)
-
-                show_rollcall(
-                    rollcall_ss,
-                    mode="daily_boy"
-                )
-
-            elif str(dorm).startswith("女"):
-
-                rollcall_ss = open_sheet(ROLLCALL_GIRL_URL)
-
-                show_rollcall(
-                    rollcall_ss,
-                    mode="daily_girl"
-                )
-
-            else:
-                st.warning("無法判斷樓長宿舍性別")
-
 
 if "補點名單" in tab_names:
     with tabs[tab_names.index("補點名單")]:
