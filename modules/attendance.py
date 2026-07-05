@@ -391,6 +391,7 @@ def load_attendance_students(term, dorm, floor):
             bed_col = df.columns[1]
             sid_col = df.columns[3]
             name_col = df.columns[5]
+            class_col = df.columns[4]
 
             bed_col = find_col(df, ["床位"])
             sid_col = find_col(df, ["學號"], exclude_keywords=["替代"])
@@ -416,6 +417,15 @@ def load_attendance_students(term, dorm, floor):
                 .astype(str)
                 .map(normalize_value)
             )
+
+            if class_col:
+                temp["班級"] = (
+                    df[class_col]
+                    .astype(str)
+                    .str.strip()
+                )
+            else:
+                temp["班級"] = ""
 
             temp["姓名"] = (
                 df[name_col]
@@ -639,6 +649,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "房號",
         "床位",
         "學號",
+        "班級",
         "姓名",
         "狀態",
         "備註"
@@ -658,11 +669,11 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("房號", ""),
             r.get("床位", ""),
             r.get("學號", ""),
+            r.get("班級", ""),
             r.get("姓名", ""),
             status,
             r.get("備註", "")
         ]
-
         all_rows.append(row_data)
 
         if status == "缺":

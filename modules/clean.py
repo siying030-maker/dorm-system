@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import time
+
 
 from datetime import date
 
@@ -546,55 +548,62 @@ def show_clean_view():
     except Exception as e:
         st.error(str(e))
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_current_clean_setting():
 
-    ss = open_sheet(CLEAN_RESULT_URL)
-    ws = ss.worksheet("整潔比賽時判斷")
+    try:
+        ss = open_sheet(CLEAN_RESULT_URL)
+        ws = ss.worksheet("整潔比賽判斷")
 
-    values = ws.get_all_values()
+        values = []
 
-    if len(values) <= 1:
+        for i in range(5):
+            try:
+                values = ws.get("A:D")
+                break
+            except Exception as e:
+                if "429" in str(e):
+                    time.sleep((i + 1) * 5)
+                else:
+                    raise e
+
+        if len(values) <= 1:
+            return None
+
+        df = pd.DataFrame(
+            values[1:],
+            columns=values[0]
+        )
+
+        df.columns = df.columns.astype(str).str.strip()
+
+        today = date.today()
+
+        for _, row in df.iterrows():
+
+            period = str(row.get("可輸入期間", "")).strip()
+
+            if "~" not in period:
+                continue
+
+            start_text, end_text = period.split("~")
+
+            start_date = pd.to_datetime(start_text.strip(), errors="coerce")
+            end_date = pd.to_datetime(end_text.strip(), errors="coerce")
+
+            if pd.isna(start_date) or pd.isna(end_date):
+                continue
+
+            if start_date.date() <= today <= end_date.date():
+                return {
+                    "學期": str(row.get("學期", "")).strip(),
+                    "第幾次": str(row.get("第幾次", "")).strip(),
+                    "整潔比賽日期": str(row.get("整潔比賽日期", "")).strip(),
+                    "可輸入期間": period,
+                }
+
         return None
 
-    df = pd.DataFrame(
-        values[1:],
-        columns=values[0]
-    )
-
-    df.columns = df.columns.astype(str).str.strip()
-
-    today = date.today()
-
-    for _, row in df.iterrows():
-
-        period = str(row.get("可輸入期間", "")).strip()
-
-        if "~" not in period:
-            continue
-
-        start_text, end_text = period.split("~")
-
-        start_date = pd.to_datetime(
-            start_text.strip(),
-            errors="coerce"
-        )
-
-        end_date = pd.to_datetime(
-            end_text.strip(),
-            errors="coerce"
-        )
-
-        if pd.isna(start_date) or pd.isna(end_date):
-            continue
-
-        if start_date.date() <= today <= end_date.date():
-
-            return {
-                "學期": str(row.get("學期", "")).strip(),
-                "第幾次": str(row.get("第幾次", "")).strip(),
-                "整潔比賽日期": str(row.get("整潔比賽日期", "")).strip(),
-                "可輸入期間": period,
-            }
-
-    return None
+    except Exception as e:
+        st.warning(f"讀取整潔比賽判斷失敗：{e}")
+        return None

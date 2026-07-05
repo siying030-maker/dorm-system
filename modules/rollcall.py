@@ -305,11 +305,9 @@ def show_daily(data, dates, search):
         show_cols = [
             c for c in [
                 "性別",
-                "宿舍",
-                "樓層",
-                "房號",
                 "床位",
                 "學號",
+                "班級",
                 "姓名",
                 "狀態",
                 "備註"
@@ -319,36 +317,11 @@ def show_daily(data, dates, search):
 
         show = df[show_cols].copy()
 
-        def highlight_row(row):
-            status = str(row.get("狀態", "")).strip()
-
-            if status == "未入住":
-                return [
-                    "color:red;font-weight:bold"
-                    for _ in row
-                ]
-
-            if status == "缺":
-                return [
-                    "color:#b58900;font-weight:bold"
-                    for _ in row
-                ]
-
-            return [
-                ""
-                for _ in row
-            ]
-
-        style_df = show.style.apply(
-            highlight_row,
-            axis=1
-        )
-
-        st.dataframe(
-            style_df,
-            use_container_width=True,
-            hide_index=True
-        )
+    st.dataframe(
+        show,
+        use_container_width=True,
+        hide_index=True
+    )
 
     if not found:
         st.info("本月無資料")
