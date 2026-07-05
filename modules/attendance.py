@@ -125,25 +125,30 @@ def get_floor_sheet_name(dorm, floor):
 
 
 def get_attendance_url(term, dorm):
+
     dorm = normalize_dorm(dorm)
 
-    if term in ["上學期", "下學期"]:
-        return ATTENDANCE_SHEETS[term].get(dorm, "")
+    if term in ["上學期", "上學期假日"]:
+        return ATTENDANCE_SHEETS["上學期"].get(dorm, "")
 
-    if term in ["寒假", "暑假"]:
-        return VACATION_SHEETS[term].get(dorm, "")
+    if term in ["下學期", "下學期假日"]:
+        return ATTENDANCE_SHEETS["下學期"].get(dorm, "")
 
-    
+    if term == "寒假":
+        return VACATION_SHEETS["寒假"].get(dorm, "")
+
+    if term == "暑假":
+        return VACATION_SHEETS["暑假"].get(dorm, "")
 
     return ""
 
 
 def get_gate_sheet_url(term):
 
-    if term == "上學期":
+    if term in ["上學期", "上學期假日"]:
         return UPPER_GATE_URL
 
-    if term == "下學期":
+    if term in ["下學期", "下學期假日"]:
         return LOWER_GATE_URL
 
     if term == "寒假":
@@ -160,16 +165,28 @@ def get_available_terms():
     role = st.session_state.get("role", "")
 
     if role in ["舍監", "行政"]:
-        return ["上學期", "下學期", "寒假", "暑假"]
+        return [
+            "上學期",
+            "下學期",
+            "上學期假日",
+            "下學期假日",
+            "寒假",
+            "暑假"
+        ]
 
+    # 樓長
     if st.session_state.get("winter_dorms", ""):
         return ["寒假"]
 
     if st.session_state.get("summer_dorms", ""):
         return ["暑假"]
 
-    return ["上學期", "下學期"]
-
+    return [
+        "上學期",
+        "下學期",
+        "上學期假日",
+        "下學期假日"
+    ]
 
 def get_login_dorm_options(term):
     role = st.session_state.get("role", "")
