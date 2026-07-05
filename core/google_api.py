@@ -12,14 +12,22 @@ SCOPES = [
 
 _last_call = 0
 
-def rate_limit():
+
+def rate_limit(seconds=0.5):
     global _last_call
+
     now = time.time()
 
-    if now - _last_call < 0.3:
-        time.sleep(0.3)
+    wait = seconds - (now - _last_call)
+
+    if wait > 0:
+        time.sleep(wait)
 
     _last_call = time.time()
+
+
+def extract_sheet_id(url):
+    return url.split("/d/")[1].split("/")[0]
 
 
 @st.cache_resource(ttl=CACHE_TTL)
@@ -28,22 +36,28 @@ def get_client():
         st.secrets["google"],
         scopes=SCOPES
     )
+
     return gspread.authorize(creds)
 
 
 @st.cache_resource(ttl=CACHE_TTL)
 def open_sheet(url):
     client = get_client()
+    sheet_id = extract_sheet_id(url)
 
     for i in range(5):
+
         try:
-            rate_limit()
-            return client.open_by_url(url)
+            rate_limit(0.5)
+
+            return client.open_by_key(sheet_id)
 
         except Exception as e:
+
             if "429" in str(e):
                 time.sleep((i + 1) * 5)
+
             else:
                 raise e
 
-    raise Exception("Google API 過載")
+    raise Exception("Google API 過載，請稍後再試")
