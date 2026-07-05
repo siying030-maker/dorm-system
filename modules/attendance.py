@@ -512,12 +512,14 @@ def load_special_status(term, attendance_date):
 
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):
+
     ss = open_sheet(url)
 
     try:
         ws = ss.worksheet(sheet_name)
 
     except:
+
         ws = ss.add_worksheet(
             title=sheet_name,
             rows=3000,
@@ -526,9 +528,18 @@ def append_rows_to_sheet(url, sheet_name, headers, rows):
 
         ws.append_row(headers)
 
+        # 新增的 Sheet 移到最前面
+        worksheets = ss.worksheets()
+
+        new_order = [ws] + [
+            w for w in worksheets
+            if w.id != ws.id
+        ]
+
+        ss.reorder_worksheets(new_order)
+
     if rows:
         ws.append_rows(rows)
-
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
     gender = get_dorm_gender(dorm)

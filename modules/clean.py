@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 
+from datetime import date
+
 from core.google_api import open_sheet
 
 
@@ -293,6 +295,45 @@ def show_clean():
 
     st.header("整潔比賽")
 
+    # ==========================
+    # 自動判斷目前整潔比賽
+    # ==========================
+
+    setting = get_current_clean_setting()
+
+    if setting is None:
+        st.warning("目前不在整潔比賽可輸入期間")
+        return
+
+    clean_term = setting["學期"]        # 例如：115-1
+    contest = setting["第幾次"]         # 第一次
+
+    school_year = clean_term.split("-")[0]
+
+    semester = (
+        "上學期"
+        if clean_term.split("-")[1] == "1"
+        else "下學期"
+    )
+
+    st.info(
+        f"""
+目前學年：{school_year}
+
+目前學期：{semester}
+
+目前整潔比賽：{contest}
+
+比賽日期：{setting["整潔比賽日期"]}
+
+可輸入期間：{setting["可輸入期間"]}
+"""
+    )
+
+    # ==========================
+    # 宿舍
+    # ==========================
+
     dorm_options = get_manage_dorm_options()
 
     if len(dorm_options) == 0:
@@ -307,29 +348,19 @@ def show_clean():
 
     st.subheader(f"宿舍：{dorm}")
 
-    school_year = st.text_input(
-        "學年",
-        placeholder="例如：114",
-        key="clean_school_year"
-    )
-
-    semester = st.selectbox(
-        "學期",
-        ["上學期", "下學期"],
-        key="clean_semester"
-    )
-
-    contest = st.selectbox(
-        "第幾次",
-        ["第一次", "第二次", "第三次"],
-        key="clean_contest"
-    )
+    # ==========================
+    # 名次（保留人工選）
+    # ==========================
 
     rank = st.selectbox(
         "名次",
         ["第一名", "第二名", "第三名"],
         key="clean_rank"
     )
+
+    # ==========================
+    # 樓層房號
+    # ==========================
 
     floors = FLOOR_OPTIONS.get(dorm, [])
 
@@ -343,14 +374,24 @@ def show_clean():
     rooms = {}
 
     for floor in floors:
-        sheet_name = get_floor_sheet_name(dorm, floor)
+
+        sheet_name = get_floor_sheet_name(
+            dorm,
+            floor
+        )
 
         rooms[floor] = st.text_input(
             f"{floor} 房號（讀取 {sheet_name}）",
             key=f"clean_room_{dorm}_{floor}_{semester}_{contest}_{rank}"
         )
 
-    query_key = f"clean_result_{dorm}_{semester}_{contest}_{rank}"
+    # ==========================
+    # 查詢
+    # ==========================
+
+    query_key = (
+        f"clean_result_{dorm}_{semester}_{contest}_{rank}"
+    )
 
     if st.button(
         "查詢名單",
@@ -379,6 +420,10 @@ def show_clean():
         st.info("請輸入房號後按「查詢名單」")
         return
 
+    # ==========================
+    # 顯示名單
+    # ==========================
+
     st.divider()
     st.subheader("名單確認")
 
@@ -393,16 +438,17 @@ def show_clean():
         use_container_width=True
     )
 
+    # ==========================
+    # 儲存
+    # ==========================
+
     if st.button(
         "儲存到試算表",
         key=f"save_clean_{dorm}_{semester}_{contest}_{rank}"
     ):
 
-        if school_year.strip() == "":
-            st.error("請先輸入學年")
-            return
-
         try:
+
             save_clean_result(
                 total,
                 school_year,
@@ -499,3 +545,56 @@ def show_clean_view():
 
     except Exception as e:
         st.error(str(e))
+
+@st.cache_data(ttl=600)
+def get_current_clean_setting():
+
+    ss = open_sheet(CLEAN_RESULT_URL)
+    ws = ss.worksheet("整潔比賽判斷")
+
+    values = ws.get_all_values()
+
+    if len(values) <= 1:
+        return None
+
+    df = pd.DataFrame(
+        values[1:],
+        columns=values[0]
+    )
+
+    df.columns = df.columns.astype(str).str.strip()
+
+    today = date.today()
+
+    for _, row in df.iterrows():
+
+        period = str(row.get("可輸入期間", "")).strip()
+
+        if "~" not in period:
+            continue
+
+        start_text, end_text = period.split("~")
+
+        start_date = pd.to_datetime(
+            start_text.strip(),
+            errors="coerce"
+        )
+
+        end_date = pd.to_datetime(
+            end_text.strip(),
+            errors="coerce"
+        )
+
+        if pd.isna(start_date) or pd.isna(end_date):
+            continue
+
+        if start_date.date() <= today <= end_date.date():
+
+            return {
+                "學期": str(row.get("學期", "")).strip(),
+                "第幾次": str(row.get("第幾次", "")).strip(),
+                "整潔比賽日期": str(row.get("整潔比賽日期", "")).strip(),
+                "可輸入期間": period,
+            }
+
+    return None
