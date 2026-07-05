@@ -159,6 +159,8 @@ def get_gate_sheet_url(term):
 
     return LOWER_GATE_URL
 
+def is_holiday_term(term):
+    return term in ["上學期假日", "下學期假日"]
 
 def get_available_terms():
 
@@ -722,13 +724,13 @@ def show_attendance():
 
     if is_holiday_term(term):
         floor = "全部"
-    st.info("假日點名：不分樓層，只顯示境外生")
+        st.info("假日點名：不分樓層，只顯示境外生")
     else:
-    floor = st.selectbox(
-        "樓層",
-        floors,
-        key="attendance_floor"
-    )
+        floor = st.selectbox(
+            "樓層",
+            floors,
+            key="attendance_floor"
+        )
     
 
     attendance_date = st.date_input(
@@ -905,5 +907,3 @@ def show_attendance():
             st.error(f"儲存失敗：{e}")
 
             
-def is_holiday_term(term):
-    return term in ["上學期假日", "下學期假日"]
