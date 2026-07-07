@@ -965,7 +965,7 @@ def show_attendance():
 
         if is_leave:
             mark = "【外宿】"
-            mark_color = "red"
+            mark_color = "#A689E1"
             default_status = "缺"
 
         elif is_long_leave:
@@ -975,7 +975,7 @@ def show_attendance():
 
         elif is_late:
             mark = "【長期晚歸】"
-            mark_color = "#b58900"
+            mark_color = "#e7c663"
             default_status = "在"
 
         if is_unpaid:
