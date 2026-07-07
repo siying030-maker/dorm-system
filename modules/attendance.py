@@ -585,8 +585,9 @@ def load_unpaid_ids():
         st.warning(f"讀取未繳費名單失敗：{e}")
         return set()
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_special_status(term, attendance_date):
+
     try:
         url = get_gate_sheet_url(term)
         ss = open_sheet(url)
@@ -594,22 +595,42 @@ def load_special_status(term, attendance_date):
         leave_df = read_worksheet_df(ss, "外宿申請")
         late_df = read_worksheet_df(ss, "長期晚歸")
         long_leave_df = read_worksheet_df(ss, "長期外宿")
-        
 
         target_date = pd.to_datetime(attendance_date).date()
 
         leave_ids = set()
         late_ids = set()
         long_leave_ids = set()
-        
 
+        # ==========================
+        # 外宿申請
+        # ==========================
         if not leave_df.empty:
-            sid_col = find_col(leave_df, ["學號"])
-            start_col = find_col(leave_df, ["申請日期"])
-            end_col = find_col(leave_df, ["結束日期"])
 
-            if sid_col and start_col and end_col:
+            sid_col = find_col(leave_df, ["學號"])
+
+            start_col = find_col(
+                leave_df,
+                ["申請日期", "開始日期", "外宿開始", "起始日期", "日期"]
+            )
+
+            end_col = find_col(
+                leave_df,
+                ["結束日期", "結束日期時間", "外宿結束", "截止日期", "返回日期"]
+            )
+
+            if sid_col is None:
+                st.warning("外宿申請找不到「學號」欄位")
+
+            elif start_col is None:
+                st.warning("外宿申請找不到「申請日期 / 開始日期」欄位")
+
+            elif end_col is None:
+                st.warning("外宿申請找不到「結束日期 / 返回日期」欄位")
+
+            else:
                 for _, row in leave_df.iterrows():
+
                     sid = normalize_value(row.get(sid_col, ""))
 
                     start_date = pd.to_datetime(
@@ -622,11 +643,20 @@ def load_special_status(term, attendance_date):
                         errors="coerce"
                     )
 
-                    if sid and pd.notna(start_date) and pd.notna(end_date):
-                        if start_date.date() <= target_date <= end_date.date():
-                            leave_ids.add(sid)
+                    if sid == "":
+                        continue
 
+                    if pd.isna(start_date) or pd.isna(end_date):
+                        continue
+
+                    if start_date.date() <= target_date <= end_date.date():
+                        leave_ids.add(sid)
+
+        # ==========================
+        # 長期外宿
+        # ==========================
         if not long_leave_df.empty:
+
             sid_col = find_col(long_leave_df, ["學號"])
 
             if sid_col:
@@ -637,7 +667,11 @@ def load_special_status(term, attendance_date):
                     .tolist()
                 )
 
+        # ==========================
+        # 長期晚歸
+        # ==========================
         if not late_df.empty:
+
             sid_col = find_col(late_df, ["學號"])
 
             if sid_col:
@@ -668,12 +702,12 @@ def load_special_status(term, attendance_date):
 
     except Exception as e:
         st.warning(f"讀取外宿 / 晚歸資料失敗：{e}")
+
         return {
             "leave_ids": set(),
             "long_leave_ids": set(),
             "late_ids": set(),
         }
-
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):
 
