@@ -537,12 +537,14 @@ def load_attendance_students(term, dorm, floor):
         st.error(f"讀取點名名單失敗：{e}")
         return pd.DataFrame()
     
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_unpaid_ids():
 
     try:
         ss = open_sheet(UNPAID_URL)
-        ws = ss.get_worksheet(0)
+
+        # 指定讀取 Sheet：未繳費名單
+        ws = ss.worksheet("未繳費名單")
 
         from core.google_api import get_all_values
 
@@ -564,6 +566,7 @@ def load_unpaid_ids():
         )
 
         if sid_col is None:
+            st.warning("未繳費名單找不到「學號」欄位")
             return set()
 
         ids = (
@@ -582,7 +585,6 @@ def load_unpaid_ids():
         st.warning(f"讀取未繳費名單失敗：{e}")
         return set()
 
-
 @st.cache_data(ttl=300)
 def load_special_status(term, attendance_date):
     try:
@@ -592,12 +594,14 @@ def load_special_status(term, attendance_date):
         leave_df = read_worksheet_df(ss, "外宿申請")
         late_df = read_worksheet_df(ss, "長期晚歸")
         long_leave_df = read_worksheet_df(ss, "長期外宿")
+        
 
         target_date = pd.to_datetime(attendance_date).date()
 
         leave_ids = set()
         late_ids = set()
         long_leave_ids = set()
+        
 
         if not leave_df.empty:
             sid_col = find_col(leave_df, ["學號"])
