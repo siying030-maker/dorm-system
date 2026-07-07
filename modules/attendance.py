@@ -572,6 +572,31 @@ def load_unpaid_ids():
         st.warning(f"讀取未繳費名單失敗：{e}")
         return set()
 
+def read_raw_sheet_df(ss, sheet_name):
+
+    try:
+        ws = ss.worksheet(sheet_name)
+
+        values = ws.get_all_values(
+            value_render_option="UNFORMATTED_VALUE"
+        )
+
+        if len(values) <= 2:
+            return pd.DataFrame()
+
+        # 固定第 2 列是標題，第 3 列開始是資料
+        headers = build_unique_headers(values[1])
+        data = values[2:]
+
+        df = pd.DataFrame(data, columns=headers)
+        df.columns = df.columns.astype(str).str.strip()
+
+        return df
+
+    except Exception as e:
+        st.warning(f"{sheet_name} 讀取失敗：{e}")
+        return pd.DataFrame()
+
 @st.cache_data(ttl=300, show_spinner=False)
 def load_special_status(term, attendance_date):
 
@@ -579,9 +604,9 @@ def load_special_status(term, attendance_date):
         url = get_gate_sheet_url(term)
         ss = open_sheet(url)
 
-        leave_df = read_worksheet_df(ss, "外宿申請")
-        late_df = read_worksheet_df(ss, "長期晚歸")
-        long_leave_df = read_worksheet_df(ss, "長期外宿")
+        leave_df = read_raw_sheet_df(ss, "外宿申請")
+        late_df = read_raw_sheet_df(ss, "長期晚歸")
+        long_leave_df = read_raw_sheet_df(ss, "長期外宿")
 
         target_date = pd.to_datetime(attendance_date).date()
 
@@ -649,6 +674,7 @@ def load_special_status(term, attendance_date):
             "long_leave_ids": set(),
             "late_ids": set(),
         }
+    st.write("外宿抓到：", leave_ids)
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):
 
