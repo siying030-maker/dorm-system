@@ -598,7 +598,7 @@ def load_special_status(term, attendance_date):
 
             for _, row in leave_df.iterrows():
 
-            sid = normalize_value(row.get(sid_col, ""))
+                sid = normalize_value(row.get(sid_col, ""))
 
             start_date = parse_sheet_date(
                     row.get(start_col, "")
