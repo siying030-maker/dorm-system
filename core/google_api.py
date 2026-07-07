@@ -17,7 +17,6 @@ def rate_limit(seconds=0.5):
     global _last_call
 
     now = time.time()
-
     wait = seconds - (now - _last_call)
 
     if wait > 0:
@@ -36,7 +35,6 @@ def get_client():
         st.secrets["google"],
         scopes=SCOPES
     )
-
     return gspread.authorize(creds)
 
 
@@ -46,17 +44,13 @@ def open_sheet(url):
     sheet_id = extract_sheet_id(url)
 
     for i in range(5):
-
         try:
             rate_limit(0.5)
-
             return client.open_by_key(sheet_id)
 
         except Exception as e:
-
             if "429" in str(e):
                 time.sleep((i + 1) * 5)
-
             else:
                 raise e
 

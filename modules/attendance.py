@@ -297,28 +297,53 @@ def find_header_index(values):
     return 0
 
 
+import time
+
 def read_worksheet_df(ss, sheet_name):
-    try:
-        ws = ss.worksheet(sheet_name)
 
-        values = ws.get_all_values(
-            value_render_option="UNFORMATTED_VALUE"
-        )
+    for retry in range(3):
 
-        if len(values) <= 1:
-            return pd.DataFrame()
+        try:
+            ws = ss.worksheet(sheet_name)
 
-        header_index = find_header_index(values)
-        headers = build_unique_headers(values[header_index])
-        data = values[header_index + 1:]
+            values = ws.get_all_values(
+                value_render_option="UNFORMATTED_VALUE"
+            )
 
-        df = pd.DataFrame(data, columns=headers)
-        df.columns = df.columns.astype(str).str.strip()
+            if len(values) <= 1:
+                return pd.DataFrame()
 
-        return df
+            header_index = find_header_index(values)
 
-    except:
-        return pd.DataFrame()
+            headers = build_unique_headers(
+                values[header_index]
+            )
+
+            data = values[header_index + 1:]
+
+            df = pd.DataFrame(
+                data,
+                columns=headers
+            )
+
+            df.columns = (
+                df.columns.astype(str)
+                .str.strip()
+            )
+
+            return df
+
+        except Exception as e:
+
+            if retry < 2:
+                time.sleep(1)
+                continue
+
+            st.warning(
+                f"{sheet_name} 讀取失敗：{e}"
+            )
+
+    return pd.DataFrame()
 
 
 def find_col(df, keywords, exclude_keywords=None):
@@ -375,11 +400,16 @@ def load_attendance_students(term, dorm, floor):
         sheet_names = get_sheet_names_for_attendance(term, dorm, floor)
 
         for sheet_name in sheet_names:
-            time.sleep(0.2)
+            time.sleep(0.4)
 
             df = read_worksheet_df(ss, sheet_name)
 
             if df.empty:
+
+                st.warning(
+                f"{sheet_name} 暫時讀不到，正在略過"
+                )
+
                 continue
 
             if len(df.columns) < 6:

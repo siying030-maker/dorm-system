@@ -95,7 +95,7 @@ def normalize_text(value):
     return str(value).strip()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=30, show_spinner=False)
 def load_need_makeup_source(gender):
 
     source_url = (
@@ -428,6 +428,10 @@ def filter_by_leader_scope(df):
 def show_makeup_rollcall():
 
     st.header("補點名單")
+
+    if st.button("重新整理補點名單", key="refresh_makeup"):
+        st.cache_data.clear()
+        st.rerun()
 
     allowed_genders = get_allowed_genders()
 
