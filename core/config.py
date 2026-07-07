@@ -43,3 +43,6 @@ ROLLCALL_BOY_URL = "https://docs.google.com/spreadsheets/d/1a93wUnnVo8OUACB1lLrT
 REWARD_UPPER_URL = "https://docs.google.com/spreadsheets/d/18FrgMjyb6bo0apiAKpOfTkr7fQQSQlbW6al8G6y_AYk/edit?usp=sharing"
 
 REWARD_LOWER_URL = "https://docs.google.com/spreadsheets/d/1kymMcZ7M69he0ZkE7pCQnbDsWJ4qawQdO730nUuHn3M/edit?usp=sharing"
+
+#未繳費
+UNPAID_URL = "https://docs.google.com/spreadsheets/d/1-pDlEcx3ScEyo9dQQncHh32_8QuXlrsVkQch5b6x4SY/edit"
