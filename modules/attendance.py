@@ -597,7 +597,7 @@ def read_raw_sheet_df(ss, sheet_name):
         st.warning(f"{sheet_name} 讀取失敗：{e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_special_status(term, attendance_date):
 
     try:
@@ -614,28 +614,33 @@ def load_special_status(term, attendance_date):
         late_ids = set()
         long_leave_ids = set()
 
-        # 外宿申請：C/N/O 欄
+        # 外宿申請：固定抓 C / N / O 欄
         if not leave_df.empty and len(leave_df.columns) >= 15:
 
-            sid_col = leave_df.columns[2]       # C欄 學號
-            start_col = leave_df.columns[13]    # N欄 申請日期
-            end_col = leave_df.columns[14]      # O欄 結束日期
+            sid_col = leave_df.columns[2]       # C欄：學號
+            start_col = leave_df.columns[13]    # N欄：申請日期
+            end_col = leave_df.columns[14]      # O欄：結束日期
 
             for _, row in leave_df.iterrows():
 
                 sid = normalize_value(row.get(sid_col, ""))
 
-            start_date = parse_sheet_date(
+                start_date = parse_sheet_date(
                     row.get(start_col, "")
                 )
 
-            end_date = parse_sheet_date(
+                end_date = parse_sheet_date(
                     row.get(end_col, "")
                 )
 
-            if sid and pd.notna(start_date) and pd.notna(end_date):
-                    if start_date.date() <= target_date <= end_date.date():
-                        leave_ids.add(sid)
+                if sid == "":
+                    continue
+
+                if pd.isna(start_date) or pd.isna(end_date):
+                    continue
+
+                if start_date.date() <= target_date <= end_date.date():
+                    leave_ids.add(sid)
 
         # 長期外宿：固定抓 C 欄
         if not long_leave_df.empty and len(long_leave_df.columns) >= 3:
@@ -662,9 +667,18 @@ def load_special_status(term, attendance_date):
             )
 
         return {
-            "leave_ids": {x for x in leave_ids if x != ""},
-            "long_leave_ids": {x for x in long_leave_ids if x != ""},
-            "late_ids": {x for x in late_ids if x != ""},
+            "leave_ids": {
+                x for x in leave_ids
+                if x != ""
+            },
+            "long_leave_ids": {
+                x for x in long_leave_ids
+                if x != ""
+            },
+            "late_ids": {
+                x for x in late_ids
+                if x != ""
+            },
         }
 
     except Exception as e:
@@ -674,7 +688,9 @@ def load_special_status(term, attendance_date):
             "long_leave_ids": set(),
             "late_ids": set(),
         }
-    st.write("外宿抓到：", leave_ids)
+    
+st.cache_data.clear()
+    
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):
 
