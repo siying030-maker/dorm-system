@@ -37,30 +37,49 @@ def normalize_supervisor_type(value):
     return ""
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+import time
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_users(role):
-    try:
-        ss = open_sheet(ADMIN_SHEET_URL)
-        ws = ss.worksheet(role)
-        from core.google_api import get_all_values
 
-        values = get_all_values(ws)
+    for retry in range(5):
 
-        if len(values) <= 1:
-            return pd.DataFrame()
+        try:
+            ss = open_sheet(ADMIN_SHEET_URL)
+            ws = ss.worksheet(role)
 
-        df = pd.DataFrame(
-            values[1:],
-            columns=values[0]
-        )
+            values = ws.get_all_values()
 
-        df.columns = df.columns.astype(str).str.strip()
+            if len(values) <= 1:
+                return pd.DataFrame()
 
-        return df
+            df = pd.DataFrame(
+                values[1:],
+                columns=values[0]
+            )
 
-    except Exception as e:
-        st.error(f"讀取 {role} 帳號失敗：{e}")
-        return pd.DataFrame()
+            df.columns = df.columns.astype(str).str.strip()
+
+            return df
+
+        except Exception as e:
+
+            if "429" in str(e) or "Quota exceeded" in str(e):
+
+                wait_time = (retry + 1) * 5
+
+                st.warning(
+                    f"Google API 讀取過量，{wait_time} 秒後自動重試..."
+                )
+
+                time.sleep(wait_time)
+
+            else:
+                st.error(f"讀取 {role} 帳號失敗：{e}")
+                return pd.DataFrame()
+
+    st.error(f"讀取 {role} 帳號失敗：Google API 過載，請稍後再試")
+    return pd.DataFrame()
 
 
 def get_row_gender(row):
