@@ -542,32 +542,22 @@ def load_unpaid_ids():
 
     try:
         ss = open_sheet(UNPAID_URL)
-
-        # 指定讀取 Sheet：未繳費名單
         ws = ss.worksheet("未繳費名單")
 
         from core.google_api import get_all_values
-
         values = get_all_values(ws)
 
         if len(values) <= 1:
             return set()
 
-        df = pd.DataFrame(
-            values[1:],
-            columns=values[0]
-        )
+        df = pd.DataFrame(values[1:], columns=values[0])
 
-        df.columns = df.columns.astype(str).str.strip()
-
-        sid_col = find_col(
-            df,
-            ["學號"]
-        )
-
-        if sid_col is None:
-            st.warning("未繳費名單找不到「學號」欄位")
+        # 未繳費固定抓 E 欄，index = 4
+        if len(df.columns) < 5:
+            st.warning("未繳費名單沒有 E 欄")
             return set()
+
+        sid_col = df.columns[4]
 
         ids = (
             df[sid_col]
@@ -576,10 +566,7 @@ def load_unpaid_ids():
             .tolist()
         )
 
-        return {
-            x for x in ids
-            if x != ""
-        }
+        return {x for x in ids if x != ""}
 
     except Exception as e:
         st.warning(f"讀取未繳費名單失敗：{e}")
@@ -602,107 +589,63 @@ def load_special_status(term, attendance_date):
         late_ids = set()
         long_leave_ids = set()
 
-        # ==========================
-        # 外宿申請
-        # ==========================
-        if not leave_df.empty:
+        # 外宿申請：C/N/O 欄
+        if not leave_df.empty and len(leave_df.columns) >= 15:
 
-            sid_col = find_col(leave_df, ["學號"])
+            sid_col = leave_df.columns[2]       # C欄 學號
+            start_col = leave_df.columns[13]    # N欄 申請日期
+            end_col = leave_df.columns[14]      # O欄 結束日期
 
-            start_col = find_col(
-                leave_df,
-                ["申請日期", "開始日期", "外宿開始", "起始日期", "日期"]
-            )
+            for _, row in leave_df.iterrows():
 
-            end_col = find_col(
-                leave_df,
-                ["結束日期", "結束日期時間", "外宿結束", "截止日期", "返回日期"]
-            )
+                sid = normalize_value(row.get(sid_col, ""))
 
-            if sid_col is None:
-                st.warning("外宿申請找不到「學號」欄位")
+                start_date = pd.to_datetime(
+                    row.get(start_col, ""),
+                    errors="coerce"
+                )
 
-            elif start_col is None:
-                st.warning("外宿申請找不到「申請日期 / 開始日期」欄位")
+                end_date = pd.to_datetime(
+                    row.get(end_col, ""),
+                    errors="coerce"
+                )
 
-            elif end_col is None:
-                st.warning("外宿申請找不到「結束日期 / 返回日期」欄位")
-
-            else:
-                for _, row in leave_df.iterrows():
-
-                    sid = normalize_value(row.get(sid_col, ""))
-
-                    start_date = pd.to_datetime(
-                        row.get(start_col, ""),
-                        errors="coerce"
-                    )
-
-                    end_date = pd.to_datetime(
-                        row.get(end_col, ""),
-                        errors="coerce"
-                    )
-
-                    if sid == "":
-                        continue
-
-                    if pd.isna(start_date) or pd.isna(end_date):
-                        continue
-
+                if sid and pd.notna(start_date) and pd.notna(end_date):
                     if start_date.date() <= target_date <= end_date.date():
                         leave_ids.add(sid)
 
-        # ==========================
-        # 長期外宿
-        # ==========================
-        if not long_leave_df.empty:
+        # 長期外宿：固定抓 C 欄
+        if not long_leave_df.empty and len(long_leave_df.columns) >= 3:
 
-            sid_col = find_col(long_leave_df, ["學號"])
+            sid_col = long_leave_df.columns[2]
 
-            if sid_col:
-                long_leave_ids.update(
-                    long_leave_df[sid_col]
-                    .astype(str)
-                    .map(normalize_value)
-                    .tolist()
-                )
+            long_leave_ids.update(
+                long_leave_df[sid_col]
+                .astype(str)
+                .map(normalize_value)
+                .tolist()
+            )
 
-        # ==========================
-        # 長期晚歸
-        # ==========================
-        if not late_df.empty:
+        # 長期晚歸：固定抓 C 欄
+        if not late_df.empty and len(late_df.columns) >= 3:
 
-            sid_col = find_col(late_df, ["學號"])
+            sid_col = late_df.columns[2]
 
-            if sid_col:
-                late_ids.update(
-                    late_df[sid_col]
-                    .astype(str)
-                    .map(normalize_value)
-                    .tolist()
-                )
+            late_ids.update(
+                late_df[sid_col]
+                .astype(str)
+                .map(normalize_value)
+                .tolist()
+            )
 
         return {
-            "leave_ids": {
-                normalize_value(x)
-                for x in leave_ids
-                if normalize_value(x) != ""
-            },
-            "long_leave_ids": {
-                normalize_value(x)
-                for x in long_leave_ids
-                if normalize_value(x) != ""
-            },
-            "late_ids": {
-                normalize_value(x)
-                for x in late_ids
-                if normalize_value(x) != ""
-            },
+            "leave_ids": {x for x in leave_ids if x != ""},
+            "long_leave_ids": {x for x in long_leave_ids if x != ""},
+            "late_ids": {x for x in late_ids if x != ""},
         }
 
     except Exception as e:
         st.warning(f"讀取外宿 / 晚歸資料失敗：{e}")
-
         return {
             "leave_ids": set(),
             "long_leave_ids": set(),
@@ -946,56 +889,51 @@ def show_attendance():
     for i, row in students.iterrows():
 
         sid = normalize_value(row["學號"])
-        unpaid_mark = ""
 
-        if sid in unpaid_ids:
-            color = "red"
-            unpaid_mark = "未繳費"
+        is_unpaid = sid in unpaid_ids
+        is_leave = sid in leave_ids
+        is_long_leave = sid in long_leave_ids
+        is_late = sid in late_ids
 
-        if sid in leave_ids:
-            color = "#800080"
-            mark = "外宿申請"
+        mark = ""
+        mark_color = "black"
+        default_status = "在"
+
+        if is_leave:
+            mark = "【外宿】"
+            mark_color = "red"
             default_status = "缺"
 
-        elif sid in long_leave_ids:
-            color = "blue"
-            mark = "長期外宿"
+        elif is_long_leave:
+            mark = "【長期外宿】"
+            mark_color = "blue"
             default_status = "缺"
 
-        elif sid in late_ids:
-            color = "#ecc963"
-            mark = "長期晚歸"
+        elif is_late:
+            mark = "【長期晚歸】"
+            mark_color = "#b58900"
             default_status = "在"
 
-        else:
-            color = "black"
-            mark = ""
-            default_status = "在"
-        
-        if unpaid_mark:
+        if is_unpaid:
             st.markdown(
-                f"<span style='color:red;font-weight:700'>{unpaid_mark}</span>",
+                "<span style='color:red;font-weight:700;'>未繳費</span>",
                 unsafe_allow_html=True
             )
 
         st.markdown(
             f"""
             <div style="font-size:18px;font-weight:700;margin-bottom:8px;">
-                {color_text(row["床位"], color)}
+                {row["床位"]}
                 &nbsp;&nbsp;&nbsp;
-                {color_text(row["學號"], color)}
+                {row["學號"]}
                 &nbsp;&nbsp;&nbsp;
-                {color_text(row["姓名"], color)}
+                {row["姓名"]}
+                &nbsp;&nbsp;
+                <span style="color:{mark_color};">{mark}</span>
             </div>
             """,
             unsafe_allow_html=True
         )
-
-        if mark:
-            st.markdown(
-                color_text(mark, color),
-                unsafe_allow_html=True
-            )
 
         status = st.selectbox(
             "狀態",
@@ -1017,6 +955,7 @@ def show_attendance():
             "房號": row["房號"],
             "床位": row["床位"],
             "學號": row["學號"],
+            "班級": row.get("班級", ""),
             "姓名": row["姓名"],
             "狀態": status,
             "備註": note
