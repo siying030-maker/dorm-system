@@ -9,18 +9,16 @@ SCOPES = [
 
 ROLLCALL_SHEET_URL = "https://docs.google.com/spreadsheets/d/18cr9QP_xp1kEB8V-hWa0iSmyWbxXOneNfppwt30KqbM/edit"
 
-#上下學期外宿晚歸
-
+# 上學期外宿 / 晚歸
 UPPER_GATE_URL = "https://docs.google.com/spreadsheets/d/1Pr1fQYH35KgXMkl6igxqc-3jnZ5ufi0QgWtgp3782Lo/edit"
 
+# 下學期外宿 / 晚歸
 LOWER_GATE_URL = "https://docs.google.com/spreadsheets/d/1ivjA_-voyNAUGbvbc5o5BULu_MgU2AqbNokvQJ5dfe4/edit"
 
-#J暑假外宿晚歸
-
+# 暑假外宿 / 晚歸
 SUMMER_URL = "https://docs.google.com/spreadsheets/d/17nBz-Q4XSb2csKVrvWF7TheHBkgqWFuSPj1Y5axmX1U/edit"
 
-#寒假外宿晚歸
-
+# 寒假外宿 / 晚歸
 WINTER_URL = "https://docs.google.com/spreadsheets/d/1OztfFffM6wc3irlbnYISXhkUtpSKXjBrzpykilqZqOU/edit"
 
 #宿舍管理員
