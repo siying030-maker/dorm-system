@@ -93,10 +93,6 @@ def get_row_gender(row):
     return ""
 
 
-if st.button("重新讀取帳號資料", key="refresh_admin_users"):
-    st.cache_data.clear()
-    st.rerun()
-
 def login_page():
 
     if st.button("重新讀取帳號資料", key="refresh_admin_users"):
