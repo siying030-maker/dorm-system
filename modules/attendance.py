@@ -905,7 +905,7 @@ def show_attendance():
 
     st.divider()
     st.subheader("點名名單")
-    st.caption("紅色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
+    st.caption("紫色：外宿申請　藍色：長期外宿　黃色：長期晚歸")
 
     final_rows = []
 
@@ -915,11 +915,11 @@ def show_attendance():
         unpaid_mark = ""
 
         if sid in unpaid_ids:
-            color = "pink"
+            color = "red"
             unpaid_mark = "未繳費"
 
         if sid in leave_ids:
-            color = "red"
+            color = "#800080"
             mark = "外宿申請"
             default_status = "缺"
 
@@ -929,7 +929,7 @@ def show_attendance():
             default_status = "缺"
 
         elif sid in late_ids:
-            color = "#b58900"
+            color = "#ecc963"
             mark = "長期晚歸"
             default_status = "在"
 
