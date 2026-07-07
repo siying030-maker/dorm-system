@@ -13,6 +13,7 @@ from core.config import (
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
+    UNPAID_URL,
 )
 
 
@@ -505,6 +506,49 @@ def load_attendance_students(term, dorm, floor):
     except Exception as e:
         st.error(f"讀取點名名單失敗：{e}")
         return pd.DataFrame()
+    
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_unpaid_ids():
+
+    try:
+        ss = open_sheet(UNPAID_URL)
+        ws = ss.get_worksheet(0)
+
+        values = ws.get_all_values()
+
+        if len(values) <= 1:
+            return set()
+
+        df = pd.DataFrame(
+            values[1:],
+            columns=values[0]
+        )
+
+        df.columns = df.columns.astype(str).str.strip()
+
+        sid_col = find_col(
+            df,
+            ["學號"]
+        )
+
+        if sid_col is None:
+            return set()
+
+        ids = (
+            df[sid_col]
+            .astype(str)
+            .map(normalize_value)
+            .tolist()
+        )
+
+        return {
+            x for x in ids
+            if x != ""
+        }
+
+    except Exception as e:
+        st.warning(f"讀取未繳費名單失敗：{e}")
+        return set()
 
 
 @st.cache_data(ttl=300)
@@ -774,8 +818,11 @@ def show_attendance():
             attendance_date
         )
 
+        unpaid_ids = load_unpaid_ids()
+
         st.session_state["attendance_students"] = students
         st.session_state["attendance_special_status"] = special_status
+        st.session_state["attendance_unpaid_ids"] = unpaid_ids
 
         if students.empty:
             st.warning("查無學生資料")
@@ -794,6 +841,11 @@ def show_attendance():
             "long_leave_ids": set(),
             "late_ids": set(),
         }
+    )
+
+    unpaid_ids = st.session_state.get(
+        "attendance_unpaid_ids",
+        set()
     )
 
     if students.empty:
@@ -822,6 +874,10 @@ def show_attendance():
     for i, row in students.iterrows():
 
         sid = normalize_value(row["學號"])
+        unpaid_mark = ""
+
+        if sid in unpaid_ids:
+            unpaid_mark = "未繳費"
 
         if sid in leave_ids:
             color = "red"
@@ -842,6 +898,12 @@ def show_attendance():
             color = "black"
             mark = ""
             default_status = "在"
+        
+        if unpaid_mark:
+            st.markdown(
+                f"<span style='color:red;font-weight:700'>{unpaid_mark}</span>",
+                unsafe_allow_html=True
+            )
 
         st.markdown(
             f"""
