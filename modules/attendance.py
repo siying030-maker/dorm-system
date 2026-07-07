@@ -911,6 +911,7 @@ def show_attendance():
         unpaid_mark = ""
 
         if sid in unpaid_ids:
+            color = "pink"
             unpaid_mark = "未繳費"
 
         if sid in leave_ids:
