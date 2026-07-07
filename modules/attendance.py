@@ -598,19 +598,17 @@ def load_special_status(term, attendance_date):
 
             for _, row in leave_df.iterrows():
 
-                sid = normalize_value(row.get(sid_col, ""))
+            sid = normalize_value(row.get(sid_col, ""))
 
-                start_date = pd.to_datetime(
-                    row.get(start_col, ""),
-                    errors="coerce"
+            start_date = parse_sheet_date(
+                    row.get(start_col, "")
                 )
 
-                end_date = pd.to_datetime(
-                    row.get(end_col, ""),
-                    errors="coerce"
+            end_date = parse_sheet_date(
+                    row.get(end_col, "")
                 )
 
-                if sid and pd.notna(start_date) and pd.notna(end_date):
+            if sid and pd.notna(start_date) and pd.notna(end_date):
                     if start_date.date() <= target_date <= end_date.date():
                         leave_ids.add(sid)
 
@@ -755,6 +753,30 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
+
+def parse_sheet_date(value):
+
+    if value is None:
+        return pd.NaT
+
+    value_str = str(value).strip()
+
+    if value_str == "":
+        return pd.NaT
+
+    # Google Sheet / Excel 日期序號
+    try:
+        num = float(value_str)
+
+        if 20000 <= num <= 60000:
+            return pd.Timestamp("1899-12-30") + pd.to_timedelta(num, unit="D")
+    except:
+        pass
+
+    return pd.to_datetime(
+        value_str,
+        errors="coerce"
+    )
 
 
 def show_attendance():
