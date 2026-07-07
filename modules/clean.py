@@ -135,7 +135,9 @@ def load_clean_floor_sheet(url, sheet_name):
             return pd.DataFrame()
 
         ws = ss.worksheet(sheet_name)
-        values = ws.get_all_values()
+        from core.google_api import get_all_values
+
+        values = get_all_values(ws)
 
         if len(values) == 0:
             return pd.DataFrame()
@@ -490,7 +492,9 @@ def show_clean_view():
 
         ws = ss.worksheet(school_year)
 
-        values = ws.get_all_values()
+        from core.google_api import get_all_values
+
+        values = get_all_values(ws)
 
         if len(values) <= 1:
             st.info("尚無資料")

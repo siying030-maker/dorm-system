@@ -544,7 +544,9 @@ def load_unpaid_ids():
         ss = open_sheet(UNPAID_URL)
         ws = ss.get_worksheet(0)
 
-        values = ws.get_all_values()
+        from core.google_api import get_all_values
+
+        values = get_all_values(ws)
 
         if len(values) <= 1:
             return set()
@@ -697,7 +699,9 @@ def append_rows_to_sheet(url, sheet_name, headers, rows):
         ss.reorder_worksheets(new_order)
 
     if rows:
-        ws.append_rows(rows)
+        from core.google_api import append_rows
+
+        append_rows(ws, rows)
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
     gender = get_dorm_gender(dorm)

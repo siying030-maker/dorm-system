@@ -123,7 +123,9 @@ def load_need_makeup_source(gender):
     if ws is None:
         return pd.DataFrame()
 
-    values = ws.get_all_values()
+    from core.google_api import get_all_values
+
+    values = get_all_values(ws)
 
     if len(values) <= 1:
         return pd.DataFrame()
@@ -250,7 +252,9 @@ def update_rollcall_status_to_makeup(gender, target_row):
     except:
         raise Exception(f"點名總表找不到 Sheet：{sheet_name}")
 
-    values = ws.get_all_values()
+    from core.google_api import get_all_values
+
+    values = get_all_values(ws)
 
     if len(values) <= 1:
         raise Exception("點名總表沒有資料")
@@ -317,7 +321,9 @@ def update_need_makeup_status_to_done(gender, target_row):
     except:
         raise Exception(f"需補點名單找不到 Sheet：{sheet_name}")
 
-    values = ws.get_all_values()
+    from core.google_api import get_all_values
+
+    values = get_all_values(ws)
 
     if len(values) <= 1:
         return

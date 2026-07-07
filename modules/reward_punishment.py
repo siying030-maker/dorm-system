@@ -41,7 +41,9 @@ def read_reward(url):
         ss = open_sheet(url)
         ws = ss.worksheet(TARGET_SHEET_NAME)
 
-        values = ws.get_all_values()
+        from core.google_api import get_all_values
+
+        values = get_all_values(ws)
 
         if len(values) <= 1:
             return pd.DataFrame()

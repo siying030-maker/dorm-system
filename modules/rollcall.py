@@ -82,7 +82,9 @@ def load_rollcall_data():
                         continue
 
                     rate_limit()
-                    values = ws.get_all_values()
+                    from core.google_api import get_all_values
+
+                    values = get_all_values(ws)
 
                     if len(values) <= 1:
                         continue
