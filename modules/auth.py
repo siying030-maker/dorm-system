@@ -39,7 +39,7 @@ def normalize_supervisor_type(value):
 
 import time
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_users(role):
 
     for retry in range(5):
@@ -93,13 +93,20 @@ def get_row_gender(row):
     return ""
 
 
+if st.button("重新讀取帳號資料", key="refresh_admin_users"):
+    st.cache_data.clear()
+    st.rerun()
+
 def login_page():
+
+    if st.button("重新讀取帳號資料", key="refresh_admin_users"):
+        st.cache_data.clear()
+        st.rerun()
 
     role = st.selectbox(
         "登入權限",
         ["舍監", "行政", "樓長"]
     )
-
     user_df = load_users(role)
 
     if user_df.empty:
