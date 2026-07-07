@@ -131,15 +131,11 @@ def load_holiday_students(term, allowed_dorms):
                     ["姓名", "名字"]
                 )
 
-                bed_col = find_col(
-                    df,
-                    ["床位"]
-                )
+                # 固定抓 B 欄作為床位，例如 82113-1
+                if len(df.columns) < 2:
+                    continue
 
-                room_col = find_col(
-                    df,
-                    ["房號", "寢室"]
-                )
+                bed_col = df.columns[1]
 
                 overseas_col = get_overseas_col(df)
 
@@ -167,31 +163,18 @@ def load_holiday_students(term, allowed_dorms):
                 temp["宿舍"] = dorm
                 temp["樓層"] = floor
 
-                if bed_col:
-                    temp["床位"] = (
-                        temp_df[bed_col]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
+                temp["床位"] = (
+                temp_df[bed_col]
+                .astype(str)
+                .map(normalize_value)
+                )
 
-                    temp["房號"] = (
-                        temp["床位"]
-                        .astype(str)
-                        .str.split("-")
-                        .str[0]
-                    )
-
-                elif room_col:
-                    temp["房號"] = (
-                        temp_df[room_col]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
-
-                    temp["床位"] = temp["房號"]
-
-                else:
-                    continue
+                temp["房號"] = (
+                temp["床位"]
+                .astype(str)
+                .str.split("-")
+                .str[0]
+                )
 
                 temp["學號"] = (
                     temp_df[sid_col]
