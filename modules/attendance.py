@@ -387,6 +387,7 @@ def get_overseas_col(df):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_attendance_students(term, dorm, floor):
+
     try:
         dorm = normalize_dorm(dorm)
         url = get_attendance_url(term, dorm)
@@ -397,67 +398,60 @@ def load_attendance_students(term, dorm, floor):
         ss = open_sheet(url)
         result_list = []
 
-        sheet_names = get_sheet_names_for_attendance(term, dorm, floor)
+        sheet_names = get_sheet_names_for_attendance(
+            term,
+            dorm,
+            floor
+        )
 
         for sheet_name in sheet_names:
+
             time.sleep(0.4)
 
-            df = read_worksheet_df(ss, sheet_name)
+            df = read_worksheet_df(
+                ss,
+                sheet_name
+            )
 
             if df.empty:
-
-                st.warning(
-                f"{sheet_name} 暫時讀不到，正在略過"
-                )
-
+                st.warning(f"{sheet_name} 暫時讀不到，正在略過")
                 continue
 
-            if len(df.columns) < 6:
+            if len(df.columns) < 10:
+                st.warning(f"{sheet_name} 欄位不足，至少需要 A~J 欄")
                 continue
-
-            # 固定欄位：
-            # B欄 = 床位，例如 82113-1
-            # D欄 = 學號
-            # F欄 = 姓名
-            sid_col = df.columns[0]          # A 學號
-            class_col = df.columns[1]        # B 班級
-            name_col = df.columns[2]         # C 姓名
-            dept_col = df.columns[3]         # D 科系
-            bed_col = df.columns[4]          # E 床位
-            room_col = df.columns[5]         # F 房號
-            local_col = df.columns[6]        # G 本地/境外
-            phone_col = df.columns[7]        # H 手機
-            parent_col = df.columns[8]       # I 家長姓名
-            tel_col = df.columns[9]          # J 連絡電話1
-
-            bed_col = find_col(df, ["床位"])
-            sid_col = find_col(df, ["學號"], exclude_keywords=["替代"])
-            name_col = find_col(df, ["姓名"])
 
             temp = pd.DataFrame()
 
-            temp["學號"] = df[sid_col].astype(str).str.strip()
-            temp["班級"] = df[class_col].astype(str).str.strip()
-            temp["姓名"] = df[name_col].astype(str).str.strip()
-            temp["科系"] = df[dept_col].astype(str).str.strip()
-            temp["床位"] = df[bed_col].astype(str).str.strip()
-            temp["房號"] = df[room_col].astype(str).str.strip()
-            temp["本地/境外"] = df[local_col].astype(str).str.strip()
-            temp["手機"] = df[phone_col].astype(str).str.strip()
-            temp["家長姓名"] = df[parent_col].astype(str).str.strip()
-            temp["連絡電話1"] = df[tel_col].astype(str).str.strip()
+            temp["學號"] = df.iloc[:, 0].astype(str).map(normalize_value)
+            temp["班級"] = df.iloc[:, 1].astype(str).str.strip()
+            temp["姓名"] = df.iloc[:, 2].astype(str).str.strip()
+            temp["科系"] = df.iloc[:, 3].astype(str).str.strip()
+            temp["床位"] = df.iloc[:, 4].astype(str).map(normalize_value)
+            temp["房號"] = df.iloc[:, 5].astype(str).map(normalize_value)
+            temp["本地/境外"] = df.iloc[:, 6].astype(str).str.strip()
+            temp["手機"] = df.iloc[:, 7].astype(str).str.strip()
+            temp["家長姓名"] = df.iloc[:, 8].astype(str).str.strip()
+            temp["連絡電話1"] = df.iloc[:, 9].astype(str).str.strip()
 
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
 
+            # 假日點名只顯示境外生
+            if is_holiday_term(term):
+                temp = temp[
+                    temp["本地/境外"]
+                    .astype(str)
+                    .str.contains("境外", na=False)
+                ].copy()
+
+            # 移除空白列
             temp = temp[
-                (temp["床位"].astype(str).str.strip() != "")
-                &
-                (temp["房號"].astype(str).str.strip() != "")
-                &
                 (temp["學號"].astype(str).str.strip() != "")
                 &
                 (temp["姓名"].astype(str).str.strip() != "")
+                &
+                (temp["床位"].astype(str).str.strip() != "")
             ].copy()
 
             temp = temp[
@@ -466,35 +460,32 @@ def load_attendance_students(term, dorm, floor):
                 )
             ].copy()
 
-            temp = temp[
-                ~temp["姓名"].astype(str).str.upper().isin(
-                    ["NAN", "NONE", "NA"]
-                )
-            ].copy()
-
             if not temp.empty:
                 result_list.append(temp)
 
         if result_list:
+
             result = pd.concat(
                 result_list,
                 ignore_index=True
             )
 
             return result[
-    [
-        c for c in [
-            "房號",
-            "床位",
-            "學號",
-            "姓名",
-            "性別",
-            "本地境外",
-            "讀取Sheet"
-        ]
-        if c in result.columns
-    ]
-]
+                [
+                    "學號",
+                    "班級",
+                    "姓名",
+                    "科系",
+                    "床位",
+                    "房號",
+                    "本地/境外",
+                    "手機",
+                    "家長姓名",
+                    "連絡電話1",
+                    "性別",
+                    "讀取Sheet"
+                ]
+            ]
 
         return pd.DataFrame()
 

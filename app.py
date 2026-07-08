@@ -66,6 +66,7 @@ tab_names = build_tabs(
     st.session_state.is_main
 )
 
+# 移除不要的頁面
 tab_names = [
     t for t in tab_names
     if t != "連三天不假外宿"
@@ -75,20 +76,16 @@ if not tab_names:
     st.warning("目前沒有可用功能")
     st.stop()
 
-tabs = st.tabs(tab_names)
-
 
 # ==============================
-# 單頁路由：只執行目前選到的功能
+# 自訂功能按鈕導覽
 # ==============================
 
-selected_page = st.session_state.get(
-    "selected_page",
-    tab_names[0]
-)
+if "selected_page" not in st.session_state:
+    st.session_state.selected_page = tab_names[0]
 
-if selected_page not in tab_names:
-    selected_page = tab_names[0]
+if st.session_state.selected_page not in tab_names:
+    st.session_state.selected_page = tab_names[0]
 
 cols = st.columns(len(tab_names))
 
@@ -96,7 +93,7 @@ for i, name in enumerate(tab_names):
     with cols[i]:
         if st.button(
             name,
-            key=f"nav_{name}",
+            key=f"nav_btn_{name}",
             use_container_width=True
         ):
             st.session_state.selected_page = name
@@ -104,16 +101,16 @@ for i, name in enumerate(tab_names):
 
 st.divider()
 
-selected_page = st.session_state.get(
-    "selected_page",
-    tab_names[0]
-)
+selected_page = st.session_state.selected_page
+
 
 if selected_page == "點名系統":
     show_attendance()
 
+
 elif selected_page == "補點名單":
     show_makeup_rollcall()
+
 
 elif selected_page == "每日點名未到名單":
 
@@ -125,29 +122,17 @@ elif selected_page == "每日點名未到名單":
     if role == "行政":
         girl_ss = open_sheet(ROLLCALL_GIRL_URL)
         boy_ss = open_sheet(ROLLCALL_BOY_URL)
-
-        show_rollcall(
-            [girl_ss, boy_ss],
-            mode="daily_all"
-        )
+        show_rollcall([girl_ss, boy_ss], mode="daily_all")
 
     elif role == "舍監":
 
         if supervisor_type == "男舍監":
             boy_ss = open_sheet(ROLLCALL_BOY_URL)
-
-            show_rollcall(
-                boy_ss,
-                mode="daily_boy"
-            )
+            show_rollcall(boy_ss, mode="daily_boy")
 
         elif supervisor_type == "女舍監":
             girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-
-            show_rollcall(
-                girl_ss,
-                mode="daily_girl"
-            )
+            show_rollcall(girl_ss, mode="daily_girl")
 
         else:
             st.warning("無法判斷舍監性別")
@@ -156,52 +141,41 @@ elif selected_page == "每日點名未到名單":
 
         if str(dorm).startswith("男") or gender == "男":
             boy_ss = open_sheet(ROLLCALL_BOY_URL)
-
-            show_rollcall(
-                boy_ss,
-                mode="daily_boy"
-            )
+            show_rollcall(boy_ss, mode="daily_boy")
 
         elif str(dorm).startswith("女") or gender == "女":
             girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-
-            show_rollcall(
-                girl_ss,
-                mode="daily_girl"
-            )
+            show_rollcall(girl_ss, mode="daily_girl")
 
         else:
             st.warning("無法判斷樓長宿舍性別")
 
+
 elif selected_page == "獎懲查詢":
     show_reward_punishment()
 
+
 elif selected_page == "上學期門禁":
     upper_ss = open_sheet(UPPER_GATE_URL)
+    show_gate("上學期門禁", upper_ss, "upper_gate")
 
-    show_gate(
-        "上學期門禁",
-        upper_ss,
-        "upper_gate"
-    )
 
 elif selected_page == "下學期門禁":
     lower_ss = open_sheet(LOWER_GATE_URL)
+    show_gate("下學期門禁", lower_ss, "lower_gate")
 
-    show_gate(
-        "下學期門禁",
-        lower_ss,
-        "lower_gate"
-    )
 
 elif selected_page == "整潔比賽":
     show_clean()
 
+
 elif selected_page == "整潔比賽(檢視)":
     show_clean_view()
 
+
 elif selected_page == "上學期假日點名單":
     show_holiday_rollcall("上學期")
+
 
 elif selected_page == "下學期假日點名單":
     show_holiday_rollcall("下學期")
