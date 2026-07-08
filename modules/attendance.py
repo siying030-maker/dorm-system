@@ -417,73 +417,67 @@ def load_attendance_students(term, dorm, floor):
                 st.warning(f"{sheet_name} 暫時讀不到，正在略過")
                 continue
 
-            # ==============================
-            # 寒暑假格式
-            # B床位、D學號、F姓名
-            # ==============================
+            temp = pd.DataFrame()
+
+            # 寒假、暑假：
+            # B房號、D學號、E班級、F姓名、I本地/境外、J手機、P家長姓名、Q連絡電話1
             if term in ["寒假", "暑假"]:
 
-                if len(df.columns) < 6:
-                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~F 欄")
+                if len(df.columns) < 17:
+                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~Q 欄")
                     continue
 
-                temp = pd.DataFrame()
-
-                temp["床位"] = df.iloc[:, 1].astype(str).map(normalize_value)
-                temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
+                temp["房號"] = df.iloc[:, 1].astype(str).map(normalize_value)
+                temp["床位"] = temp["房號"]
                 temp["學號"] = df.iloc[:, 3].astype(str).map(normalize_value)
                 temp["班級"] = df.iloc[:, 4].astype(str).str.strip()
                 temp["姓名"] = df.iloc[:, 5].astype(str).str.strip()
-
                 temp["科系"] = ""
-                temp["本地/境外"] = ""
-                temp["手機"] = ""
-                temp["家長姓名"] = ""
-                temp["連絡電話1"] = ""
+                temp["本地/境外"] = df.iloc[:, 8].astype(str).str.strip()
+                temp["手機"] = df.iloc[:, 9].astype(str).str.strip()
+                temp["家長姓名"] = df.iloc[:, 15].astype(str).str.strip()
+                temp["連絡電話1"] = df.iloc[:, 16].astype(str).str.strip()
 
-            # ==============================
-            # 上下學期格式
-            # B床位、E學號、G姓名
-            # ==============================
+            # 上學期、下學期、上學期假日、下學期假日：
+            # B床位、E學號、F班級、G姓名、I電話、O家長姓名、Q連絡電話1、AQ本地/境外
             else:
 
-                if len(df.columns) < 7:
-                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~G 欄")
+                if len(df.columns) < 43:
+                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~AQ 欄")
                     continue
-
-                temp = pd.DataFrame()
 
                 temp["床位"] = df.iloc[:, 1].astype(str).map(normalize_value)
                 temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
                 temp["學號"] = df.iloc[:, 4].astype(str).map(normalize_value)
                 temp["班級"] = df.iloc[:, 5].astype(str).str.strip()
                 temp["姓名"] = df.iloc[:, 6].astype(str).str.strip()
-
                 temp["科系"] = ""
-                temp["本地/境外"] = ""
-                temp["手機"] = ""
-                temp["家長姓名"] = ""
-                temp["連絡電話1"] = ""
+                temp["手機"] = df.iloc[:, 8].astype(str).str.strip()
+                temp["家長姓名"] = df.iloc[:, 14].astype(str).str.strip()
+                temp["連絡電話1"] = df.iloc[:, 16].astype(str).str.strip()
+                temp["本地/境外"] = df.iloc[:, 42].astype(str).str.strip()
 
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
 
+            # 假日點名只顯示境外生
+            if is_holiday_term(term):
+                temp = temp[
+                    temp["本地/境外"]
+                    .astype(str)
+                    .str.contains("境外", na=False)
+                ].copy()
+
             temp = temp[
-                (temp["床位"].astype(str).str.strip() != "")
-                &
                 (temp["學號"].astype(str).str.strip() != "")
                 &
                 (temp["姓名"].astype(str).str.strip() != "")
+                &
+                (temp["床位"].astype(str).str.strip() != "")
             ].copy()
 
             temp = temp[
                 ~temp["學號"].astype(str).str.upper().isin(
-                    ["NAN", "NONE", "NA"]
-                )
-            ].copy()
-
-            temp = temp[
-                ~temp["姓名"].astype(str).str.upper().isin(
                     ["NAN", "NONE", "NA"]
                 )
             ].copy()
@@ -711,6 +705,7 @@ def append_rows_to_sheet(url, sheet_name, headers, rows):
         append_rows(ws, rows)
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
+
     gender = get_dorm_gender(dorm)
 
     if gender == "女生":
@@ -726,7 +721,8 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
     sheet_name = str(attendance_date)
 
-    headers = [
+    # 男生點名回報 / 女生點名回報欄位
+    rollcall_headers = [
         "學號",
         "班級",
         "姓名",
@@ -741,13 +737,24 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "備註"
     ]
 
-    all_rows = []
-    absent_rows = []
+    # 補點名單只存這些欄位
+    makeup_headers = [
+        "床位",
+        "學號",
+        "班級",
+        "姓名",
+        "狀態",
+        "備註"
+    ]
+
+    rollcall_rows = []
+    makeup_rows = []
 
     for _, r in final_df.iterrows():
+
         status = str(r.get("狀態", "")).strip()
 
-        row_data = [
+        rollcall_row = [
             r.get("學號", ""),
             r.get("班級", ""),
             r.get("姓名", ""),
@@ -760,26 +767,35 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("連絡電話1", ""),
             status,
             r.get("備註", "")
-]
-        all_rows.append(row_data)
+        ]
+
+        makeup_row = [
+            r.get("床位", ""),
+            r.get("學號", ""),
+            r.get("班級", ""),
+            r.get("姓名", ""),
+            status,
+            r.get("備註", "")
+        ]
+
+        rollcall_rows.append(rollcall_row)
 
         if status == "缺":
-            absent_rows.append(row_data)
-
-    append_rows_to_sheet(
-        need_makeup_url,
-        sheet_name,
-        headers,
-        all_rows
-    )
+            makeup_rows.append(makeup_row)
 
     append_rows_to_sheet(
         rollcall_url,
         sheet_name,
-        headers,
-        absent_rows
+        rollcall_headers,
+        rollcall_rows
     )
 
+    append_rows_to_sheet(
+        need_makeup_url,
+        sheet_name,
+        makeup_headers,
+        makeup_rows
+    )
 
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
@@ -1000,18 +1016,16 @@ def show_attendance():
         )
 
         final_rows.append({
-
             "學號": row["學號"],
-            "班級": row["班級"],
+            "班級": row.get("班級", ""),
             "姓名": row["姓名"],
-            "科系": row["科系"],
+            "科系": row.get("科系", ""),
             "床位": row["床位"],
-            "房號": row["房號"],
-            "本地/境外": row["本地/境外"],
-            "手機": row["手機"],
-            "家長姓名": row["家長姓名"],
-            "連絡電話1": row["連絡電話1"],
-
+            "房號": row.get("房號", ""),
+            "本地/境外": row.get("本地/境外", ""),
+            "手機": row.get("手機", ""),
+            "家長姓名": row.get("家長姓名", ""),
+            "連絡電話1": row.get("連絡電話1", ""),
             "狀態": status,
             "備註": note
         })

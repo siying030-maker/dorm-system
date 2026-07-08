@@ -500,21 +500,16 @@ def show_makeup_rollcall():
         return
 
     show_cols = [
-        c for c in [
-            "性別",
-            "日期",
-            "宿舍",
-            "樓層",
-            "房號",
-            "床位",
-            "學號",
-            "姓名",
-            "狀態",
-            "備註",
-            "來源Sheet"
-        ]
-        if c in df.columns
+    c for c in [
+        "床位",
+        "學號",
+        "班級",
+        "姓名",
+        "狀態",
+        "備註"
     ]
+    if c in df.columns
+]
 
     st.dataframe(
         df[show_cols],
