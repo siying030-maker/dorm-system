@@ -417,45 +417,73 @@ def load_attendance_students(term, dorm, floor):
                 st.warning(f"{sheet_name} 暫時讀不到，正在略過")
                 continue
 
-            if len(df.columns) < 10:
-                st.warning(f"{sheet_name} 欄位不足，至少需要 A~J 欄")
-                continue
+            # ==============================
+            # 寒暑假格式
+            # B床位、D學號、F姓名
+            # ==============================
+            if term in ["寒假", "暑假"]:
 
-            temp = pd.DataFrame()
+                if len(df.columns) < 6:
+                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~F 欄")
+                    continue
 
-            temp["學號"] = df.iloc[:, 0].astype(str).map(normalize_value)
-            temp["班級"] = df.iloc[:, 1].astype(str).str.strip()
-            temp["姓名"] = df.iloc[:, 2].astype(str).str.strip()
-            temp["科系"] = df.iloc[:, 3].astype(str).str.strip()
-            temp["床位"] = df.iloc[:, 4].astype(str).map(normalize_value)
-            temp["房號"] = df.iloc[:, 5].astype(str).map(normalize_value)
-            temp["本地/境外"] = df.iloc[:, 6].astype(str).str.strip()
-            temp["手機"] = df.iloc[:, 7].astype(str).str.strip()
-            temp["家長姓名"] = df.iloc[:, 8].astype(str).str.strip()
-            temp["連絡電話1"] = df.iloc[:, 9].astype(str).str.strip()
+                temp = pd.DataFrame()
+
+                temp["床位"] = df.iloc[:, 1].astype(str).map(normalize_value)
+                temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
+                temp["學號"] = df.iloc[:, 3].astype(str).map(normalize_value)
+                temp["班級"] = df.iloc[:, 4].astype(str).str.strip()
+                temp["姓名"] = df.iloc[:, 5].astype(str).str.strip()
+
+                temp["科系"] = ""
+                temp["本地/境外"] = ""
+                temp["手機"] = ""
+                temp["家長姓名"] = ""
+                temp["連絡電話1"] = ""
+
+            # ==============================
+            # 上下學期格式
+            # B床位、E學號、G姓名
+            # ==============================
+            else:
+
+                if len(df.columns) < 7:
+                    st.warning(f"{sheet_name} 欄位不足，至少需要 A~G 欄")
+                    continue
+
+                temp = pd.DataFrame()
+
+                temp["床位"] = df.iloc[:, 1].astype(str).map(normalize_value)
+                temp["房號"] = temp["床位"].astype(str).str.split("-").str[0]
+                temp["學號"] = df.iloc[:, 4].astype(str).map(normalize_value)
+                temp["班級"] = df.iloc[:, 5].astype(str).str.strip()
+                temp["姓名"] = df.iloc[:, 6].astype(str).str.strip()
+
+                temp["科系"] = ""
+                temp["本地/境外"] = ""
+                temp["手機"] = ""
+                temp["家長姓名"] = ""
+                temp["連絡電話1"] = ""
 
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
 
-            # 假日點名只顯示境外生
-            if is_holiday_term(term):
-                temp = temp[
-                    temp["本地/境外"]
-                    .astype(str)
-                    .str.contains("境外", na=False)
-                ].copy()
-
-            # 移除空白列
             temp = temp[
+                (temp["床位"].astype(str).str.strip() != "")
+                &
                 (temp["學號"].astype(str).str.strip() != "")
                 &
                 (temp["姓名"].astype(str).str.strip() != "")
-                &
-                (temp["床位"].astype(str).str.strip() != "")
             ].copy()
 
             temp = temp[
                 ~temp["學號"].astype(str).str.upper().isin(
+                    ["NAN", "NONE", "NA"]
+                )
+            ].copy()
+
+            temp = temp[
+                ~temp["姓名"].astype(str).str.upper().isin(
                     ["NAN", "NONE", "NA"]
                 )
             ].copy()
