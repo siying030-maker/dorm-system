@@ -66,9 +66,27 @@ if "點名系統" in tab_names:
 
 if "每日點名未到名單" in tab_names:
     with tabs[tab_names.index("每日點名未到名單")]:
-        show_rollcall(
-            mode="daily"
-        )
+
+        role = st.session_state.get("role", "")
+        supervisor_type = st.session_state.get("supervisor_type", "")
+        dorm = st.session_state.get("dorm", "")
+
+        if role == "行政":
+            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
+            boy_ss = open_sheet(ROLLCALL_BOY_URL)
+            show_rollcall([girl_ss, boy_ss], mode="daily_all")
+
+        elif role == "舍監":
+            if supervisor_type == "男舍監":
+                show_rollcall(open_sheet(ROLLCALL_BOY_URL), mode="daily_boy")
+            elif supervisor_type == "女舍監":
+                show_rollcall(open_sheet(ROLLCALL_GIRL_URL), mode="daily_girl")
+
+        elif role == "樓長":
+            if str(dorm).startswith("男"):
+                show_rollcall(open_sheet(ROLLCALL_BOY_URL), mode="daily_boy")
+            elif str(dorm).startswith("女"):
+                show_rollcall(open_sheet(ROLLCALL_GIRL_URL), mode="daily_girl")
 
 
 if "補點名單" in tab_names:

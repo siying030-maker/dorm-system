@@ -385,7 +385,7 @@ def get_overseas_col(df):
     return None
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_attendance_students(term, dorm, floor):
     try:
         dorm = normalize_dorm(dorm)
@@ -689,7 +689,9 @@ def load_special_status(term, attendance_date):
             "late_ids": set(),
         }
     
-st.cache_data.clear()
+if st.button("重新整理"):
+    st.cache_data.clear()
+    st.rerun()
     
 
 def append_rows_to_sheet(url, sheet_name, headers, rows):

@@ -95,9 +95,8 @@ def normalize_text(value):
     return str(value).strip()
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=10, show_spinner=False)
 def load_need_makeup_source(gender):
-
     source_url = (
         NEED_MAKEUP_GIRL_URL
         if gender == "女生"
