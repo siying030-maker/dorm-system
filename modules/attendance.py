@@ -419,10 +419,16 @@ def load_attendance_students(term, dorm, floor):
             # B欄 = 床位，例如 82113-1
             # D欄 = 學號
             # F欄 = 姓名
-            bed_col = df.columns[1]
-            sid_col = df.columns[3]
-            name_col = df.columns[5]
-            class_col = df.columns[4]
+            sid_col = df.columns[0]          # A 學號
+            class_col = df.columns[1]        # B 班級
+            name_col = df.columns[2]         # C 姓名
+            dept_col = df.columns[3]         # D 科系
+            bed_col = df.columns[4]          # E 床位
+            room_col = df.columns[5]         # F 房號
+            local_col = df.columns[6]        # G 本地/境外
+            phone_col = df.columns[7]        # H 手機
+            parent_col = df.columns[8]       # I 家長姓名
+            tel_col = df.columns[9]          # J 連絡電話1
 
             bed_col = find_col(df, ["床位"])
             sid_col = find_col(df, ["學號"], exclude_keywords=["替代"])
@@ -430,57 +436,16 @@ def load_attendance_students(term, dorm, floor):
 
             temp = pd.DataFrame()
 
-            # B欄
-            temp["床位"] = (
-                df[df.columns[1]]
-                .astype(str)
-                .map(normalize_value)
-            )
-
-            temp["房號"] = (
-                temp["床位"]
-                .str.split("-")
-                .str[0]
-            )
-
-            temp["學號"] = (
-                df[sid_col]
-                .astype(str)
-                .map(normalize_value)
-            )
-
-            if class_col:
-                temp["班級"] = (
-                    df[class_col]
-                    .astype(str)
-                    .str.strip()
-                )
-            else:
-                temp["班級"] = ""
-
-            temp["姓名"] = (
-                df[name_col]
-                .astype(str)
-                .str.strip()
-            )
-            if is_holiday_term(term):
-
-                overseas_col = get_overseas_col(df)
-
-                if overseas_col is None:
-                    continue
-
-                temp["本地境外"] = (
-                    df[overseas_col]
-                    .astype(str)
-                    .str.strip()
-                )
-
-                temp = temp[
-                    temp["本地境外"]
-                    .astype(str)
-                    .str.contains("境外", na=False)
-                ].copy()
+            temp["學號"] = df[sid_col].astype(str).str.strip()
+            temp["班級"] = df[class_col].astype(str).str.strip()
+            temp["姓名"] = df[name_col].astype(str).str.strip()
+            temp["科系"] = df[dept_col].astype(str).str.strip()
+            temp["床位"] = df[bed_col].astype(str).str.strip()
+            temp["房號"] = df[room_col].astype(str).str.strip()
+            temp["本地/境外"] = df[local_col].astype(str).str.strip()
+            temp["手機"] = df[phone_col].astype(str).str.strip()
+            temp["家長姓名"] = df[parent_col].astype(str).str.strip()
+            temp["連絡電話1"] = df[tel_col].astype(str).str.strip()
 
             temp["性別"] = get_dorm_gender(dorm).replace("生", "")
             temp["讀取Sheet"] = sheet_name
@@ -743,15 +708,16 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
     sheet_name = str(attendance_date)
 
     headers = [
-        "日期",
-        "性別",
-        "宿舍",
-        "樓層",
-        "房號",
-        "床位",
         "學號",
         "班級",
         "姓名",
+        "科系",
+        "床位",
+        "房號",
+        "本地/境外",
+        "手機",
+        "家長姓名",
+        "連絡電話1",
         "狀態",
         "備註"
     ]
@@ -763,18 +729,19 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         status = str(r.get("狀態", "")).strip()
 
         row_data = [
-            str(attendance_date),
-            r.get("性別", gender.replace("生", "")),
-            dorm,
-            floor,
-            r.get("房號", ""),
-            r.get("床位", ""),
             r.get("學號", ""),
             r.get("班級", ""),
             r.get("姓名", ""),
+            r.get("科系", ""),
+            r.get("床位", ""),
+            r.get("房號", ""),
+            r.get("本地/境外", ""),
+            r.get("手機", ""),
+            r.get("家長姓名", ""),
+            r.get("連絡電話1", ""),
             status,
             r.get("備註", "")
-        ]
+]
         all_rows.append(row_data)
 
         if status == "缺":
@@ -1014,15 +981,18 @@ def show_attendance():
         )
 
         final_rows.append({
-            "日期": str(attendance_date),
-            "性別": row.get("性別", gender.replace("生", "")),
-            "宿舍": dorm,
-            "樓層": floor,
-            "房號": row["房號"],
-            "床位": row["床位"],
+
             "學號": row["學號"],
-            "班級": row.get("班級", ""),
+            "班級": row["班級"],
             "姓名": row["姓名"],
+            "科系": row["科系"],
+            "床位": row["床位"],
+            "房號": row["房號"],
+            "本地/境外": row["本地/境外"],
+            "手機": row["手機"],
+            "家長姓名": row["家長姓名"],
+            "連絡電話1": row["連絡電話1"],
+
             "狀態": status,
             "備註": note
         })
