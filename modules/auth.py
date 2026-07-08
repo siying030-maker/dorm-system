@@ -36,6 +36,16 @@ def normalize_supervisor_type(value):
 
     return ""
 
+def normalize_gender(value):
+    value = str(value).strip()
+
+    if "男" in value:
+        return "男"
+
+    if "女" in value:
+        return "女"
+
+    return ""
 
 import time
 
@@ -170,8 +180,8 @@ def login_page():
                 row.get("宿舍別", "")
             )
 
-            st.session_state.gender = clean_text(
-                row.get("性別", "")
+            st.session_state.gender = normalize_gender(
+            row.get("性別", "")
             )
 
             st.session_state.gender = get_row_gender(row)
@@ -244,6 +254,7 @@ def login_page():
             st.session_state.gender = get_row_gender(row)
 
             st.session_state.dorm = ""
+            st.session_state.gender = ""
             st.session_state.is_main = False
             st.session_state.manage_dorms = ""
 
