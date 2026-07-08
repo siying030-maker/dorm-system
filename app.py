@@ -59,83 +59,50 @@ if not tab_names:
 tabs = st.tabs(tab_names)
 
 
-if "點名系統" in tab_names:
-    with tabs[tab_names.index("點名系統")]:
-        show_attendance()
+selected_tab = st.radio(
+    "功能選單",
+    tab_names,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="main_tab_radio"
+)
 
+if selected_tab == "點名系統":
+    show_attendance()
 
-if "每日點名未到名單" in tab_names:
-    with tabs[tab_names.index("每日點名未到名單")]:
+elif selected_tab == "補點名單":
+    show_makeup_rollcall()
 
-        role = st.session_state.get("role", "")
-        supervisor_type = st.session_state.get("supervisor_type", "")
-        dorm = st.session_state.get("dorm", "")
+elif selected_tab == "每日點名未到名單":
 
-        if role == "行政":
-            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-            boy_ss = open_sheet(ROLLCALL_BOY_URL)
-            show_rollcall([girl_ss, boy_ss], mode="daily_all")
+    role = st.session_state.get("role", "")
+    supervisor_type = st.session_state.get("supervisor_type", "")
+    dorm = st.session_state.get("dorm", "")
 
-        elif role == "舍監":
-            if supervisor_type == "男舍監":
-                show_rollcall(open_sheet(ROLLCALL_BOY_URL), mode="daily_boy")
-            elif supervisor_type == "女舍監":
-                show_rollcall(open_sheet(ROLLCALL_GIRL_URL), mode="daily_girl")
+    if role == "行政":
+        girl_ss = open_sheet(ROLLCALL_GIRL_URL)
+        boy_ss = open_sheet(ROLLCALL_BOY_URL)
+        show_rollcall([girl_ss, boy_ss], mode="daily_all")
 
-        elif role == "樓長":
-            if str(dorm).startswith("男"):
-                show_rollcall(open_sheet(ROLLCALL_BOY_URL), mode="daily_boy")
-            elif str(dorm).startswith("女"):
-                show_rollcall(open_sheet(ROLLCALL_GIRL_URL), mode="daily_girl")
+    elif role == "樓長":
+        if str(dorm).startswith("男"):
+            show_rollcall(open_sheet(ROLLCALL_BOY_URL), mode="daily_boy")
+        elif str(dorm).startswith("女"):
+            show_rollcall(open_sheet(ROLLCALL_GIRL_URL), mode="daily_girl")
 
+elif selected_tab == "獎懲查詢":
+    show_reward_punishment()
 
-if "補點名單" in tab_names:
-    with tabs[tab_names.index("補點名單")]:
-        show_makeup_rollcall()
+elif selected_tab == "上學期門禁":
+    upper_ss = open_sheet(UPPER_GATE_URL)
+    show_gate("上學期門禁", upper_ss, "upper_gate")
 
+elif selected_tab == "下學期門禁":
+    lower_ss = open_sheet(LOWER_GATE_URL)
+    show_gate("下學期門禁", lower_ss, "lower_gate")
 
-if "獎懲查詢" in tab_names:
-    with tabs[tab_names.index("獎懲查詢")]:
-        show_reward_punishment()
+elif selected_tab == "整潔比賽":
+    show_clean()
 
-
-if "上學期門禁" in tab_names:
-    with tabs[tab_names.index("上學期門禁")]:
-
-        upper_ss = open_sheet(UPPER_GATE_URL)
-
-        show_gate(
-            "上學期門禁",
-            upper_ss,
-            "upper_gate"
-        )
-
-
-if "下學期門禁" in tab_names:
-    with tabs[tab_names.index("下學期門禁")]:
-
-        lower_ss = open_sheet(LOWER_GATE_URL)
-
-        show_gate(
-            "下學期門禁",
-            lower_ss,
-            "lower_gate"
-        )
-
-
-if "整潔比賽" in tab_names:
-    with tabs[tab_names.index("整潔比賽")]:
-        show_clean()
-
-
-if "整潔比賽(檢視)" in tab_names:
-    with tabs[tab_names.index("整潔比賽(檢視)")]:
-        show_clean_view()
-
-if "上學期假日點名單" in tab_names:
-    with tabs[tab_names.index("上學期假日點名單")]:
-        show_holiday_rollcall("上學期")
-
-if "下學期假日點名單" in tab_names:
-    with tabs[tab_names.index("下學期假日點名單")]:
-        show_holiday_rollcall("下學期")
+elif selected_tab == "整潔比賽(檢視)":
+    show_clean_view()
