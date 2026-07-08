@@ -108,25 +108,26 @@ if "每日點名未到名單" in tab_names:
 
         elif role == "樓長":
 
-            if str(dorm).startswith("男"):
-                boy_ss = open_sheet(ROLLCALL_BOY_URL)
+            gender = st.session_state.get("gender", "")
 
-                show_rollcall(
-                    boy_ss,
-                    mode="daily_boy"
-                )
+        if str(dorm).startswith("男") or gender == "男":
+            boy_ss = open_sheet(ROLLCALL_BOY_URL)
 
-            elif str(dorm).startswith("女"):
-                girl_ss = open_sheet(ROLLCALL_GIRL_URL)
+            show_rollcall(
+                boy_ss,
+                mode="daily_boy"
+            )
 
-                show_rollcall(
-                    girl_ss,
-                    mode="daily_girl"
-                )
+        elif str(dorm).startswith("女") or gender == "女":
+            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
 
-            else:
-                st.warning("無法判斷樓長宿舍性別")
+            show_rollcall(
+                girl_ss,
+                mode="daily_girl"
+            )
 
+        else:
+            st.warning("無法判斷樓長宿舍性別")
 
 if "獎懲查詢" in tab_names:
     with tabs[tab_names.index("獎懲查詢")]:

@@ -145,6 +145,7 @@ def login_page():
             key="login_leader_password"
         )
 
+        
         if st.button("登入", key="login_leader_btn"):
 
             match = temp[
@@ -167,6 +168,10 @@ def login_page():
 
             st.session_state.dorm = normalize_dorm(
                 row.get("宿舍別", "")
+            )
+
+            st.session_state.gender = clean_text(
+                row.get("性別", "")
             )
 
             st.session_state.gender = get_row_gender(row)
