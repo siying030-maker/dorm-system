@@ -3,17 +3,15 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-from core.config import (
-    UNPAID_URL,
-    NEED_MAKEUP_GIRL_URL,
-    NEED_MAKEUP_BOY_URL,
-    UPPER_GATE_URL,
-    LOWER_GATE_URL,
-    WINTER_URL,
-    SUMMER_URL,
-    ROLLCALL_BOY_URL,
-    ROLLCALL_GIRL_URL,
-
+from core.google_api import (
+    open_sheet,
+    get_worksheet,
+    get_all_values,
+    get_worksheets,
+    append_row,
+    append_rows,
+    add_worksheet,
+    reorder_worksheets,
 )
 
 
@@ -547,21 +545,40 @@ def load_unpaid_ids():
 def read_raw_sheet_df(ss, sheet_name):
 
     try:
-        ws = get_worksheet(ss, sheet_name)
+        ws = get_worksheet(
+            ss,
+            sheet_name
+        )
 
         values = get_all_values(ws)
 
         if len(values) <= 2:
             return pd.DataFrame()
 
-        # 固定第 2 列是標題，第 3 列開始是資料
-        headers = build_unique_headers(values[1])
+        headers = build_unique_headers(
+            values[1]
+        )
+
         data = values[2:]
 
-        df = pd.DataFrame(data, columns=headers)
-        df.columns = df.columns.astype(str).str.strip()
+        df = pd.DataFrame(
+            data,
+            columns=headers
+        )
+
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+        )
 
         return df
+
+    except Exception as e:
+        st.warning(
+            f"{sheet_name} 讀取失敗：{e}"
+        )
+        return pd.DataFrame()
 
     except Exception as e:
         st.warning(f"{sheet_name} 讀取失敗：{e}")
