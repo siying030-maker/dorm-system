@@ -1395,33 +1395,12 @@ def show_attendance():
             )
 
         # 床位、學號、姓名、特殊狀態同一行
-        st.markdown(
-            f"""
-            <div style="
-                font-size:18px;
-                font-weight:700;
-                margin-top:6px;
-                margin-bottom:8px;
-            ">
-                {row.get("床位", "")}
-                &nbsp;&nbsp;&nbsp;
+        title = f'{row["床位"]}    {row["學號"]}    {row["姓名"]}'
 
-                {row.get("學號", "")}
-                &nbsp;&nbsp;&nbsp;
+        if mark:
+            title += f"    {mark}"
 
-                {row.get("姓名", "")}
-                &nbsp;&nbsp;
-
-                <span style="
-                    color:{mark_color};
-                    font-weight:700;
-                ">
-                    {mark}
-                </span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.subheader(title)
 
         # 狀態
         status_options = [
