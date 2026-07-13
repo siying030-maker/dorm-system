@@ -1345,17 +1345,31 @@ def show_attendance():
         default_status = "在"
         status_list = []
 
+        st.write(f"{row['床位']}    {row['學號']}    {row['姓名']}")
+
         if is_leave:
-            status_list.append("🟣 外宿")
+            st.markdown(
+                "<span style='color:#9C27B0;font-weight:bold;'>🟣 外宿</span>",
+                unsafe_allow_html=True
+            )
 
         if is_long_leave:
-            status_list.append("🔵 長期外宿")
+            st.markdown(
+                "<span style='color:#1976D2;font-weight:bold;'>🔵 長期外宿</span>",
+                unsafe_allow_html=True
+            )
 
         if is_late:
-            status_list.append("🟡 長期晚歸")
+            st.markdown(
+                "<span style='color:#F9A825;font-weight:bold;'>🟡 長期晚歸</span>",
+                unsafe_allow_html=True
+            )
 
         if is_unpaid:
-            st.error("🔴 未繳費")
+            st.markdown(
+                "<span style='color:#D32F2F;font-weight:bold;'>🔴 未繳費</span>",
+                unsafe_allow_html=True
+            )
 
         title = (
             f"{row.get('床位', '')}　"
