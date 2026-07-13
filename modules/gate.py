@@ -7,7 +7,7 @@ from datetime import timedelta
 
 def load_sheet_df(ss, name):
     try:
-        ws = ss.worksheet(name)
+        get_worksheet(ss,name)
         df = pd.DataFrame(ws.get_all_records())
         df.columns = df.columns.str.strip()
         return df

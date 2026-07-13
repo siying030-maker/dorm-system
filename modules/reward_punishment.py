@@ -39,7 +39,7 @@ def read_reward(url):
 
     try:
         ss = open_sheet(url)
-        ws = ss.worksheet(TARGET_SHEET_NAME)
+        get_worksheet(ss,TARGET_SHEET_NAME)
 
         from core.google_api import get_all_values
 

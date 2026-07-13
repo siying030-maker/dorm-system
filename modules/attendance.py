@@ -4,16 +4,15 @@ import pandas as pd
 from datetime import date
 
 from core.google_api import open_sheet
-from core.config import (
-    UPPER_GATE_URL,
-    LOWER_GATE_URL,
-    WINTER_URL,
-    SUMMER_URL,
-    ROLLCALL_GIRL_URL,
-    ROLLCALL_BOY_URL,
-    NEED_MAKEUP_GIRL_URL,
-    NEED_MAKEUP_BOY_URL,
-    UNPAID_URL,
+from core.google_api import (
+    open_sheet,
+    get_worksheet,
+    get_all_values,
+    get_worksheets,
+    append_row,
+    append_rows,
+    add_worksheet,
+    reorder_worksheets,
 )
 
 
@@ -301,49 +300,44 @@ import time
 
 def read_worksheet_df(ss, sheet_name):
 
-    for retry in range(3):
+    try:
+        ws = get_worksheet(ss, sheet_name)
 
-        try:
-            ws = ss.worksheet(sheet_name)
+        values = get_all_values(
+            ws,
+            value_render_option="UNFORMATTED_VALUE",
+        )
 
-            values = ws.get_all_values(
-                value_render_option="UNFORMATTED_VALUE"
-            )
+        if len(values) <= 1:
+            return pd.DataFrame()
 
-            if len(values) <= 1:
-                return pd.DataFrame()
+        header_index = find_header_index(values)
 
-            header_index = find_header_index(values)
+        headers = build_unique_headers(
+            values[header_index]
+        )
 
-            headers = build_unique_headers(
-                values[header_index]
-            )
+        data = values[header_index + 1:]
 
-            data = values[header_index + 1:]
+        if not data:
+            return pd.DataFrame(columns=headers)
 
-            df = pd.DataFrame(
-                data,
-                columns=headers
-            )
+        df = pd.DataFrame(
+            data,
+            columns=headers,
+        )
 
-            df.columns = (
-                df.columns.astype(str)
-                .str.strip()
-            )
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+        )
 
-            return df
+        return df
 
-        except Exception as e:
-
-            if retry < 2:
-                time.sleep(1)
-                continue
-
-            st.warning(
-                f"{sheet_name} 讀取失敗：{e}"
-            )
-
-    return pd.DataFrame()
+    except Exception as error:
+        st.warning(f"{sheet_name} 讀取失敗：{error}")
+        return pd.DataFrame()
 
 
 def find_col(df, keywords, exclude_keywords=None):
@@ -515,12 +509,13 @@ def load_attendance_students(term, dorm, floor):
         st.error(f"讀取點名名單失敗：{e}")
         return pd.DataFrame()
     
+
+    
 @st.cache_data(ttl=300, show_spinner=False)
 def load_unpaid_ids():
-
     try:
         ss = open_sheet(UNPAID_URL)
-        ws = ss.worksheet("未繳費名單")
+        get_worksheet(ss,未繳費名單")
 
         from core.google_api import get_all_values
         values = get_all_values(ws)
@@ -553,11 +548,9 @@ def load_unpaid_ids():
 def read_raw_sheet_df(ss, sheet_name):
 
     try:
-        ws = ss.worksheet(sheet_name)
+        get_worksheet(ss,sheet_name)
 
-        values = ws.get_all_values(
-            value_render_option="UNFORMATTED_VALUE"
-        )
+        get_all_values(ws)
 
         if len(values) <= 2:
             return pd.DataFrame()
@@ -575,7 +568,7 @@ def read_raw_sheet_df(ss, sheet_name):
         st.warning(f"{sheet_name} 讀取失敗：{e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def load_special_status(term, attendance_date):
 
     try:
@@ -668,41 +661,52 @@ def load_special_status(term, attendance_date):
         }
     
 if st.button("重新整理"):
-    st.cache_data.clear()
+    
     st.rerun()
     
 
-def append_rows_to_sheet(url, sheet_name, headers, rows):
+def append_rows_to_sheet(
+    url,
+    sheet_name,
+    headers,
+    rows,
+):
+
+    if not rows:
+        return
 
     ss = open_sheet(url)
 
     try:
-        ws = ss.worksheet(sheet_name)
+        ws = get_worksheet(ss, sheet_name)
 
-    except:
-
-        ws = ss.add_worksheet(
+    except Exception:
+        ws = add_worksheet(
+            ss,
             title=sheet_name,
-            rows=3000,
-            cols=len(headers) + 5
+            rows=max(3000, len(rows) + 100),
+            cols=len(headers) + 5,
         )
 
-        ws.append_row(headers)
+        append_row(ws, headers)
 
-        # 新增的 Sheet 移到最前面
-        worksheets = ss.worksheets()
+        worksheets = get_worksheets(ss)
 
         new_order = [ws] + [
-            w for w in worksheets
-            if w.id != ws.id
+            item
+            for item in worksheets
+            if item.id != ws.id
         ]
 
-        ss.reorder_worksheets(new_order)
+        reorder_worksheets(
+            ss,
+            new_order,
+        )
 
-    if rows:
-        from core.google_api import append_rows
-
-        append_rows(ws, rows)
+    append_rows(
+        ws,
+        rows,
+    )
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
@@ -1068,3 +1072,30 @@ def show_attendance():
 
         except Exception as e:
             st.error(f"儲存失敗：{e}")
+
+if st.button(
+    "重新讀取點名名單",
+    key="refresh_attendance_students",
+):
+    load_attendance_students.clear()
+    load_special_status.clear()
+    load_unpaid_ids.clear()
+
+    st.session_state.pop(
+        "attendance_students",
+        None,
+    )
+
+    st.session_state.pop(
+        "attendance_special_status",
+        None,
+    )
+
+    st.session_state.pop(
+        "attendance_unpaid_ids",
+        None,
+    )
+
+    st.rerun()
+
+    

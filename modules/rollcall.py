@@ -3,9 +3,11 @@ import streamlit as st
 
 from datetime import datetime
 from core.google_api import open_sheet, rate_limit
-from core.config import (
-    ROLLCALL_GIRL_URL,
-    ROLLCALL_BOY_URL,
+from core.google_api import (
+    open_sheet,
+    rate_limit,
+    get_all_values,
+    get_worksheets,
 )
 
 
@@ -60,7 +62,7 @@ def normalize_sheet_date(title):
     return str(title).replace("/", "-")
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def load_rollcall_data():
 
     data = {}
@@ -75,15 +77,14 @@ def load_rollcall_data():
         try:
             rollcall_ss = open_sheet(url)
 
-            for ws in rollcall_ss.worksheets():
+            for ws in get_worksheets(rollcall_ss):
 
                 try:
                     if not is_date_sheet(ws.title):
                         continue
 
                     rate_limit()
-                    from core.google_api import get_all_values
-
+                    
                     values = get_all_values(ws)
 
                     if len(values) <= 1:
@@ -327,3 +328,10 @@ def show_daily(data, dates, search):
 
     if not found:
         st.info("本月無資料")
+
+if st.button(
+    "重新整理每日未到名單",
+    key="refresh_daily_rollcall",
+):
+    load_rollcall_data.clear()
+    st.rerun()

@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 
-from core.google_api import open_sheet
-from core.config import ADMIN_SHEET_URL
+from core.google_api import (
+    open_sheet,
+    get_worksheet,
+    get_all_values,
+)
 
 
 def clean_text(value):
@@ -49,47 +52,40 @@ def normalize_gender(value):
 
 import time
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def load_users(role):
 
-    for retry in range(5):
+    try:
+        ss = open_sheet(ADMIN_SHEET_URL)
+        ws = get_worksheet(ss, role)
+        values = get_all_values(ws)
 
-        try:
-            ss = open_sheet(ADMIN_SHEET_URL)
-            ws = ss.worksheet(role)
+        if len(values) <= 1:
+            return pd.DataFrame()
 
-            values = ws.get_all_values()
+        headers = [
+            str(value).strip()
+            for value in values[0]
+        ]
 
-            if len(values) <= 1:
-                return pd.DataFrame()
+        df = pd.DataFrame(
+            values[1:],
+            columns=headers,
+        )
 
-            df = pd.DataFrame(
-                values[1:],
-                columns=values[0]
-            )
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+        )
 
-            df.columns = df.columns.astype(str).str.strip()
+        df = df.dropna(how="all")
 
-            return df
+        return df
 
-        except Exception as e:
-
-            if "429" in str(e) or "Quota exceeded" in str(e):
-
-                wait_time = (retry + 1) * 5
-
-                st.warning(
-                    f"Google API 讀取過量，{wait_time} 秒後自動重試..."
-                )
-
-                time.sleep(wait_time)
-
-            else:
-                st.error(f"讀取 {role} 帳號失敗：{e}")
-                return pd.DataFrame()
-
-    st.error(f"讀取 {role} 帳號失敗：Google API 過載，請稍後再試")
-    return pd.DataFrame()
+    except Exception as error:
+        st.error(f"讀取 {role} 帳號失敗：{error}")
+        return pd.DataFrame()
 
 
 def get_row_gender(row):
@@ -105,8 +101,11 @@ def get_row_gender(row):
 
 def login_page():
 
-    if st.button("重新讀取帳號資料", key="refresh_admin_users"):
-        st.cache_data.clear()
+    if st.button(
+    "重新讀取帳號資料",
+    key="refresh_login_accounts",
+):
+        load_users.clear()
         st.rerun()
 
     role = st.selectbox(

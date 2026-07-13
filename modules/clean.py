@@ -134,7 +134,7 @@ def load_clean_floor_sheet(url, sheet_name):
             st.write("目前試算表分頁：", sheet_names)
             return pd.DataFrame()
 
-        ws = ss.worksheet(sheet_name)
+        get_worksheet(ss,sheet_name)
         from core.google_api import get_all_values
 
         values = get_all_values(ws)
@@ -258,7 +258,7 @@ def save_clean_result(total, school_year, semester, contest, rank, dorm):
     ss = open_sheet(CLEAN_RESULT_URL)
 
     try:
-        ws = ss.worksheet(sheet_name)
+        get_worksheet(ss,sheet_name)
 
     except:
         ws = ss.add_worksheet(
@@ -490,7 +490,7 @@ def show_clean_view():
             key="view_clean_school_year"
         )
 
-        ws = ss.worksheet(school_year)
+        get_worksheet(ss,school_year)
 
         from core.google_api import get_all_values
 
@@ -557,7 +557,7 @@ def get_current_clean_setting():
 
     try:
         ss = open_sheet(CLEAN_RESULT_URL)
-        ws = ss.worksheet("整潔比賽時間判斷")
+        get_worksheet(ss,"整潔比賽時間判斷")
 
         values = []
 

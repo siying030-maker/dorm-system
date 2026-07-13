@@ -3,13 +3,12 @@ import pandas as pd
 
 from datetime import date
 from core.google_api import open_sheet
-from core.config import (
-    NEED_MAKEUP_GIRL_URL,
-    NEED_MAKEUP_BOY_URL,
-    ROLLCALL_GIRL_URL,
-    ROLLCALL_BOY_URL,
+from core.google_api import (
+    open_sheet,
+    get_worksheet,
+    get_all_values,
+    update_cell,
 )
-
 
 def normalize_gender(value):
 
@@ -95,7 +94,7 @@ def normalize_text(value):
     return str(value).strip()
 
 
-@st.cache_data(ttl=10, show_spinner=False)
+@st.cache_data(ttl=15, show_spinner=False)
 def load_need_makeup_source(gender):
     source_url = (
         NEED_MAKEUP_GIRL_URL
@@ -113,7 +112,8 @@ def load_need_makeup_source(gender):
     for sheet_name in [today1, today2]:
 
         try:
-            ws = ss.worksheet(sheet_name)
+            ws = get_worksheet(ss, sheet_name)
+            values = get_all_values(ws)
             break
 
         except:
@@ -246,7 +246,8 @@ def update_rollcall_status_to_makeup(gender, target_row):
     ).strip()
 
     try:
-        ws = ss.worksheet(sheet_name)
+        ws = get_worksheet(ss, sheet_name)
+        values = get_all_values(ws)
 
     except:
         raise Exception(f"點名總表找不到 Sheet：{sheet_name}")
@@ -315,7 +316,8 @@ def update_need_makeup_status_to_done(gender, target_row):
     ).strip()
 
     try:
-        ws = ss.worksheet(sheet_name)
+        ws = get_worksheet(ss, sheet_name)
+        values = get_all_values(ws)
 
     except:
         raise Exception(f"需補點名單找不到 Sheet：{sheet_name}")
@@ -351,10 +353,11 @@ def update_need_makeup_status_to_done(gender, target_row):
 
             if date_col is None or row_date == rollcall_date:
 
-                ws.update_cell(
+                update_cell(
+                    ws,
                     row_index,
                     status_col,
-                    "已補點"
+                    "已補點",
                 )
 
                 return
@@ -435,7 +438,7 @@ def show_makeup_rollcall():
     st.header("補點名單")
 
     if st.button("重新整理補點名單", key="refresh_makeup"):
-        st.cache_data.clear()
+        load_need_makeup_source.clear()
         st.rerun()
 
     allowed_genders = get_allowed_genders()
@@ -570,9 +573,17 @@ def show_makeup_rollcall():
                 target_row
             )
 
-            st.cache_data.clear()
+            load_need_makeup_source.clear()
+            st.rerun()
 
             st.success("已將狀態更新為：已補點")
 
         except Exception as e:
             st.error(f"更新失敗：{e}")
+
+if st.button(
+    "重新整理補點名單",
+    key="refresh_makeup_rollcall",
+):
+    load_need_makeup_source.clear()
+    st.rerun()
