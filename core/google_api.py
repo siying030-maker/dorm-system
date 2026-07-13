@@ -4,6 +4,17 @@ import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
 
+from gspread.exceptions import APIError
+import time
+
+def get_all_values(ws):
+    for i in range(5):
+        try:
+            return ws.get_all_values()
+        except APIError:
+            time.sleep(2 ** i)   # 1、2、4、8、16 秒
+    raise
+
 
 CACHE_TTL = 3600
 
@@ -206,3 +217,4 @@ def reorder_worksheets(spreadsheet, worksheets):
         retries=5,
         base_wait=1.5,
     )
+
