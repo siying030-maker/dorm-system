@@ -177,6 +177,32 @@ def open_sheet(url_or_id: str):
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+def get_worksheet(spreadsheet, sheet_name):
+    return retry_call(
+        lambda: spreadsheet.worksheet(sheet_name),
+        retries=MAX_RETRIES,
+        base_wait=1.0,
+    )
+
+
+def get_all_values(
+    worksheet,
+    value_render_option=None
+):
+    if value_render_option:
+        return retry_call(
+            lambda: worksheet.get_all_values(
+                value_render_option=value_render_option
+            ),
+            retries=MAX_RETRIES,
+            base_wait=1.0,
+        )
+
+    return retry_call(
+        lambda: worksheet.get_all_values(),
+        retries=MAX_RETRIES,
+        base_wait=1.0,
+    )
 
 
 # ==================================================

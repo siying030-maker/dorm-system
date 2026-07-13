@@ -5,8 +5,9 @@ from core.google_api import (
     open_sheet,
     get_worksheet,
     get_all_values,
-    ADMIN_SHEET_URL,
 )
+
+from core.config import ADMIN_SHEET_URL
 
 
 def clean_text(value):
@@ -58,7 +59,12 @@ def load_users(role):
 
     try:
         ss = open_sheet(ADMIN_SHEET_URL)
-        ws = get_worksheet(ss, role)
+
+        ws = get_worksheet(
+            ss,
+            role
+        )
+
         values = get_all_values(ws)
 
         if len(values) <= 1:
@@ -71,7 +77,7 @@ def load_users(role):
 
         df = pd.DataFrame(
             values[1:],
-            columns=headers,
+            columns=headers
         )
 
         df.columns = (
@@ -80,12 +86,10 @@ def load_users(role):
             .str.strip()
         )
 
-        df = df.dropna(how="all")
-
         return df
 
-    except Exception as error:
-        st.error(f"讀取 {role} 帳號失敗：{error}")
+    except Exception as e:
+        st.error(f"讀取 {role} 帳號失敗：{e}")
         return pd.DataFrame()
 
 
