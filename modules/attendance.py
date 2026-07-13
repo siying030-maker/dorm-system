@@ -1342,22 +1342,17 @@ def show_attendance():
         is_long_leave = sid in long_leave_ids
         is_late = sid in late_ids
 
-        # 一定要先設定預設值
         default_status = "在"
-
         status_list = []
 
         if is_leave:
-            status_list.append("🟣外宿")
-            default_status = "在"
+            status_list.append("🟣 外宿")
 
         if is_long_leave:
-            status_list.append("🔵長期外宿")
-            default_status = "在"
+            status_list.append("🔵 長期外宿")
 
         if is_late:
-            status_list.append("🟡長期晚歸")
-            default_status = "在"
+            status_list.append("🟡 長期晚歸")
 
         if is_unpaid:
             st.error("🔴 未繳費")
@@ -1369,7 +1364,7 @@ def show_attendance():
         )
 
         if status_list:
-            title += "　" + " ".join(status_list)
+            title += "　" + "　".join(status_list)
 
         st.subheader(title)
 
@@ -1413,80 +1408,72 @@ def show_attendance():
 
         st.divider()
 
-        # ==================================================
-        # 點名結果預覽
-        # ==================================================
+    # ==================================================
+    # 注意：從這裡開始已經離開學生迴圈
+    # ==================================================
 
-        final_df = pd.DataFrame(
-            final_rows
-        )
+    final_df = pd.DataFrame(final_rows)
 
-        if final_df.empty:
-            st.warning(
-                "目前沒有可儲存的點名資料"
-            )
-            return
+    if final_df.empty:
+        st.warning("目前沒有可儲存的點名資料")
+        return
 
-        st.subheader("點名結果預覽")
+    # ==================================================
+    # 點名結果預覽
+    # ==================================================
 
-        preview_columns = [
-            column
-            for column in [
-                "床位",
-                "學號",
-                "班級",
-                "姓名",
-                "狀態",
-                "備註",
-            ]
-            if column in final_df.columns
+    st.subheader("點名結果預覽")
+
+    preview_columns = [
+        column
+        for column in [
+            "床位",
+            "學號",
+            "班級",
+            "姓名",
+            "狀態",
+            "備註",
         ]
+        if column in final_df.columns
+    ]
 
-        st.dataframe(
-            final_df[preview_columns],
-            use_container_width=True,
-            hide_index=True
-        )
+    st.dataframe(
+        final_df[preview_columns],
+        use_container_width=True,
+        hide_index=True
+    )
 
-        # ==================================================
-        # 儲存
-        # ==================================================
+    # ==================================================
+    # 儲存按鈕：整個頁面只建立一次
+    # ==================================================
 
-        if st.button(
-            "儲存點名結果",
-            key="save_attendance"
-        ):
+    if st.button(
+        "儲存點名結果",
+        key="save_attendance"
+    ):
 
-            try:
+        try:
 
-                with st.spinner(
-                    "正在儲存點名結果..."
-                ):
+            with st.spinner("正在儲存點名結果..."):
 
-                    absent_count = save_rollcall_result(
-                        attendance_date,
-                        dorm,
-                        floor,
-                        final_df
-                    )
-
-                if absent_count == 0:
-
-                    st.info(
-                        "本次沒有狀態為「缺」的學生，不寫入試算表。"
-                    )
-
-                else:
-
-                    st.success(
-                        f"已成功儲存 {absent_count} 位缺席學生。"
-                    )
-
-                    # 清除相關快取，讓補點與每日未到更新
-                    load_attendance_students.clear()
-
-            except Exception as error:
-
-                st.error(
-                    f"儲存失敗：{error}"
+                absent_count = save_rollcall_result(
+                    attendance_date,
+                    dorm,
+                    floor,
+                    final_df
                 )
+
+            if absent_count == 0:
+                st.info(
+                    "本次沒有狀態為「缺」的學生，不寫入試算表。"
+                )
+
+            else:
+                st.success(
+                    f"已成功儲存 {absent_count} 位缺席學生。"
+                )
+
+        except Exception as error:
+            st.error(
+                f"儲存失敗：{error}"
+            )
