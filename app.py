@@ -1,5 +1,5 @@
-import streamlit as st
 import time
+import streamlit as st
 
 from core.session import init_session
 from core.google_api import open_sheet
@@ -21,6 +21,10 @@ from modules.reward_punishment import show_reward_punishment
 from modules.holiday_rollcall import show_holiday_rollcall
 
 
+# ==============================
+# 頁面設定
+# ==============================
+
 st.set_page_config(
     page_title="宿舍管理系統",
     layout="wide"
@@ -28,22 +32,13 @@ st.set_page_config(
 
 st.title("宿舍管理系統")
 
+
+# ==============================
+# 初始化登入狀態
+# ==============================
+
 init_session()
 
-# 點名學生名單：住宿資料不常變
-@st.cache_data(ttl=1800, show_spinner=False)
-
-# 外宿 / 晚歸 / 未繳費
-@st.cache_data(ttl=300, show_spinner=False)
-
-# 補點名單：要即時
-@st.cache_data(ttl=10, show_spinner=False)
-
-# 每日點名未到名單
-@st.cache_data(ttl=300, show_spinner=False)
-
-# 整潔比賽 / 獎懲查詢
-@st.cache_data(ttl=600, show_spinner=False)
 
 # ==============================
 # 25 分鐘未操作自動登出
@@ -53,32 +48,61 @@ TIMEOUT_SECONDS = 25 * 60
 now = time.time()
 
 if "last_active_time" not in st.session_state:
-    st.session_state.last_active_time = now
+    st.session_state["last_active_time"] = now
 
 if st.session_state.get("login", False):
-    if now - st.session_state.last_active_time > TIMEOUT_SECONDS:
+
+    last_active_time = st.session_state.get(
+        "last_active_time",
+        now
+    )
+
+    if now - last_active_time > TIMEOUT_SECONDS:
         st.session_state.clear()
         st.warning("已超過 25 分鐘未操作，系統已自動登出。")
-        st.stop()
-    else:
-        st.session_state.last_active_time = now
+        st.rerun()
 
-if not st.session_state.login:
+    st.session_state["last_active_time"] = now
+
+
+# ==============================
+# 登入頁面
+# ==============================
+
+if not st.session_state.get("login", False):
     login_page()
     st.stop()
 
+
+# ==============================
+# 登入資訊
+# ==============================
+
 st.success(
-    f"{st.session_state.role} / {st.session_state.user}"
+    f"{st.session_state.get('role', '')} / "
+    f"{st.session_state.get('user', '')}"
 )
 
-if st.button("登出", key="logout_btn"):
+
+# ==============================
+# 登出
+# ==============================
+
+if st.button(
+    "登出",
+    key="logout_btn"
+):
     st.session_state.clear()
     st.rerun()
 
 
+# ==============================
+# 功能選單
+# ==============================
+
 tab_names = build_tabs(
-    st.session_state.role,
-    st.session_state.is_main
+    st.session_state.get("role", ""),
+    st.session_state.get("is_main", False)
 )
 
 # 移除不要的頁面
