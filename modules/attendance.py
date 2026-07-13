@@ -3,6 +3,18 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+from core.config import (
+    UPPER_GATE_URL,
+    LOWER_GATE_URL,
+    WINTER_URL,
+    SUMMER_URL,
+    UNPAID_URL,
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
+    NEED_MAKEUP_GIRL_URL,
+    NEED_MAKEUP_BOY_URL,
+)
+
 from core.google_api import (
     open_sheet,
     get_worksheet,

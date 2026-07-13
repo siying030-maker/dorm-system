@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from datetime import datetime
-from core.google_api import open_sheet, rate_limit
+
 from core.google_api import (
     open_sheet,
     rate_limit,
@@ -10,6 +10,10 @@ from core.google_api import (
     get_worksheets,
 )
 
+from core.config import (
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
+)
 
 def normalize_gender(value):
     value = str(value).strip()

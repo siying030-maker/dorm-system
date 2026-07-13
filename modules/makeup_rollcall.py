@@ -2,12 +2,19 @@ import streamlit as st
 import pandas as pd
 
 from datetime import date
-from core.google_api import open_sheet
+
 from core.google_api import (
     open_sheet,
     get_worksheet,
     get_all_values,
     update_cell,
+)
+
+from core.config import (
+    NEED_MAKEUP_GIRL_URL,
+    NEED_MAKEUP_BOY_URL,
+    ROLLCALL_GIRL_URL,
+    ROLLCALL_BOY_URL,
 )
 
 def normalize_gender(value):
