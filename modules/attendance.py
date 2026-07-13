@@ -1331,134 +1331,87 @@ def show_attendance():
     # 每位學生
     # ==================================================
 
-    for i, row in students.iterrows():
+for i, row in students.iterrows():
 
-        sid = normalize_value(
-            row.get("學號", "")
+    sid = normalize_value(
+        row.get("學號", "")
+    )
+
+    is_unpaid = sid in unpaid_ids
+    is_leave = sid in leave_ids
+    is_long_leave = sid in long_leave_ids
+    is_late = sid in late_ids
+
+    # 一定要先設定預設值
+    default_status = "在"
+
+    status_list = []
+
+    if is_leave:
+        status_list.append("🟣外宿")
+        default_status = "在"
+
+    if is_long_leave:
+        status_list.append("🔵長期外宿")
+        default_status = "在"
+
+    if is_late:
+        status_list.append("🟡長期晚歸")
+        default_status = "在"
+
+    if is_unpaid:
+        st.error("🔴 未繳費")
+
+    title = (
+        f"{row.get('床位', '')}　"
+        f"{row.get('學號', '')}　"
+        f"{row.get('姓名', '')}"
+    )
+
+    if status_list:
+        title += "　" + " ".join(status_list)
+
+    st.subheader(title)
+
+    status_options = [
+        "在",
+        "缺",
+        "未入住",
+    ]
+
+    status = st.selectbox(
+        "狀態",
+        status_options,
+        index=status_options.index(default_status),
+        key=(
+            f"attendance_status_"
+            f"{term}_{dorm}_{floor}_{sid}_{i}"
         )
+    )
 
-        is_unpaid = (
-            sid in unpaid_ids
+    note = st.text_input(
+        "備註",
+        key=(
+            f"attendance_note_"
+            f"{term}_{dorm}_{floor}_{sid}_{i}"
         )
+    )
 
-        is_leave = (
-            sid in leave_ids
-        )
+    final_rows.append({
+        "學號": row.get("學號", ""),
+        "班級": row.get("班級", ""),
+        "姓名": row.get("姓名", ""),
+        "床位": row.get("床位", ""),
+        "房號": row.get("房號", ""),
+        "本地/境外": row.get("本地/境外", ""),
+        "手機": row.get("手機", ""),
+        "家長姓名": row.get("家長姓名", ""),
+        "連絡電話1": row.get("連絡電話1", ""),
+        "狀態": status,
+        "備註": note,
+    })
 
-        is_long_leave = (
-            sid in long_leave_ids
-        )
-
-        is_late = (
-            sid in late_ids
-        )
-
-        # 床位、學號、姓名、特殊狀態同一行
-        # ==============================
-        # 顯示學生基本資料
-        # ==============================
-
-        title = f"{row['床位']}    {row['學號']}    {row['姓名']}"
-
-        status_list = []
-
-        if is_leave:
-            status_list.append("🟣外宿")
-
-        if is_long_leave:
-            status_list.append("🔵長期外宿")
-
-        if is_late:
-            status_list.append("🟡長期晚歸")
-
-        if status_list:
-            title += "    " + " ".join(status_list)
-
-        if is_unpaid:
-            st.markdown("### 🔴 未繳費")
-
-        st.subheader(title)
-
-        # 狀態
-        status_options = [
-            "在",
-            "缺",
-            "未入住",
-        ]
-
-        status = st.selectbox(
-            "狀態",
-            status_options,
-            index=status_options.index(
-                default_status
-            ),
-            key=(
-                f"attendance_status_"
-                f"{term}_"
-                f"{dorm}_"
-                f"{floor}_"
-                f"{sid}_"
-                f"{i}"
-            )
-        )
-
-        # 備註
-        note = st.text_input(
-            "備註",
-            key=(
-                f"attendance_note_"
-                f"{term}_"
-                f"{dorm}_"
-                f"{floor}_"
-                f"{sid}_"
-                f"{i}"
-            )
-        )
-
-        final_rows.append(
-            {
-                "學號": row.get(
-                    "學號",
-                    ""
-                ),
-                "班級": row.get(
-                    "班級",
-                    ""
-                ),
-                "姓名": row.get(
-                    "姓名",
-                    ""
-                ),
-                "床位": row.get(
-                    "床位",
-                    ""
-                ),
-                "房號": row.get(
-                    "房號",
-                    ""
-                ),
-                "本地/境外": row.get(
-                    "本地/境外",
-                    ""
-                ),
-                "手機": row.get(
-                    "手機",
-                    ""
-                ),
-                "家長姓名": row.get(
-                    "家長姓名",
-                    ""
-                ),
-                "連絡電話1": row.get(
-                    "連絡電話1",
-                    ""
-                ),
-                "狀態": status,
-                "備註": note,
-            }
-        )
-
-        st.divider()
+    st.divider()
 
     # ==================================================
     # 點名結果預覽
