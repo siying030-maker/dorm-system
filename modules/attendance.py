@@ -1353,52 +1353,29 @@ def show_attendance():
             sid in late_ids
         )
 
-        mark = ""
-        mark_color = "black"
-        default_status = "在"
-
-        # 外宿
-        if is_leave:
-
-            mark = "【外宿】"
-            mark_color = "#A689E1"
-            default_status = "在"
-
-        # 長期外宿
-        elif is_long_leave:
-
-            mark = "【長期外宿】"
-            mark_color = "blue"
-            default_status = "在"
-
-        # 長期晚歸
-        elif is_late:
-
-            mark = "【長期晚歸】"
-            mark_color = "#b58900"
-            default_status = "在"
-
-        # 未繳費顯示在左上
-        if is_unpaid:
-
-            st.markdown(
-                """
-                <span style="
-                    color:red;
-                    font-weight:700;
-                    font-size:17px;
-                ">
-                    未繳費
-                </span>
-                """,
-                unsafe_allow_html=True
-            )
-
         # 床位、學號、姓名、特殊狀態同一行
-        title = f'{row["床位"]}    {row["學號"]}    {row["姓名"]}'
+        # ==============================
+        # 顯示學生基本資料
+        # ==============================
 
-        if mark:
-            title += f"    {mark}"
+        title = f"{row['床位']}    {row['學號']}    {row['姓名']}"
+
+        status_list = []
+
+        if is_leave:
+            status_list.append("🟣外宿")
+
+        if is_long_leave:
+            status_list.append("🔵長期外宿")
+
+        if is_late:
+            status_list.append("🟡長期晚歸")
+
+        if status_list:
+            title += "    " + " ".join(status_list)
+
+        if is_unpaid:
+            st.markdown("### 🔴 未繳費")
 
         st.subheader(title)
 
