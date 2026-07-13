@@ -721,7 +721,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
     sheet_name = str(attendance_date)
 
-    # 男生點名回報 / 女生點名回報欄位
+    # 女生／男生點名回報的欄位
     rollcall_headers = [
         "學號",
         "班級",
@@ -737,7 +737,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "備註"
     ]
 
-    # 補點名單只存這些欄位
+    # 點名單總表的欄位
     makeup_headers = [
         "床位",
         "學號",
@@ -747,12 +747,16 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "備註"
     ]
 
-    rollcall_rows = []
-    makeup_rows = []
+    absent_rollcall_rows = []
+    absent_makeup_rows = []
 
     for _, r in final_df.iterrows():
 
         status = str(r.get("狀態", "")).strip()
+
+        # 只處理狀態為「缺」的學生
+        if status != "缺":
+            continue
 
         rollcall_row = [
             r.get("學號", ""),
@@ -778,24 +782,30 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("備註", "")
         ]
 
-        rollcall_rows.append(rollcall_row)
+        absent_rollcall_rows.append(rollcall_row)
+        absent_makeup_rows.append(makeup_row)
 
-        if status == "缺":
-            makeup_rows.append(makeup_row)
+    # 當天沒有人缺席時，不建立或寫入資料
+    if not absent_rollcall_rows:
+        return 0
 
+    # 女生點名回報／男生點名回報
     append_rows_to_sheet(
         rollcall_url,
         sheet_name,
         rollcall_headers,
-        rollcall_rows
+        absent_rollcall_rows
     )
 
+    # 點名單總表（女）／點名單總表（男）
     append_rows_to_sheet(
         need_makeup_url,
         sheet_name,
         makeup_headers,
-        makeup_rows
+        absent_makeup_rows
     )
+
+    return len(absent_rollcall_rows)
 
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
@@ -1042,14 +1052,19 @@ def show_attendance():
     if st.button("儲存點名結果", key="save_attendance"):
 
         try:
-            save_rollcall_result(
+            absent_count = save_rollcall_result(
                 attendance_date,
                 dorm,
                 floor,
                 final_df
             )
 
-            st.success("點名結果已儲存")
+            if absent_count == 0:
+                st.info("本次沒有狀態為「缺」的學生，不寫入試算表。")
+            else:
+                st.success(
+                    f"已成功儲存 {absent_count} 位缺席學生。"
+                )
 
         except Exception as e:
             st.error(f"儲存失敗：{e}")

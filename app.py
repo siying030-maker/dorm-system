@@ -30,6 +30,21 @@ st.title("宿舍管理系統")
 
 init_session()
 
+# 點名學生名單：住宿資料不常變
+@st.cache_data(ttl=1800, show_spinner=False)
+
+# 外宿 / 晚歸 / 未繳費
+@st.cache_data(ttl=300, show_spinner=False)
+
+# 補點名單：要即時
+@st.cache_data(ttl=10, show_spinner=False)
+
+# 每日點名未到名單
+@st.cache_data(ttl=300, show_spinner=False)
+
+# 整潔比賽 / 獎懲查詢
+@st.cache_data(ttl=600, show_spinner=False)
+
 # ==============================
 # 25 分鐘未操作自動登出
 # ==============================
