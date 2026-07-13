@@ -432,7 +432,7 @@ def load_attendance_students(term, dorm, floor):
                 temp["學號"] = df.iloc[:, 3].astype(str).map(normalize_value)
                 temp["班級"] = df.iloc[:, 4].astype(str).str.strip()
                 temp["姓名"] = df.iloc[:, 5].astype(str).str.strip()
-                temp["科系"] = ""
+                #temp["科系"] = ""
                 temp["本地/境外"] = df.iloc[:, 8].astype(str).str.strip()
                 temp["手機"] = df.iloc[:, 9].astype(str).str.strip()
                 temp["家長姓名"] = df.iloc[:, 15].astype(str).str.strip()
@@ -451,7 +451,7 @@ def load_attendance_students(term, dorm, floor):
                 temp["學號"] = df.iloc[:, 4].astype(str).map(normalize_value)
                 temp["班級"] = df.iloc[:, 5].astype(str).str.strip()
                 temp["姓名"] = df.iloc[:, 6].astype(str).str.strip()
-                temp["科系"] = ""
+                #temp["科系"] = ""
                 temp["手機"] = df.iloc[:, 8].astype(str).str.strip()
                 temp["家長姓名"] = df.iloc[:, 14].astype(str).str.strip()
                 temp["連絡電話1"] = df.iloc[:, 16].astype(str).str.strip()
@@ -497,7 +497,7 @@ def load_attendance_students(term, dorm, floor):
                     "學號",
                     "班級",
                     "姓名",
-                    "科系",
+                    #"科系",
                     "床位",
                     "房號",
                     "本地/境外",
@@ -726,7 +726,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "學號",
         "班級",
         "姓名",
-        "科系",
+        #"科系",
         "床位",
         "房號",
         "本地/境外",
@@ -762,7 +762,7 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
             r.get("學號", ""),
             r.get("班級", ""),
             r.get("姓名", ""),
-            r.get("科系", ""),
+            #r.get("科系", ""),
             r.get("床位", ""),
             r.get("房號", ""),
             r.get("本地/境外", ""),
@@ -1029,7 +1029,7 @@ def show_attendance():
             "學號": row["學號"],
             "班級": row.get("班級", ""),
             "姓名": row["姓名"],
-            "科系": row.get("科系", ""),
+            #3"科系": row.get("科系", ""),
             "床位": row["床位"],
             "房號": row.get("房號", ""),
             "本地/境外": row.get("本地/境外", ""),
