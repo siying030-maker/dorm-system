@@ -12,7 +12,7 @@ from core.config import (
     WINTER_URL,
     SUMMER_URL,
     ROLLCALL_BOY_URL,
-    ROLLCALL_GIRL_URL
+    ROLLCALL_GIRL_URL,
 
 )
 
