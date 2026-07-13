@@ -593,43 +593,56 @@ def read_raw_sheet_df(ss, sheet_name):
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_special_status(term, attendance_date):
+
+    empty_result = {
+        "leave_ids": set(),
+        "long_leave_ids": set(),
+        "late_ids": set(),
+    }
 
     try:
         url = get_gate_sheet_url(term)
+
+        if not url:
+            st.warning(f"{term} 沒有設定外宿晚歸試算表")
+            return empty_result
+
         ss = open_sheet(url)
-
-        leave_df = read_raw_sheet_df(ss, "外宿申請")
-        late_df = read_raw_sheet_df(ss, "長期晚歸")
-        long_leave_df = read_raw_sheet_df(ss, "長期外宿")
-
         target_date = pd.to_datetime(attendance_date).date()
 
         leave_ids = set()
-        late_ids = set()
         long_leave_ids = set()
+        late_ids = set()
 
-        # 外宿申請：固定抓 C / N / O 欄
-        if not leave_df.empty and len(leave_df.columns) >= 15:
+        # ==================================================
+        # 外宿申請：固定抓 C、N、O 欄
+        # C = 學號，N = 開始日期，O = 結束日期
+        # ==================================================
 
-            sid_col = leave_df.columns[2]       # C欄：學號
-            start_col = leave_df.columns[13]    # N欄：申請日期
-            end_col = leave_df.columns[14]      # O欄：結束日期
+        try:
+            leave_ws = get_worksheet(ss, "外宿申請")
+            leave_values = get_all_values(
+                leave_ws,
+                value_render_option="UNFORMATTED_VALUE"
+            )
 
-            for _, row in leave_df.iterrows():
+            for row in leave_values:
 
-                sid = normalize_value(row.get(sid_col, ""))
+                # 至少需要到 O 欄
+                if len(row) < 15:
+                    continue
 
-                start_date = parse_sheet_date(
-                    row.get(start_col, "")
-                )
+                sid = normalize_value(row[2])
+                start_date = parse_sheet_date(row[13])
+                end_date = parse_sheet_date(row[14])
 
-                end_date = parse_sheet_date(
-                    row.get(end_col, "")
-                )
-
+                # 自動跳過標題與無效資料
                 if sid == "":
+                    continue
+
+                if "學號" in sid:
                     continue
 
                 if pd.isna(start_date) or pd.isna(end_date):
@@ -638,100 +651,60 @@ def load_special_status(term, attendance_date):
                 if start_date.date() <= target_date <= end_date.date():
                     leave_ids.add(sid)
 
+        except Exception as error:
+            st.warning(f"外宿申請讀取失敗：{error}")
+
+        # ==================================================
         # 長期外宿：固定抓 C 欄
-        if not long_leave_df.empty and len(long_leave_df.columns) >= 3:
+        # ==================================================
 
-            sid_col = long_leave_df.columns[2]
+        try:
+            long_leave_ws = get_worksheet(ss, "長期外宿")
+            long_leave_values = get_all_values(long_leave_ws)
 
-            long_leave_ids.update(
-                long_leave_df[sid_col]
-                .astype(str)
-                .map(normalize_value)
-                .tolist()
-            )
+            for row in long_leave_values:
 
+                if len(row) < 3:
+                    continue
+
+                sid = normalize_value(row[2])
+
+                if sid and "學號" not in sid:
+                    long_leave_ids.add(sid)
+
+        except Exception as error:
+            st.warning(f"長期外宿讀取失敗：{error}")
+
+        # ==================================================
         # 長期晚歸：固定抓 C 欄
-        if not late_df.empty and len(late_df.columns) >= 3:
+        # ==================================================
 
-            sid_col = late_df.columns[2]
+        try:
+            late_ws = get_worksheet(ss, "長期晚歸")
+            late_values = get_all_values(late_ws)
 
-            late_ids.update(
-                late_df[sid_col]
-                .astype(str)
-                .map(normalize_value)
-                .tolist()
-            )
+            for row in late_values:
+
+                if len(row) < 3:
+                    continue
+
+                sid = normalize_value(row[2])
+
+                if sid and "學號" not in sid:
+                    late_ids.add(sid)
+
+        except Exception as error:
+            st.warning(f"長期晚歸讀取失敗：{error}")
 
         return {
-            "leave_ids": {
-                x for x in leave_ids
-                if x != ""
-            },
-            "long_leave_ids": {
-                x for x in long_leave_ids
-                if x != ""
-            },
-            "late_ids": {
-                x for x in late_ids
-                if x != ""
-            },
+            "leave_ids": leave_ids,
+            "long_leave_ids": long_leave_ids,
+            "late_ids": late_ids,
         }
 
-    except Exception as e:
-        st.warning(f"讀取外宿 / 晚歸資料失敗：{e}")
-        return {
-            "leave_ids": set(),
-            "long_leave_ids": set(),
-            "late_ids": set(),
-        }
-    
-if st.button("重新整理"):
-    
-    st.rerun()
-    
-
-def append_rows_to_sheet(
-    url,
-    sheet_name,
-    headers,
-    rows,
-):
-
-    if not rows:
-        return
-
-    ss = open_sheet(url)
-
-    try:
-        ws = get_worksheet(ss, sheet_name)
-
-    except Exception:
-        ws = add_worksheet(
-            ss,
-            title=sheet_name,
-            rows=max(3000, len(rows) + 100),
-            cols=len(headers) + 5,
-        )
-
-        append_row(ws, headers)
-
-        worksheets = get_worksheets(ss)
-
-        new_order = [ws] + [
-            item
-            for item in worksheets
-            if item.id != ws.id
-        ]
-
-        reorder_worksheets(
-            ss,
-            new_order,
-        )
-
-    append_rows(
-        ws,
-        rows,
-    )
+    except Exception as error:
+        st.warning(f"讀取外宿／晚歸資料失敗：{error}")
+        return empty_result
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
@@ -1343,44 +1316,53 @@ def show_attendance():
         is_late = sid in late_ids
 
         default_status = "在"
-        status_list = []
 
-        st.write(f"{row['床位']}    {row['學號']}    {row['姓名']}")
-
-        if is_leave:
-            st.markdown(
-                "<span style='color:#9C27B0;font-weight:bold;'>🟣 外宿</span>",
-                unsafe_allow_html=True
-            )
-
-        if is_long_leave:
-            st.markdown(
-                "<span style='color:#1976D2;font-weight:bold;'>🔵 長期外宿</span>",
-                unsafe_allow_html=True
-            )
-
-        if is_late:
-            st.markdown(
-                "<span style='color:#F9A825;font-weight:bold;'>🟡 長期晚歸</span>",
-                unsafe_allow_html=True
-            )
-
-        if is_unpaid:
-            st.markdown(
-                "<span style='color:#D32F2F;font-weight:bold;'>🔴 未繳費</span>",
-                unsafe_allow_html=True
-            )
-
-        title = (
+        # 先顯示床位、學號、姓名
+        st.subheader(
             f"{row.get('床位', '')}　"
             f"{row.get('學號', '')}　"
             f"{row.get('姓名', '')}"
         )
 
-        if status_list:
-            title += "　" + "　".join(status_list)
+        # 外宿文字顯示紫色
+        if is_leave:
+            st.markdown(
+                "<span style='color:#9C27B0;"
+                "font-size:18px;font-weight:700;'>"
+                "外宿"
+                "</span>",
+                unsafe_allow_html=True
+            )
 
-        st.subheader(title)
+        # 長期外宿文字顯示藍色
+        if is_long_leave:
+            st.markdown(
+                "<span style='color:#1976D2;"
+                "font-size:18px;font-weight:700;'>"
+                "長期外宿"
+                "</span>",
+                unsafe_allow_html=True
+            )
+
+        # 長期晚歸文字顯示黃色
+        if is_late:
+            st.markdown(
+                "<span style='color:#C49000;"
+                "font-size:18px;font-weight:700;'>"
+                "長期晚歸"
+                "</span>",
+                unsafe_allow_html=True
+            )
+
+        # 未繳費文字顯示紅色
+        if is_unpaid:
+            st.markdown(
+                "<span style='color:#D32F2F;"
+                "font-size:18px;font-weight:700;'>"
+                "未繳費"
+                "</span>",
+                unsafe_allow_html=True
+            )
 
         status_options = [
             "在",
