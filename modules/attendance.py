@@ -705,6 +705,46 @@ def load_special_status(term, attendance_date):
     except Exception as error:
         st.warning(f"讀取外宿／晚歸資料失敗：{error}")
         return empty_result
+    
+def append_rows_to_sheet(
+    spreadsheet_url,
+    sheet_name,
+    headers,
+    rows,
+):
+   
+
+    ss = open_sheet(spreadsheet_url)
+
+    try:
+        ws = get_worksheet(ss, sheet_name)
+
+    except Exception:
+
+        ws = add_worksheet(
+            ss,
+            sheet_name,
+            rows=1000,
+            cols=len(headers)
+        )
+
+        append_row(
+            ws,
+            headers
+        )
+
+    values = get_all_values(ws)
+
+    if len(values) == 0:
+        append_row(
+            ws,
+            headers
+        )
+
+    append_rows(
+        ws,
+        rows
+    )
 
 def save_rollcall_result(attendance_date, dorm, floor, final_df):
 
