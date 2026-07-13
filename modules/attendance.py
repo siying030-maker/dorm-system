@@ -3,16 +3,17 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-from core.google_api import open_sheet
-from core.google_api import (
-    open_sheet,
-    get_worksheet,
-    get_all_values,
-    get_worksheets,
-    append_row,
-    append_rows,
-    add_worksheet,
-    reorder_worksheets,
+from core.config import (
+    UNPAID_URL,
+    NEED_MAKEUP_GIRL_URL,
+    NEED_MAKEUP_BOY_URL,
+    UPPER_GATE_URL,
+    LOWER_GATE_URL,
+    WINTER_URL,
+    SUMMER_URL,
+    ROLLCALL_BOY_URL,
+    ROLLCALL_GIRL_URL
+
 )
 
 
@@ -296,8 +297,6 @@ def find_header_index(values):
     return 0
 
 
-import time
-
 def read_worksheet_df(ss, sheet_name):
 
     try:
@@ -400,7 +399,7 @@ def load_attendance_students(term, dorm, floor):
 
         for sheet_name in sheet_names:
 
-            time.sleep(0.4)
+            time.sleep(0.05)
 
             df = read_worksheet_df(
                 ss,
@@ -515,7 +514,7 @@ def load_attendance_students(term, dorm, floor):
 def load_unpaid_ids():
     try:
         ss = open_sheet(UNPAID_URL)
-        get_worksheet(ss,未繳費名單")
+        ws = ss.worksheet("未繳費名單")
 
         from core.google_api import get_all_values
         values = get_all_values(ws)
@@ -548,9 +547,9 @@ def load_unpaid_ids():
 def read_raw_sheet_df(ss, sheet_name):
 
     try:
-        get_worksheet(ss,sheet_name)
+        ws = get_worksheet(ss, sheet_name)
 
-        get_all_values(ws)
+        values = get_all_values(ws)
 
         if len(values) <= 2:
             return pd.DataFrame()
@@ -895,14 +894,37 @@ def show_attendance():
     )
 
     sheet_names = get_sheet_names_for_attendance(
-        term,
-        dorm,
-        floor
+    term,
+    dorm,
+    floor
     )
 
     st.info("目前讀取 Sheet：" + "、".join(sheet_names))
 
-    if st.button("載入點名名單", key="load_attendance"):
+    # ==========================
+    # 重新讀取點名名單
+    # ==========================
+    if st.button(
+        "重新讀取點名名單",
+        key="refresh_attendance_students",
+    ):
+        load_attendance_students.clear()
+        load_special_status.clear()
+        load_unpaid_ids.clear()
+
+        st.session_state.pop("attendance_students", None)
+        st.session_state.pop("attendance_special_status", None)
+        st.session_state.pop("attendance_unpaid_ids", None)
+
+        st.rerun()
+
+    # ==========================
+    # 載入點名名單
+    # ==========================
+    if st.button(
+        "載入點名名單",
+        key="load_attendance"
+    ):
 
         students = load_attendance_students(
             term,
@@ -1073,10 +1095,7 @@ def show_attendance():
         except Exception as e:
             st.error(f"儲存失敗：{e}")
 
-if st.button(
-    "重新讀取點名名單",
-    key="refresh_attendance_students",
-):
+
     load_attendance_students.clear()
     load_special_status.clear()
     load_unpaid_ids.clear()
@@ -1098,4 +1117,3 @@ if st.button(
 
     st.rerun()
 
-    
