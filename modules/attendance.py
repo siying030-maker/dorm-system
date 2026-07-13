@@ -931,9 +931,9 @@ def show_attendance():
     # 重新讀取點名名單
     # ==========================
     if st.button(
-        "重新讀取點名名單",
-        key="refresh_attendance_students",
-    ):
+    "重新讀取點名名單",
+    key="refresh_attendance_students",
+):
         load_attendance_students.clear()
         load_special_status.clear()
         load_unpaid_ids.clear()
@@ -941,6 +941,7 @@ def show_attendance():
         st.session_state.pop("attendance_students", None)
         st.session_state.pop("attendance_special_status", None)
         st.session_state.pop("attendance_unpaid_ids", None)
+        st.session_state.pop("attendance_loaded_context", None)
 
         st.rerun()
 
@@ -948,67 +949,150 @@ def show_attendance():
     # 載入點名名單
     # ==========================
     if st.button(
-        "載入點名名單",
-        key="load_attendance"
-    ):
+    "載入點名名單",
+    key="load_attendance"
+):
 
-        students = load_attendance_students(
-            term,
-            dorm,
-            floor
+        with st.spinner("正在載入點名名單..."):
+
+            students = load_attendance_students(
+                term,
+                dorm,
+                floor
+            )
+
+            special_status = load_special_status(
+                term,
+                attendance_date
+            )
+
+            unpaid_ids = load_unpaid_ids()
+
+    st.session_state["attendance_students"] = students
+    st.session_state["attendance_special_status"] = special_status
+    st.session_state["attendance_unpaid_ids"] = unpaid_ids
+
+    st.session_state["attendance_loaded_context"] = {
+        "term": term,
+        "dorm": dorm,
+        "floor": floor,
+    }
+
+    if students.empty:
+        st.warning("查無學生資料")
+    else:
+        st.success(f"成功載入 {len(students)} 筆資料")
+
+        # ==================================================
+        # 取得已載入的點名資料
+        # ==================================================
+
+        students = st.session_state.get(
+            "attendance_students",
+            pd.DataFrame()
         )
 
-        special_status = load_special_status(
-            term,
-            attendance_date
+        special_status = st.session_state.get(
+            "attendance_special_status",
+            {
+                "leave_ids": set(),
+                "long_leave_ids": set(),
+                "late_ids": set(),
+            }
         )
 
-        unpaid_ids = load_unpaid_ids()
+        unpaid_ids = st.session_state.get(
+            "attendance_unpaid_ids",
+            set()
+        )
 
-        st.session_state["attendance_students"] = students
-        st.session_state["attendance_special_status"] = special_status
-        st.session_state["attendance_unpaid_ids"] = unpaid_ids
+        loaded_context = st.session_state.get(
+            "attendance_loaded_context",
+            {}
+        )
+
+        # 尚未按下「載入點名名單」
+        if not isinstance(students, pd.DataFrame):
+            students = pd.DataFrame()
 
         if students.empty:
-            st.warning("查無學生資料")
-        else:
-            st.success(f"成功載入 {len(students)} 筆資料")
+            st.info("請先按「載入點名名單」")
+            return
 
-    students = st.session_state.get(
-        "attendance_students",
-        pd.DataFrame()
-    )
-
-    special_status = st.session_state.get(
-        "attendance_special_status",
-        {
-            "leave_ids": set(),
-            "long_leave_ids": set(),
-            "late_ids": set(),
+        # 檢查目前選項是否和已載入資料一致
+        current_context = {
+            "term": term,
+            "dorm": dorm,
+            "floor": floor,
         }
-    )
 
-    unpaid_ids = st.session_state.get(
-        "attendance_unpaid_ids",
-        set()
-    )
+        if loaded_context and loaded_context != current_context:
+            st.warning("點名類型、宿舍或樓層已變更，請重新載入點名名單。")
+            return
 
-    if students.empty:
-        return
+        # 必要欄位檢查
+        required_columns = [
+            "床位",
+            "學號",
+            "姓名",
+        ]
 
-    students = students[
-        (students["學號"].astype(str).str.strip() != "")
-        &
-        (students["姓名"].astype(str).str.strip() != "")
-    ].copy()
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in students.columns
+        ]
 
-    if students.empty:
-        st.warning("查無有效學生資料")
-        return
+        if missing_columns:
+            st.error(
+                "載入的點名資料缺少欄位："
+                + "、".join(missing_columns)
+            )
+            st.write("目前實際欄位：", list(students.columns))
+            return
 
-    leave_ids = special_status.get("leave_ids", set())
-    long_leave_ids = special_status.get("long_leave_ids", set())
-    late_ids = special_status.get("late_ids", set())
+        # 清理資料
+        students = students.copy()
+
+        students["床位"] = (
+            students["床位"]
+            .astype(str)
+            .map(normalize_value)
+        )
+
+        students["學號"] = (
+            students["學號"]
+            .astype(str)
+            .map(normalize_value)
+        )
+
+        students["姓名"] = (
+            students["姓名"]
+            .astype(str)
+            .str.strip()
+        )
+
+        students = students[
+            (students["床位"] != "")
+            &
+            (students["學號"] != "")
+            &
+            (students["姓名"] != "")
+        ].copy()
+
+        students = students.reset_index(drop=True)
+
+        if students.empty:
+            st.warning("已讀取資料，但過濾後沒有有效學生資料。")
+            return
+
+        st.success(f"目前顯示 {len(students)} 位學生")
+
+        leave_ids = special_status.get("leave_ids", set())
+        long_leave_ids = special_status.get("long_leave_ids", set())
+        late_ids = special_status.get("late_ids", set())
+        long_leave_ids = special_status.get("long_leave_ids", set())
+        late_ids = special_status.get("late_ids", set())
 
     st.divider()
     st.subheader("點名名單")
