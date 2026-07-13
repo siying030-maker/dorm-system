@@ -268,6 +268,10 @@ def show_rollcall(_unused=None, mode="daily"):
         search
     )
 
+    if st.button("重新整理每日未到名單"):
+        load_rollcall_data.clear()
+        st.rerun()
+
 
 def show_daily(data, dates, search):
 
@@ -329,9 +333,6 @@ def show_daily(data, dates, search):
     if not found:
         st.info("本月無資料")
 
-if st.button(
-    "重新整理每日未到名單",
-    key="refresh_daily_rollcall",
-):
+
     load_rollcall_data.clear()
     st.rerun()

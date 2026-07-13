@@ -437,6 +437,8 @@ def show_makeup_rollcall():
 
     st.header("補點名單")
 
+    
+
     if st.button("重新整理補點名單", key="refresh_makeup"):
         load_need_makeup_source.clear()
         st.rerun()
@@ -501,6 +503,13 @@ def show_makeup_rollcall():
     if df.empty:
         st.info("查無符合條件的補點名資料")
         return
+    
+    if st.button(
+        "重新整理補點名單",
+        key="refresh_makeup"
+    ):
+        load_makeup_data.clear()
+        st.rerun()
 
     show_cols = [
     c for c in [
@@ -581,9 +590,3 @@ def show_makeup_rollcall():
         except Exception as e:
             st.error(f"更新失敗：{e}")
 
-if st.button(
-    "重新整理補點名單",
-    key="refresh_makeup_rollcall",
-):
-    load_need_makeup_source.clear()
-    st.rerun()
