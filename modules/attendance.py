@@ -580,9 +580,6 @@ def read_raw_sheet_df(ss, sheet_name):
         )
         return pd.DataFrame()
 
-    except Exception as e:
-        st.warning(f"{sheet_name} 讀取失敗：{e}")
-        return pd.DataFrame()
 
 @st.cache_data(ttl=120, show_spinner=False)
 def load_special_status(term, attendance_date):
