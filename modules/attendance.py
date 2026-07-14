@@ -409,6 +409,7 @@ def load_attendance_students(term, dorm, floor):
 
         for sheet_name in sheet_names:
 
+
             df = read_worksheet_df(
                 ss,
                 sheet_name
@@ -1222,10 +1223,10 @@ def show_attendance():
     # 重新讀取
     # ==================================================
 
-    #if st.button(
-        #"重新讀取點名名單",
-        #key="refresh_attendance_students"
-    #):
+    """if st.button(
+        "重新讀取點名名單",
+        key="refresh_attendance_students"
+    ):
 
         load_attendance_students.clear()
         load_special_status.clear()
@@ -1251,7 +1252,7 @@ def show_attendance():
             None
         )
 
-        st.rerun()
+        """st.rerun()
 
     # ==================================================
     # 載入點名名單
