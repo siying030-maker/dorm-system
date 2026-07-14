@@ -159,19 +159,15 @@ elif selected_page == "每日點名未到名單":
     gender = st.session_state.get("gender", "")
 
     if role == "行政":
-        girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-        boy_ss = open_sheet(ROLLCALL_BOY_URL)
-        show_rollcall([girl_ss, boy_ss], mode="daily_all")
+        show_rollcall(mode="daily_all")
 
     elif role == "舍監":
 
         if supervisor_type == "男舍監":
-            boy_ss = open_sheet(ROLLCALL_BOY_URL)
-            show_rollcall(boy_ss, mode="daily_boy")
+            show_rollcall(mode="daily_boy")
 
         elif supervisor_type == "女舍監":
-            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-            show_rollcall(girl_ss, mode="daily_girl")
+            show_rollcall(mode="daily_girl")
 
         else:
             st.warning("無法判斷舍監性別")
@@ -179,12 +175,10 @@ elif selected_page == "每日點名未到名單":
     elif role == "樓長":
 
         if str(dorm).startswith("男") or gender == "男":
-            boy_ss = open_sheet(ROLLCALL_BOY_URL)
-            show_rollcall(boy_ss, mode="daily_boy")
+            show_rollcall(mode="daily_boy")
 
         elif str(dorm).startswith("女") or gender == "女":
-            girl_ss = open_sheet(ROLLCALL_GIRL_URL)
-            show_rollcall(girl_ss, mode="daily_girl")
+            show_rollcall(mode="daily_girl")
 
         else:
             st.warning("無法判斷樓長宿舍性別")

@@ -5,9 +5,9 @@ from datetime import datetime
 
 from core.google_api import (
     open_sheet,
-    rate_limit,
     get_all_values,
     get_worksheets,
+    get_values,
 )
 
 from core.config import (
@@ -66,7 +66,7 @@ def normalize_sheet_date(title):
     return str(title).replace("/", "-")
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_rollcall_data():
 
     data = {}
@@ -81,25 +81,49 @@ def load_rollcall_data():
         try:
             rollcall_ss = open_sheet(url)
 
-            for ws in get_worksheets(rollcall_ss):
+            worksheets = get_worksheets(rollcall_ss)
+
+            date_worksheets = [
+                ws
+                for ws in worksheets
+                if is_date_sheet(ws.title)
+            ]
+
+            date_worksheets = sorted(
+                date_worksheets,
+                key=lambda ws: normalize_sheet_date(ws.title),
+                reverse=True
+            )
+
+            # 只讀最近 40 天
+            date_worksheets = date_worksheets[:40]
+
+            for ws in date_worksheets:
 
                 try:
-                    if not is_date_sheet(ws.title):
-                        continue
-
-                    rate_limit()
-                    
-                    values = get_all_values(ws)
+                    values = get_values(
+                        ws,
+                        "A:K"
+                    )
 
                     if len(values) <= 1:
                         continue
 
+                    headers = [
+                        str(value).strip()
+                        for value in values[0]
+                    ]
+
                     df = pd.DataFrame(
                         values[1:],
-                        columns=values[0]
+                        columns=headers
                     )
 
-                    df.columns = df.columns.astype(str).str.strip()
+                    df.columns = (
+                        df.columns
+                        .astype(str)
+                        .str.strip()
+                    )
 
                     if "狀態" not in df.columns:
                         continue
@@ -111,14 +135,10 @@ def load_rollcall_data():
                     )
 
                     df = df[
-                        ~df["狀態"].isin(["已補點", "補"])
+                        ~df["狀態"].isin(
+                            ["已補點", "補", ""]
+                        )
                     ].copy()
-
-                    df = df[
-                        df["狀態"]
-                        .astype(str)
-                        .str.strip() != ""
-                    ]
 
                     if "性別" in df.columns:
                         df["性別"] = (
@@ -131,29 +151,30 @@ def load_rollcall_data():
                             df["性別"] == gender_value
                         ].copy()
 
-                        df["性別"] = gender_label
-
-                    else:
-                        df["性別"] = gender_label
-
-                    if "姓名" in df.columns:
-                        df = df[
-                            df["姓名"]
-                            .astype(str)
-                            .str.strip() != ""
-                        ]
+                    df["性別"] = gender_label
 
                     if "學號" in df.columns:
                         df = df[
                             df["學號"]
                             .astype(str)
-                            .str.strip() != ""
-                        ]
+                            .str.strip()
+                            .ne("")
+                        ].copy()
+
+                    if "姓名" in df.columns:
+                        df = df[
+                            df["姓名"]
+                            .astype(str)
+                            .str.strip()
+                            .ne("")
+                        ].copy()
 
                     if df.empty:
                         continue
 
-                    key = normalize_sheet_date(ws.title)
+                    key = normalize_sheet_date(
+                        ws.title
+                    )
 
                     if key in data:
                         data[key] = pd.concat(
@@ -163,14 +184,15 @@ def load_rollcall_data():
                     else:
                         data[key] = df
 
-                except:
+                except Exception:
                     continue
 
-        except Exception as e:
-            st.warning(f"{gender_label}點名總表讀取失敗：{e}")
+        except Exception as error:
+            st.warning(
+                f"{gender_label}點名總表讀取失敗：{error}"
+            )
 
     return data
-
 
 def filter_by_permission(df):
 
