@@ -1223,7 +1223,7 @@ def show_attendance():
     # 重新讀取
     # ==================================================
 
-    """if st.button(
+    if st.button(
         "重新讀取點名名單",
         key="refresh_attendance_students"
     ):
@@ -1252,7 +1252,7 @@ def show_attendance():
             None
         )
 
-        """st.rerun()
+        st.rerun()
 
     # ==================================================
     # 載入點名名單
