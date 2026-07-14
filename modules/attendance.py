@@ -746,29 +746,191 @@ def append_rows_to_sheet(
         rows
     )
 
-def save_rollcall_result(attendance_date, dorm, floor, final_df):
+def append_rows_to_sheet(
+    spreadsheet_url,
+    sheet_name,
+    headers,
+    rows,
+):
+    """
+    將資料批次寫入指定 Google 試算表。
 
-    gender = get_dorm_gender(dorm)
+    功能：
+    1. rows 沒有資料時不執行。
+    2. 日期 Sheet 不存在時自動建立。
+    3. 新 Sheet 自動加入欄位標題。
+    4. 新 Sheet 自動移到最前面。
+    5. Sheet 已存在但空白時自動補標題。
+    6. 使用 append_rows 批次寫入，降低 API 次數。
+    """
 
-    if gender == "女生":
-        need_makeup_url = NEED_MAKEUP_GIRL_URL
-        rollcall_url = ROLLCALL_GIRL_URL
+    if not rows:
+        return 0
 
-    elif gender == "男生":
-        need_makeup_url = NEED_MAKEUP_BOY_URL
-        rollcall_url = ROLLCALL_BOY_URL
+    spreadsheet = open_sheet(
+        spreadsheet_url
+    )
+
+    worksheet_created = False
+
+    try:
+
+        worksheet = get_worksheet(
+            spreadsheet,
+            sheet_name
+        )
+
+    except Exception:
+
+        worksheet = add_worksheet(
+            spreadsheet,
+            title=sheet_name,
+            rows=max(
+                3000,
+                len(rows) + 100
+            ),
+            cols=max(
+                20,
+                len(headers) + 5
+            ),
+        )
+
+        worksheet_created = True
+
+    # ==================================================
+    # 新建 Sheet 時加入標題
+    # ==================================================
+
+    if worksheet_created:
+
+        append_row(
+            worksheet,
+            headers
+        )
+
+        # ==============================================
+        # 新建 Sheet 移到最前面
+        # ==============================================
+
+        try:
+
+            worksheets = get_worksheets(
+                spreadsheet
+            )
+
+            new_order = [
+                worksheet
+            ] + [
+                item
+                for item in worksheets
+                if item.id != worksheet.id
+            ]
+
+            reorder_worksheets(
+                spreadsheet,
+                new_order
+            )
+
+        except Exception as error:
+
+            st.warning(
+                "Sheet 已建立，但移到最前面失敗："
+                f"{error}"
+            )
 
     else:
-        raise Exception("無法判斷宿舍性別")
 
-    sheet_name = str(attendance_date)
+        # ==============================================
+        # 已存在 Sheet 若完全空白，自動寫入標題
+        # ==============================================
 
-    # 女生／男生點名回報的欄位
+        try:
+
+            current_values = get_all_values(
+                worksheet
+            )
+
+            if len(current_values) == 0:
+
+                append_row(
+                    worksheet,
+                    headers
+                )
+
+        except Exception:
+            pass
+
+    # ==================================================
+    # 批次新增資料
+    # ==================================================
+
+    append_rows(
+        worksheet,
+        rows
+    )
+
+    return len(rows)
+
+def save_rollcall_result(
+    attendance_date,
+    dorm,
+    floor,
+    final_df
+):
+    """
+    將狀態為「缺」的學生寫入：
+
+    女生：
+    - 女生點名回報
+    - 點名單總表（女）
+
+    男生：
+    - 男生點名回報
+    - 點名單總表（男）
+    """
+
+    gender = get_dorm_gender(
+        dorm
+    )
+
+    if gender == "女生":
+
+        need_makeup_url = (
+            NEED_MAKEUP_GIRL_URL
+        )
+
+        rollcall_url = (
+            ROLLCALL_GIRL_URL
+        )
+
+    elif gender == "男生":
+
+        need_makeup_url = (
+            NEED_MAKEUP_BOY_URL
+        )
+
+        rollcall_url = (
+            ROLLCALL_BOY_URL
+        )
+
+    else:
+
+        raise Exception(
+            "無法判斷宿舍性別"
+        )
+
+    sheet_name = str(
+        attendance_date
+    )
+
+    # ==================================================
+    # 男生／女生點名回報欄位
+    # ==================================================
+
     rollcall_headers = [
         "學號",
         "班級",
         "姓名",
-        #"科系",
         "床位",
         "房號",
         "本地/境外",
@@ -776,78 +938,157 @@ def save_rollcall_result(attendance_date, dorm, floor, final_df):
         "家長姓名",
         "連絡電話1",
         "狀態",
-        "備註"
+        "備註",
     ]
 
-    # 點名單總表的欄位
+    # ==================================================
+    # 點名單總表／補點名單欄位
+    # ==================================================
+
     makeup_headers = [
         "床位",
         "學號",
         "班級",
         "姓名",
         "狀態",
-        "備註"
+        "備註",
     ]
 
     absent_rollcall_rows = []
     absent_makeup_rows = []
 
-    for _, r in final_df.iterrows():
+    # ==================================================
+    # 只收集狀態為缺的學生
+    # ==================================================
 
-        status = str(r.get("狀態", "")).strip()
+    for _, student_row in final_df.iterrows():
 
-        # 只處理狀態為「缺」的學生
+        status = str(
+            student_row.get(
+                "狀態",
+                ""
+            )
+        ).strip()
+
         if status != "缺":
             continue
 
+        # ==============================================
+        # 男生／女生點名回報完整資料
+        # ==============================================
+
         rollcall_row = [
-            r.get("學號", ""),
-            r.get("班級", ""),
-            r.get("姓名", ""),
-            #r.get("科系", ""),
-            r.get("床位", ""),
-            r.get("房號", ""),
-            r.get("本地/境外", ""),
-            r.get("手機", ""),
-            r.get("家長姓名", ""),
-            r.get("連絡電話1", ""),
+            student_row.get(
+                "學號",
+                ""
+            ),
+            student_row.get(
+                "班級",
+                ""
+            ),
+            student_row.get(
+                "姓名",
+                ""
+            ),
+            student_row.get(
+                "床位",
+                ""
+            ),
+            student_row.get(
+                "房號",
+                ""
+            ),
+            student_row.get(
+                "本地/境外",
+                ""
+            ),
+            student_row.get(
+                "手機",
+                ""
+            ),
+            student_row.get(
+                "家長姓名",
+                ""
+            ),
+            student_row.get(
+                "連絡電話1",
+                ""
+            ),
             status,
-            r.get("備註", "")
+            student_row.get(
+                "備註",
+                ""
+            ),
         ]
+
+        # ==============================================
+        # 補點名單簡化資料
+        # ==============================================
 
         makeup_row = [
-            r.get("床位", ""),
-            r.get("學號", ""),
-            r.get("班級", ""),
-            r.get("姓名", ""),
+            student_row.get(
+                "床位",
+                ""
+            ),
+            student_row.get(
+                "學號",
+                ""
+            ),
+            student_row.get(
+                "班級",
+                ""
+            ),
+            student_row.get(
+                "姓名",
+                ""
+            ),
             status,
-            r.get("備註", "")
+            student_row.get(
+                "備註",
+                ""
+            ),
         ]
 
-        absent_rollcall_rows.append(rollcall_row)
-        absent_makeup_rows.append(makeup_row)
+        absent_rollcall_rows.append(
+            rollcall_row
+        )
 
-    # 當天沒有人缺席時，不建立或寫入資料
+        absent_makeup_rows.append(
+            makeup_row
+        )
+
+    # ==================================================
+    # 沒有缺席學生，不寫入任何資料
+    # ==================================================
+
     if not absent_rollcall_rows:
         return 0
 
-    # 女生點名回報／男生點名回報
+    # ==================================================
+    # 寫入男生／女生點名回報
+    # ==================================================
+
     append_rows_to_sheet(
-        rollcall_url,
-        sheet_name,
-        rollcall_headers,
+        spreadsheet_url=rollcall_url,
+        sheet_name=sheet_name,
+        headers=rollcall_headers,
+        rows=absent_rollcall_rows,
+    )
+
+    # ==================================================
+    # 寫入點名單總表／補點名單
+    # ==================================================
+
+    append_rows_to_sheet(
+        spreadsheet_url=need_makeup_url,
+        sheet_name=sheet_name,
+        headers=makeup_headers,
+        rows=absent_makeup_rows,
+    )
+
+    return len(
         absent_rollcall_rows
     )
-
-    # 點名單總表（女）／點名單總表（男）
-    append_rows_to_sheet(
-        need_makeup_url,
-        sheet_name,
-        makeup_headers,
-        absent_makeup_rows
-    )
-
-    return len(absent_rollcall_rows)
 
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
