@@ -218,3 +218,56 @@ elif selected_page == "上學期假日點名單":
 
 elif selected_page == "下學期假日點名單":
     show_holiday_rollcall("下學期")
+
+selected_page = st.session_state.get(
+    "selected_page",
+    tab_names[0]
+)
+
+if selected_page not in tab_names:
+    selected_page = tab_names[0]
+
+columns = st.columns(len(tab_names))
+
+for index, page_name in enumerate(tab_names):
+    with columns[index]:
+        if st.button(
+            page_name,
+            key=f"nav_{page_name}",
+            use_container_width=True
+        ):
+            st.session_state["selected_page"] = page_name
+            st.rerun()
+
+st.divider()
+
+selected_page = st.session_state.get(
+    "selected_page",
+    tab_names[0]
+)
+
+if selected_page == "點名系統":
+    show_attendance()
+
+elif selected_page == "補點名單":
+    show_makeup_rollcall()
+
+elif selected_page == "每日點名未到名單":
+    show_rollcall(mode="daily")
+
+elif selected_page == "獎懲查詢":
+    show_reward_punishment()
+
+elif selected_page == "上學期門禁":
+    upper_ss = open_sheet(UPPER_GATE_URL)
+    show_gate("上學期門禁", upper_ss, "upper_gate")
+
+elif selected_page == "下學期門禁":
+    lower_ss = open_sheet(LOWER_GATE_URL)
+    show_gate("下學期門禁", lower_ss, "lower_gate")
+
+elif selected_page == "整潔比賽":
+    show_clean()
+
+elif selected_page == "整潔比賽(檢視)":
+    show_clean_view()

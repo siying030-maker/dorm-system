@@ -510,13 +510,6 @@ def show_makeup_rollcall():
     if df.empty:
         st.info("查無符合條件的補點名資料")
         return
-    
-    if st.button(
-        "重新整理補點名單",
-        key="refresh_makeup"
-    ):
-        load_makeup_data.clear()
-        st.rerun()
 
     show_cols = [
     c for c in [

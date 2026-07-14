@@ -34,7 +34,7 @@ SHEET_CACHE_TTL = 3600
 MAX_RETRIES = 6
 
 # 每次 API 請求最少間隔秒數
-MIN_REQUEST_INTERVAL = 0.45
+MIN_REQUEST_INTERVAL = 0.25
 
 
 # ==================================================

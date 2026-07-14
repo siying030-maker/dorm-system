@@ -409,8 +409,6 @@ def load_attendance_students(term, dorm, floor):
 
         for sheet_name in sheet_names:
 
-            time.sleep(0.05)
-
             df = read_worksheet_df(
                 ss,
                 sheet_name
@@ -593,7 +591,7 @@ def read_raw_sheet_df(ss, sheet_name):
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_special_status(term, attendance_date):
 
     empty_result = {
