@@ -245,29 +245,3 @@ selected_page = st.session_state.get(
     "selected_page",
     tab_names[0]
 )
-
-if selected_page == "點名系統":
-    show_attendance()
-
-elif selected_page == "補點名單":
-    show_makeup_rollcall()
-
-elif selected_page == "每日點名未到名單":
-    show_rollcall(mode="daily")
-
-elif selected_page == "獎懲查詢":
-    show_reward_punishment()
-
-elif selected_page == "上學期門禁":
-    upper_ss = open_sheet(UPPER_GATE_URL)
-    show_gate("上學期門禁", upper_ss, "upper_gate")
-
-elif selected_page == "下學期門禁":
-    lower_ss = open_sheet(LOWER_GATE_URL)
-    show_gate("下學期門禁", lower_ss, "lower_gate")
-
-elif selected_page == "整潔比賽":
-    show_clean()
-
-elif selected_page == "整潔比賽(檢視)":
-    show_clean_view()
