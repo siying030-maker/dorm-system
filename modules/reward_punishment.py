@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 
-from core.google_api import open_sheet
+from core.google_api import (
+    open_sheet,
+    get_worksheet,
+    get_all_values,
+)
 from core.config import (
     REWARD_UPPER_URL,
     REWARD_LOWER_URL,
@@ -39,9 +43,11 @@ def read_reward(url):
 
     try:
         ss = open_sheet(url)
-        get_worksheet(ss,TARGET_SHEET_NAME)
 
-        from core.google_api import get_all_values
+        ws = get_worksheet(
+            ss,
+            TARGET_SHEET_NAME
+        )
 
         values = get_all_values(ws)
 
@@ -78,7 +84,6 @@ def read_reward(url):
     except Exception as e:
         st.warning(f"讀取獎懲資料失敗：{e}")
         return pd.DataFrame()
-
 
 def show_reward_punishment():
 
