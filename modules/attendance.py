@@ -1222,10 +1222,10 @@ def show_attendance():
     # 重新讀取
     # ==================================================
 
-    if st.button(
-        "重新讀取點名名單",
-        key="refresh_attendance_students"
-    ):
+    #if st.button(
+        #"重新讀取點名名單",
+        #key="refresh_attendance_students"
+    #):
 
         load_attendance_students.clear()
         load_special_status.clear()
