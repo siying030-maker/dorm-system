@@ -370,75 +370,93 @@ def update_need_makeup_status_to_done(gender, target_row):
                 return
 
 
-def filter_by_leader_scope(df):
+def normalize_dorm(value):
+    return str(value).strip().replace("ㄧ", "一")
 
-    role = st.session_state.get("role", "")
 
-    if role != "樓長":
-        return df
+def split_dorms(value):
+    result = []
 
-    dorm = normalize_text(
-        st.session_state.get("dorm", "")
-    )
+    for item in str(value).replace("，", ",").split(","):
+        item = normalize_dorm(item)
 
-    manage_dorms = normalize_text(
-        st.session_state.get("manage_dorms", "")
-    )
+        if item:
+            result.append(item)
 
-    winter_dorms = normalize_text(
-        st.session_state.get("winter_dorms", "")
-    )
+    return list(dict.fromkeys(result))
 
-    summer_dorms = normalize_text(
-        st.session_state.get("summer_dorms", "")
-    )
 
-    allowed_keywords = []
+def filter_makeup_permission(df):
+    """依登入身分，只顯示有權限查看的宿舍補點資料。"""
 
-    for value in [
-        dorm,
-        manage_dorms,
-        winter_dorms,
-        summer_dorms,
-        "寒假",
-        "暑假"
-    ]:
-
-        for item in str(value).replace("，", ",").split(","):
-
-            item = item.strip()
-
-            if item:
-                allowed_keywords.append(item)
-
-    allowed_keywords = list(dict.fromkeys(allowed_keywords))
-
-    if not allowed_keywords:
+    if df.empty:
         return df
 
     if "宿舍" not in df.columns:
+        st.warning(
+            "補點名單缺少「宿舍」欄位，請先使用新版點名系統重新儲存缺席資料。"
+        )
+        return df.iloc[0:0].copy()
+
+    df = df.copy()
+    df["宿舍"] = df["宿舍"].astype(str).map(normalize_dorm)
+
+    role = str(st.session_state.get("role", "")).strip()
+
+    # 行政可查看全部宿舍。
+    if role == "行政":
         return df
 
-    condition = pd.Series(
-        False,
-        index=df.index
-    )
+    # 舍監依男女宿權限查看。
+    if role == "舍監":
+        supervisor_type = str(
+            st.session_state.get("supervisor_type", "")
+        ).strip()
 
-    for keyword in allowed_keywords:
-
-        condition = (
-            condition
-            |
-            df["宿舍"]
-            .astype(str)
-            .str.contains(
-                keyword,
-                na=False
-            )
+        login_gender = normalize_gender(
+            st.session_state.get("gender", "")
         )
 
-    return df[condition]
+        if not login_gender:
+            login_gender = normalize_gender(supervisor_type)
 
+        if login_gender == "男":
+            return df[df["宿舍"].str.startswith("男", na=False)].copy()
+
+        if login_gender == "女":
+            return df[df["宿舍"].str.startswith("女", na=False)].copy()
+
+        return df.iloc[0:0].copy()
+
+    # 樓長只看自己管理的宿舍。
+    if role == "樓長":
+        allowed_dorms = []
+
+        allowed_dorms.extend(
+            split_dorms(st.session_state.get("manage_dorms", ""))
+        )
+
+        allowed_dorms.extend(
+            split_dorms(st.session_state.get("dorm", ""))
+        )
+
+        # 寒暑假樓長使用寒暑假宿舍權限。
+        allowed_dorms.extend(
+            split_dorms(st.session_state.get("winter_dorms", ""))
+        )
+
+        allowed_dorms.extend(
+            split_dorms(st.session_state.get("summer_dorms", ""))
+        )
+
+        allowed_dorms = list(dict.fromkeys(allowed_dorms))
+
+        if not allowed_dorms:
+            return df.iloc[0:0].copy()
+
+        return df[df["宿舍"].isin(allowed_dorms)].copy()
+
+    return df.iloc[0:0].copy()
 
 def show_makeup_rollcall():
 
@@ -474,7 +492,7 @@ def show_makeup_rollcall():
         ignore_index=True
     )
 
-    df = filter_by_leader_scope(df)
+    df = filter_makeup_permission(df)
 
     keyword = st.text_input(
         "搜尋學號 / 姓名 / 房號",
@@ -512,16 +530,18 @@ def show_makeup_rollcall():
         return
 
     show_cols = [
-    c for c in [
-        "床位",
-        "學號",
-        "班級",
-        "姓名",
-        "狀態",
-        "備註"
+        c for c in [
+            "宿舍",
+            "床位",
+            "房號",
+            "學號",
+            "班級",
+            "姓名",
+            "狀態",
+            "備註",
+        ]
+        if c in df.columns
     ]
-    if c in df.columns
-]
 
     st.dataframe(
         df[show_cols],
@@ -589,4 +609,3 @@ def show_makeup_rollcall():
 
         except Exception as e:
             st.error(f"更新失敗：{e}")
-
