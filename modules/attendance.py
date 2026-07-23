@@ -463,11 +463,22 @@ def load_attendance_students(term, dorm, floor):
             temp["讀取Sheet"] = sheet_name
 
             # 假日點名只顯示境外生
+            # ==================================================
             if is_holiday_term(term):
-                temp = temp[
+
+                temp["本地/境外"] = (
                     temp["本地/境外"]
                     .astype(str)
-                    .str.contains("境外","其他", na=False)
+                    .str.strip()
+                )
+
+                temp = temp[
+                    temp["本地/境外"].isin(
+                        [
+                            "境外",
+                            "其他",
+                        ]
+                    )
                 ].copy()
 
             temp = temp[
