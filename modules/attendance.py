@@ -467,7 +467,7 @@ def load_attendance_students(term, dorm, floor):
                 temp = temp[
                     temp["本地/境外"]
                     .astype(str)
-                    .str.contains("境外", na=False)
+                    .str.contains("境外","其他", na=False)
                 ].copy()
 
             temp = temp[
