@@ -14,11 +14,6 @@ from core.config import (
     ROLLCALL_BOY_URL,
 )
 
-
-# ==================================================
-# 性別正規化
-# ==================================================
-
 def normalize_gender(value):
 
     value = str(value).strip()
@@ -192,10 +187,6 @@ def load_rollcall_data():
 
                     if "狀態" not in df.columns:
                         continue
-
-                    # ==================================
-                    # 只保留狀態為「缺」的學生
-                    # ==================================
 
                     df["狀態"] = (
                         df["狀態"]

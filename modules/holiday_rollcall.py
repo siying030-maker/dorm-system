@@ -16,9 +16,6 @@ from modules.attendance import (
 
 # ==================================================
 # 權限判斷
-# 行政：全部
-# 男舍監 / 男樓長：男生
-# 女舍監 / 女樓長：女生
 # ==================================================
 
 def get_allowed_dorms(term):
@@ -152,7 +149,7 @@ def load_holiday_students(term, allowed_dorms):
                     df[overseas_col]
                     .astype(str)
                     .str.strip()
-                    .str.contains("境外", na=False)
+                    .str.contains("境外","其他", na=False)
                 ].copy()
 
                 if temp_df.empty:
@@ -214,7 +211,7 @@ def load_holiday_students(term, allowed_dorms):
 
 
 # ==================================================
-# 特殊狀態：外宿 / 長期外宿 / 長期晚歸
+# 外宿 / 長期外宿 / 長期晚歸
 # ==================================================
 
 def add_special_status(df, term):
