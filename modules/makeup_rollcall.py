@@ -370,93 +370,88 @@ def update_need_makeup_status_to_done(gender, target_row):
                 return
 
 
-def normalize_dorm(value):
-    return str(value).strip().replace("ㄧ", "一")
+def filter_by_leader_scope(df):
 
-
-def split_dorms(value):
-    result = []
-
-    for item in str(value).replace("，", ",").split(","):
-        item = normalize_dorm(item)
-
-        if item:
-            result.append(item)
-
-    return list(dict.fromkeys(result))
-
-
-def filter_makeup_permission(df):
-    """依登入身分，只顯示有權限查看的宿舍補點資料。"""
+    role = str(st.session_state.get("role", "")).strip()
 
     if df.empty:
         return df
 
     if "宿舍" not in df.columns:
         st.warning(
-            "補點名單缺少「宿舍」欄位，請先使用新版點名系統重新儲存缺席資料。"
+            "目前補點資料沒有「宿舍」欄位，無法依宿舍權限篩選。"
+            "請使用新版點名系統重新儲存缺席資料。"
         )
         return df.iloc[0:0].copy()
 
-    df = df.copy()
-    df["宿舍"] = df["宿舍"].astype(str).map(normalize_dorm)
+    result = df.copy()
+    result["宿舍"] = (
+        result["宿舍"]
+        .astype(str)
+        .str.strip()
+        .str.replace("ㄧ", "一", regex=False)
+    )
 
-    role = str(st.session_state.get("role", "")).strip()
-
-    # 行政可查看全部宿舍。
+    # 行政：可查看全部宿舍
     if role == "行政":
-        return df
+        return result
 
-    # 舍監依男女宿權限查看。
+    # 舍監：依男舍監／女舍監篩選
     if role == "舍監":
         supervisor_type = str(
             st.session_state.get("supervisor_type", "")
         ).strip()
 
-        login_gender = normalize_gender(
-            st.session_state.get("gender", "")
-        )
+        login_gender = normalize_gender(supervisor_type)
 
         if not login_gender:
-            login_gender = normalize_gender(supervisor_type)
+            login_gender = get_login_gender()
 
         if login_gender == "男":
-            return df[df["宿舍"].str.startswith("男", na=False)].copy()
+            return result[
+                result["宿舍"].str.startswith("男", na=False)
+            ].copy()
 
         if login_gender == "女":
-            return df[df["宿舍"].str.startswith("女", na=False)].copy()
+            return result[
+                result["宿舍"].str.startswith("女", na=False)
+            ].copy()
 
-        return df.iloc[0:0].copy()
+        st.warning("無法判斷舍監管理的宿舍性別")
+        return result.iloc[0:0].copy()
 
-    # 樓長只看自己管理的宿舍。
+    # 樓長：只查看登入帳號被指派的宿舍
     if role == "樓長":
         allowed_dorms = []
 
-        allowed_dorms.extend(
-            split_dorms(st.session_state.get("manage_dorms", ""))
-        )
+        for state_key in [
+            "dorm",
+            "manage_dorms",
+            "winter_dorms",
+            "summer_dorms",
+        ]:
+            raw_value = st.session_state.get(state_key, "")
 
-        allowed_dorms.extend(
-            split_dorms(st.session_state.get("dorm", ""))
-        )
+            for item in str(raw_value).replace("，", ",").split(","):
+                item = item.strip().replace("ㄧ", "一")
 
-        # 寒暑假樓長使用寒暑假宿舍權限。
-        allowed_dorms.extend(
-            split_dorms(st.session_state.get("winter_dorms", ""))
-        )
-
-        allowed_dorms.extend(
-            split_dorms(st.session_state.get("summer_dorms", ""))
-        )
+                if item:
+                    allowed_dorms.append(item)
 
         allowed_dorms = list(dict.fromkeys(allowed_dorms))
 
         if not allowed_dorms:
-            return df.iloc[0:0].copy()
+            st.warning("目前帳號沒有設定可管理的宿舍")
+            return result.iloc[0:0].copy()
 
-        return df[df["宿舍"].isin(allowed_dorms)].copy()
+        return result[
+            result["宿舍"].isin(allowed_dorms)
+        ].copy()
 
-    return df.iloc[0:0].copy()
+    # 其他身分不顯示補點資料
+    st.warning("目前帳號沒有補點名單權限")
+    return result.iloc[0:0].copy()
+
 
 def show_makeup_rollcall():
 
@@ -492,7 +487,7 @@ def show_makeup_rollcall():
         ignore_index=True
     )
 
-    df = filter_makeup_permission(df)
+    df = filter_by_leader_scope(df)
 
     keyword = st.text_input(
         "搜尋學號 / 姓名 / 房號",
@@ -530,18 +525,16 @@ def show_makeup_rollcall():
         return
 
     show_cols = [
-        c for c in [
-            "宿舍",
-            "床位",
-            "房號",
-            "學號",
-            "班級",
-            "姓名",
-            "狀態",
-            "備註",
-        ]
-        if c in df.columns
+    c for c in [
+        "床位",
+        "學號",
+        "班級",
+        "姓名",
+        "狀態",
+        "備註"
     ]
+    if c in df.columns
+]
 
     st.dataframe(
         df[show_cols],
