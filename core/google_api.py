@@ -202,6 +202,42 @@ def retry_call(
     )
 
 
+
+
+# ==================================================
+# 全系統試算表同步
+# ==================================================
+
+def clear_sheet_data_cache() -> None:
+    """
+    清除所有 Streamlit 資料快取，讓點名、補點、門禁、
+    獎懲、整潔比賽等所有功能在試算表更新後重新讀取。
+    """
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+
+    try:
+        st.session_state["sheet_sync_revision"] = (
+            int(st.session_state.get("sheet_sync_revision", 0)) + 1
+        )
+        st.session_state["sheet_last_synced_at"] = time.time()
+    except Exception:
+        pass
+
+
+def sync_all_sheet_data() -> None:
+    """供畫面上的「同步最新試算表」按鈕使用。"""
+    clear_sheet_data_cache()
+
+
+def _after_sheet_write(result: Any) -> Any:
+    """任何 Google Sheet 寫入完成後，自動讓全系統資料失效重讀。"""
+    clear_sheet_data_cache()
+    return result
+
+
 # ==================================================
 # 取得 Google Client
 # ==================================================
@@ -416,7 +452,7 @@ def append_row(
     新增單筆資料。
     """
 
-    return retry_call(
+    result = retry_call(
         lambda: worksheet.append_row(
             row,
             value_input_option=(
@@ -426,6 +462,7 @@ def append_row(
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
 
 
 def append_rows(
@@ -439,7 +476,7 @@ def append_rows(
     if not rows:
         return None
 
-    return retry_call(
+    result = retry_call(
         lambda: worksheet.append_rows(
             rows,
             value_input_option=(
@@ -449,6 +486,7 @@ def append_rows(
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
 
 
 def update_cell(
@@ -461,7 +499,7 @@ def update_cell(
     更新單一儲存格。
     """
 
-    return retry_call(
+    result = retry_call(
         lambda: worksheet.update_cell(
             row,
             col,
@@ -470,6 +508,7 @@ def update_cell(
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
 
 
 def update_range(
@@ -481,7 +520,7 @@ def update_range(
     更新指定儲存格範圍。
     """
 
-    return retry_call(
+    result = retry_call(
         lambda: worksheet.update(
             range_name=range_name,
             values=values,
@@ -492,6 +531,7 @@ def update_range(
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
 
 
 # ==================================================
@@ -508,7 +548,7 @@ def add_worksheet(
     建立新的 Worksheet。
     """
 
-    return retry_call(
+    result = retry_call(
         lambda: spreadsheet.add_worksheet(
             title=title,
             rows=rows,
@@ -517,6 +557,7 @@ def add_worksheet(
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
 
 
 def reorder_worksheets(
@@ -527,10 +568,11 @@ def reorder_worksheets(
     重新排列 Worksheets。
     """
 
-    return retry_call(
+    result = retry_call(
         lambda: spreadsheet.reorder_worksheets(
             worksheets
         ),
         retries=MAX_RETRIES,
         base_wait=1.5,
     )
+    return _after_sheet_write(result)
