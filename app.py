@@ -2,7 +2,7 @@ import time
 import streamlit as st
 
 from core.session import init_session
-from core.google_api import open_sheet
+from core.google_api import open_sheet, sync_all_sheet_data
 from core.config import (
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
@@ -93,6 +93,39 @@ if st.button(
     key="logout_btn"
 ):
     st.session_state.clear()
+    st.rerun()
+
+
+# ==============================
+# 全系統試算表同步
+# ==============================
+
+if st.button(
+    "同步最新試算表",
+    key="sync_all_sheets_btn",
+    use_container_width=True,
+):
+    sync_all_sheet_data()
+
+    # 清除目前頁面暫存的已載入資料，避免畫面保留舊名單。
+    transient_keys = [
+        key for key in list(st.session_state.keys())
+        if key.startswith((
+            "attendance_",
+            "makeup_",
+            "rollcall_",
+            "gate_",
+            "reward_",
+            "clean_",
+            "holiday_",
+        ))
+        and key not in {"sheet_sync_revision"}
+    ]
+
+    for key in transient_keys:
+        st.session_state.pop(key, None)
+
+    st.success("所有功能已同步最新試算表資料。")
     st.rerun()
 
 
