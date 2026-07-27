@@ -232,6 +232,33 @@ def sync_all_sheet_data() -> None:
     clear_sheet_data_cache()
 
 
+def ensure_sheet_data_fresh(max_age_seconds: int = 10) -> bool:
+    """
+    在使用者操作或切換功能時，自動檢查資料快取年齡。
+
+    超過 max_age_seconds 就清除資料快取，下一次讀取會直接向
+    Google Sheets 取得最新內容。這能兼顧接近即時同步與 API 穩定性。
+    回傳 True 代表本次已清除快取。
+    """
+    now = time.time()
+    last_sync = float(st.session_state.get("sheet_auto_sync_at", 0) or 0)
+
+    if now - last_sync < max(1, int(max_age_seconds)):
+        return False
+
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+
+    st.session_state["sheet_auto_sync_at"] = now
+    st.session_state["sheet_last_synced_at"] = now
+    st.session_state["sheet_sync_revision"] = (
+        int(st.session_state.get("sheet_sync_revision", 0)) + 1
+    )
+    return True
+
+
 def _after_sheet_write(result: Any) -> Any:
     """任何 Google Sheet 寫入完成後，自動讓全系統資料失效重讀。"""
     clear_sheet_data_cache()

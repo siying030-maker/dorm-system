@@ -7,7 +7,11 @@ from core.session import (
     is_session_expired,
     logout_session,
 )
-from core.google_api import open_sheet, sync_all_sheet_data
+from core.google_api import (
+    open_sheet,
+    sync_all_sheet_data,
+    ensure_sheet_data_fresh,
+)
 from core.config import (
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
@@ -60,17 +64,21 @@ if not st.session_state.get("login", False):
 # ==============================
 
 # 完整頁面執行代表使用者有操作、重新整理或返回網頁。
-# 只有這裡會更新活動時間；下方的定時檢查不會延長登入。
+# 只有這裡會更新活動時間；下方 fragment 的背景檢查不會延長登入。
 mark_user_activity()
+
+# 每次使用者操作時，最多沿用 10 秒資料快取；之後自動讀取最新試算表。
+# 不會在每個元件重跑時都打 Google API，可避免 Streamlit Cloud 配額不穩。
+ensure_sheet_data_fresh(max_age_seconds=10)
 
 
 @st.fragment(run_every=15)
 def session_timeout_watcher():
-    """每 15 秒檢查一次，不需要使用者按任何按鈕。"""
+    """每 15 秒檢查登入是否已超過 30 分鐘未操作。"""
     if is_session_expired():
         logout_session()
         st.warning("已超過 30 分鐘未操作，系統已自動登出。")
-        st.rerun()
+        st.rerun(scope="app")
 
 
 session_timeout_watcher()

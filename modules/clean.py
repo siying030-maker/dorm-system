@@ -1,5 +1,6 @@
 import time
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -757,119 +758,137 @@ def save_clean_result(
 # 讀取目前整潔比賽設定
 # ==================================================
 
+def parse_clean_date(value):
+    """支援 Google 日期序號、datetime、2026/7/28、2026-07-28 等格式。"""
+    if value is None:
+        return pd.NaT
+
+    if isinstance(value, (pd.Timestamp, datetime, date)):
+        return pd.Timestamp(value)
+
+    text = str(value).strip()
+    if text == "":
+        return pd.NaT
+
+    # Google Sheets / Excel 日期序號
+    try:
+        number = float(text)
+        if 20000 <= number <= 60000:
+            return pd.Timestamp("1899-12-30") + pd.to_timedelta(number, unit="D")
+    except (TypeError, ValueError):
+        pass
+
+    # 民國年格式，例如 115/07/28 或 115-07-28
+    roc_match = pd.Series([text]).str.extract(
+        r"^\s*(\d{2,3})[年/\-.](\d{1,2})[月/\-.](\d{1,2})日?\s*$"
+    ).iloc[0]
+    if roc_match.notna().all():
+        year, month, day = map(int, roc_match.tolist())
+        if year < 1911:
+            year += 1911
+        try:
+            return pd.Timestamp(year=year, month=month, day=day)
+        except ValueError:
+            return pd.NaT
+
+    return pd.to_datetime(text, errors="coerce")
+
+
+def taiwan_today():
+    """使用台灣時區，避免 Streamlit Cloud 的 UTC 日期造成跨日誤判。"""
+    return datetime.now(ZoneInfo("Asia/Taipei")).date()
+
+
 @st.cache_data(
-    ttl=300,
+    ttl=10,
     show_spinner=False,
 )
 def get_current_clean_setting():
+    """
+    讀取目前可輸入的整潔比賽設定。
 
+    支援新版欄位：
+    A 學期、B 第幾次、C 整潔比賽日期、D 可輸入期間開始、E 可輸入期間結束
+
+    也保留舊版「可輸入期間」欄位，例如：2026/7/28 ~ 2026/8/6。
+    """
     try:
+        ss = open_sheet(CLEAN_RESULT_URL)
+        ws = get_worksheet(ss, "整潔比賽時間判斷")
 
-        ss = open_sheet(
-            CLEAN_RESULT_URL
-        )
-
-        ws = get_worksheet(
-            ss,
-            "整潔比賽時間判斷"
-        )
-
+        # 需讀到 E 欄，不能只讀 A:D。
         values = get_values(
             ws,
-            "A:D"
+            "A:E",
+            value_render_option="UNFORMATTED_VALUE",
         )
 
         if len(values) <= 1:
             return None
 
-        headers = build_unique_headers(
-            values[0]
-        )
+        headers = build_unique_headers(values[0])
+        width = len(headers)
+        rows = [list(row) + [""] * (width - len(row)) for row in values[1:]]
+        rows = [row[:width] for row in rows]
+        df = pd.DataFrame(rows, columns=headers)
+        df.columns = df.columns.astype(str).str.strip()
 
-        df = pd.DataFrame(
-            values[1:],
-            columns=headers
-        )
-
-        df.columns = (
-            df.columns
-            .astype(str)
-            .str.strip()
-        )
-
-        today = date.today()
+        today = taiwan_today()
 
         for _, row in df.iterrows():
+            start_raw = row.get("可輸入期間開始", "")
+            end_raw = row.get("可輸入期間結束", "")
 
-            period = str(
-                row.get(
-                    "可輸入期間",
-                    ""
+            start_date = parse_clean_date(start_raw)
+            end_date = parse_clean_date(end_raw)
+
+            # 向下相容舊版「可輸入期間」單欄位。
+            if pd.isna(start_date) or pd.isna(end_date):
+                period = str(row.get("可輸入期間", "")).strip()
+                normalized_period = (
+                    period.replace("～", "~")
+                    .replace("－", "~")
+                    .replace("—", "~")
                 )
-            ).strip()
+                if "~" in normalized_period:
+                    start_text, end_text = normalized_period.split("~", 1)
+                    start_date = parse_clean_date(start_text)
+                    end_date = parse_clean_date(end_text)
 
-            if "~" not in period:
+            if pd.isna(start_date) or pd.isna(end_date):
                 continue
 
-            start_text, end_text = (
-                period.split(
-                    "~",
-                    1
+            start_day = start_date.date()
+            end_day = end_date.date()
+
+            # 若試算表不小心把開始、結束填反，自動交換。
+            if start_day > end_day:
+                start_day, end_day = end_day, start_day
+
+            if start_day <= today <= end_day:
+                contest_date = parse_clean_date(row.get("整潔比賽日期", ""))
+                contest_date_text = (
+                    contest_date.strftime("%Y/%m/%d")
+                    if not pd.isna(contest_date)
+                    else str(row.get("整潔比賽日期", "")).strip()
                 )
-            )
-
-            start_date = pd.to_datetime(
-                start_text.strip(),
-                errors="coerce"
-            )
-
-            end_date = pd.to_datetime(
-                end_text.strip(),
-                errors="coerce"
-            )
-
-            if (
-                pd.isna(start_date)
-                or pd.isna(end_date)
-            ):
-                continue
-
-            if (
-                start_date.date()
-                <= today
-                <= end_date.date()
-            ):
 
                 return {
-                    "學期": str(
-                        row.get(
-                            "學期",
-                            ""
-                        )
-                    ).strip(),
-                    "第幾次": str(
-                        row.get(
-                            "第幾次",
-                            ""
-                        )
-                    ).strip(),
-                    "整潔比賽日期": str(
-                        row.get(
-                            "整潔比賽日期",
-                            ""
-                        )
-                    ).strip(),
-                    "可輸入期間": period,
+                    "學期": str(row.get("學期", "")).strip(),
+                    "第幾次": str(row.get("第幾次", "")).strip(),
+                    "整潔比賽日期": contest_date_text,
+                    "可輸入期間": (
+                        f"{start_day.strftime('%Y/%m/%d')} ~ "
+                        f"{end_day.strftime('%Y/%m/%d')}"
+                    ),
+                    "可輸入期間開始": start_day.isoformat(),
+                    "可輸入期間結束": end_day.isoformat(),
                 }
 
         return None
 
     except Exception as error:
-
-        st.warning(
-            f"讀取整潔比賽判斷失敗：{error}"
-        )
-
+        st.warning(f"讀取整潔比賽判斷失敗：{error}")
         return None
 
 
