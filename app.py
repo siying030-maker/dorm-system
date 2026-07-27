@@ -1,7 +1,12 @@
-import time
 import streamlit as st
 
-from core.session import init_session
+from core.session import (
+    init_session,
+    restore_login_session,
+    mark_user_activity,
+    is_session_expired,
+    logout_session,
+)
 from core.google_api import open_sheet, sync_all_sheet_data
 from core.config import (
     ROLLCALL_GIRL_URL,
@@ -34,35 +39,11 @@ st.title("宿舍管理系統")
 
 
 # ==============================
-# 初始化登入狀態
+# 初始化與恢復登入狀態
 # ==============================
 
 init_session()
-
-
-# ==============================
-# 25 分鐘未操作自動登出
-# ==============================
-
-TIMEOUT_SECONDS = 25 * 60
-now = time.time()
-
-if "last_active_time" not in st.session_state:
-    st.session_state["last_active_time"] = now
-
-if st.session_state.get("login", False):
-
-    last_active_time = st.session_state.get(
-        "last_active_time",
-        now
-    )
-
-    if now - last_active_time > TIMEOUT_SECONDS:
-        st.session_state.clear()
-        st.warning("已超過 25 分鐘未操作，系統已自動登出。")
-        st.rerun()
-
-    st.session_state["last_active_time"] = now
+restore_login_session()
 
 
 # ==============================
@@ -72,6 +53,27 @@ if st.session_state.get("login", False):
 if not st.session_state.get("login", False):
     login_page()
     st.stop()
+
+
+# ==============================
+# 30 分鐘未操作自動登出
+# ==============================
+
+# 完整頁面執行代表使用者有操作、重新整理或返回網頁。
+# 只有這裡會更新活動時間；下方的定時檢查不會延長登入。
+mark_user_activity()
+
+
+@st.fragment(run_every=15)
+def session_timeout_watcher():
+    """每 15 秒檢查一次，不需要使用者按任何按鈕。"""
+    if is_session_expired():
+        logout_session()
+        st.warning("已超過 30 分鐘未操作，系統已自動登出。")
+        st.rerun()
+
+
+session_timeout_watcher()
 
 
 # ==============================
@@ -92,7 +94,7 @@ if st.button(
     "登出",
     key="logout_btn"
 ):
-    st.session_state.clear()
+    logout_session()
     st.rerun()
 
 
