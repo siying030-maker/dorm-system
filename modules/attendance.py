@@ -472,13 +472,10 @@ def load_attendance_students(term, dorm, floor):
                     .str.strip()
                 )
 
+                # 假日點名顯示所有非「本地」學生，
+                # 新增國籍或其他分類時不需要再修改程式。
                 temp = temp[
-                    temp["本地/境外"].isin(
-                        [
-                            "境外",
-                            "其他",
-                        ]
-                    )
+                    temp["本地/境外"] != "本地"
                 ].copy()
 
             temp = temp[

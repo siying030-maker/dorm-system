@@ -293,10 +293,11 @@ def update_rollcall_status_to_makeup(gender, target_row):
 
             if date_col is None or row_date == rollcall_date:
 
-                ws.update_cell(
+                update_cell(
+                    ws,
                     row_index,
                     status_col,
-                    "已補點"
+                    "已補點",
                 )
 
                 return True
