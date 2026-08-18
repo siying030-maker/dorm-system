@@ -13,6 +13,10 @@ from core.config import (
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
+    UPPER_SHORT_STAY_URL,
+    LOWER_SHORT_STAY_URL,
+    WINTER_SHORT_STAY_URL,
+    SUMMER_SHORT_STAY_URL,
 )
 
 from core.google_api import (
@@ -527,6 +531,106 @@ def load_attendance_students(term, dorm, floor):
     
 
     
+# ==================================================
+# 短期住宿
+# ==================================================
+
+def get_short_stay_url(term):
+    """依點名類型取得短期住宿試算表網址。"""
+
+    if term in ["上學期", "上學期假日"]:
+        return UPPER_SHORT_STAY_URL
+
+    if term in ["下學期", "下學期假日"]:
+        return LOWER_SHORT_STAY_URL
+
+    if term == "寒假":
+        return WINTER_SHORT_STAY_URL
+
+    if term == "暑假":
+        return SUMMER_SHORT_STAY_URL
+
+    return ""
+
+
+def format_short_stay_date(value):
+    """將 Google Sheet 日期轉成 YYYY.MM.DD 顯示。"""
+
+    parsed = parse_sheet_date(value)
+
+    if pd.isna(parsed):
+        text = str(value).strip()
+        return text
+
+    return parsed.strftime("%Y.%m.%d")
+
+
+@st.cache_data(ttl=10, show_spinner=False)
+def load_short_stay_map(term, dorm):
+    """
+    讀取對應學期/寒暑假的短期住宿表。
+
+    試算表每個宿舍一個工作表，欄位：
+    房號、床位、姓名、離開日期
+
+    回傳：{床位: 離開日期}
+    """
+
+    result = {}
+    url = get_short_stay_url(term)
+
+    if not url:
+        return result
+
+    dorm = normalize_dorm(dorm)
+
+    try:
+        ss = open_sheet(url)
+        worksheets = get_worksheets(ss)
+
+        target_ws = None
+
+        for ws in worksheets:
+            if normalize_dorm(ws.title) == dorm:
+                target_ws = ws
+                break
+
+        if target_ws is None:
+            return result
+
+        values = get_all_values(
+            target_ws,
+            value_render_option="UNFORMATTED_VALUE",
+        )
+
+        if len(values) <= 1:
+            return result
+
+        headers = [str(x).strip() for x in values[0]]
+        header_map = {name: index for index, name in enumerate(headers)}
+
+        bed_index = header_map.get("床位")
+        date_index = header_map.get("離開日期")
+
+        if bed_index is None or date_index is None:
+            return result
+
+        for row in values[1:]:
+            if len(row) <= max(bed_index, date_index):
+                continue
+
+            bed = normalize_value(row[bed_index])
+            leave_date = format_short_stay_date(row[date_index])
+
+            if bed and leave_date:
+                result[bed] = leave_date
+
+    except Exception as error:
+        st.warning(f"讀取{term}短期住宿資料失敗：{error}")
+
+    return result
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def load_unpaid_ids():
     try:
@@ -1228,6 +1332,7 @@ def show_attendance():
         load_attendance_students.clear()
         load_special_status.clear()
         load_unpaid_ids.clear()
+        load_short_stay_map.clear()
 
         st.session_state.pop(
             "attendance_students",
@@ -1556,6 +1661,12 @@ def show_attendance():
         set()
     )
 
+    # 短期住宿：以床位比對並顯示離開日期
+    short_stay_map = load_short_stay_map(
+        term,
+        dorm
+    )
+
     # ==================================================
     # 點名畫面
     # ==================================================
@@ -1568,7 +1679,8 @@ def show_attendance():
         "紫色：外宿申請　"
         "藍色：長期外宿　"
         "黃色：長期晚歸　"
-        "紅色：未繳費"
+        "紅色：未繳費　"
+        "橘色日期：短期住宿離開日期"
     )
 
     st.success(
@@ -1585,6 +1697,15 @@ def show_attendance():
 
         sid = normalize_value(
             row.get("學號", "")
+        )
+
+        bed = normalize_value(
+            row.get("床位", "")
+        )
+
+        short_stay_date = short_stay_map.get(
+            bed,
+            ""
         )
 
         is_unpaid = sid in unpaid_ids
@@ -1637,6 +1758,16 @@ def show_attendance():
                 "<span style='color:#D32F2F;"
                 "font-size:18px;font-weight:700;'>"
                 "未繳費"
+                "</span>",
+                unsafe_allow_html=True
+            )
+
+        # 短期住宿：只顯示離開日期，日期文字為橘色
+        if short_stay_date:
+            st.markdown(
+                "<span style='color:#F57C00;"
+                "font-size:18px;font-weight:700;'>"
+                f"{short_stay_date}"
                 "</span>",
                 unsafe_allow_html=True
             )
