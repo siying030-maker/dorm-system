@@ -5,8 +5,6 @@ from core.config import ANNOUNCEMENT_URL
 from core.google_api import (
     open_sheet,
     get_all_values,
-    append_row,
-    update_cell,
 )
 
 
@@ -33,65 +31,40 @@ def load_announcements():
         )
 
         if len(values) <= 1:
-            return pd.DataFrame()
+            return []
 
         headers = [
-            str(x).strip()
-            for x in values[0]
+            str(value).strip()
+            for value in values[0]
         ]
 
-        df = pd.DataFrame(
-            values[1:],
-            columns=headers
-        )
-
-        df.columns = (
-            df.columns
-            .astype(str)
-            .str.strip()
-        )
-
-        # 只顯示啟用公告
-        if "啟用" in df.columns:
-
-            df["啟用"] = (
-                df["啟用"]
-                .astype(str)
-                .str.strip()
+        if "內容" not in headers:
+            st.warning(
+                "公告試算表必須有「內容」欄位"
             )
+            return []
 
-            df = df[
-                df["啟用"].isin(
-                    [
-                        "是",
-                        "TRUE",
-                        "True",
-                        "true",
-                        "1",
-                    ]
+        content_index = headers.index(
+            "內容"
+        )
+
+        announcements = []
+
+        for row in values[1:]:
+
+            if len(row) <= content_index:
+                continue
+
+            content = str(
+                row[content_index]
+            ).strip()
+
+            if content:
+                announcements.append(
+                    content
                 )
-            ]
 
-        # 日期排序
-        if "日期" in df.columns:
-
-            df["_排序日期"] = pd.to_datetime(
-                df["日期"],
-                errors="coerce"
-            )
-
-            df = df.sort_values(
-                "_排序日期",
-                ascending=False
-            )
-
-            df = df.drop(
-                columns=["_排序日期"]
-            )
-
-        return df.reset_index(
-            drop=True
-        )
+        return announcements
 
     except Exception as error:
 
@@ -99,40 +72,11 @@ def load_announcements():
             f"讀取公告失敗：{error}"
         )
 
-        return pd.DataFrame()
+        return []
 
 
 # ==================================================
-# 新增公告
-# ==================================================
-
-def add_announcement(
-    date_value,
-    title,
-    content
-):
-
-    ss = open_sheet(
-        ANNOUNCEMENT_URL
-    )
-
-    ws = ss.get_worksheet(0)
-
-    append_row(
-        ws,
-        [
-            str(date_value),
-            title,
-            content,
-            "是",
-        ]
-    )
-
-    load_announcements.clear()
-
-
-# ==================================================
-# 公告畫面
+# 顯示公告
 # ==================================================
 
 def show_announcement():
@@ -142,129 +86,26 @@ def show_announcement():
         ""
     )
 
-    st.subheader(
-        "📢 最新公告"
-    )
-
-    df = load_announcements()
-
-    # ==================================================
-    # 行政新增公告
-    # ==================================================
-
-    if role == "行政":
-
-        with st.expander(
-            "＋ 新增公告"
-        ):
-
-            announcement_date = st.date_input(
-                "公告日期",
-                key="announcement_date"
-            )
-
-            title = st.text_input(
-                "公告標題",
-                key="announcement_title"
-            )
-
-            content = st.text_area(
-                "公告內容",
-                key="announcement_content"
-            )
-
-            if st.button(
-                "發布公告",
-                key="save_announcement"
-            ):
-
-                if not title.strip():
-
-                    st.warning(
-                        "請輸入公告標題"
-                    )
-
-                elif not content.strip():
-
-                    st.warning(
-                        "請輸入公告內容"
-                    )
-
-                else:
-
-                    try:
-
-                        add_announcement(
-                            announcement_date,
-                            title.strip(),
-                            content.strip()
-                        )
-
-                        st.success(
-                            "公告已發布"
-                        )
-
-                        st.rerun()
-
-                    except Exception as error:
-
-                        st.error(
-                            f"公告發布失敗：{error}"
-                        )
-
-    # ==================================================
-    # 顯示公告
-    # ==================================================
-
-    if df.empty:
-
-        st.info(
-            "目前沒有公告"
-        )
-
+    # 目前只讓樓長、行政看到
+    if role not in [
+        "樓長",
+        "行政",
+    ]:
         return
 
-    for _, row in df.iterrows():
+    announcements = (
+        load_announcements()
+    )
 
-        date_text = str(
-            row.get(
-                "日期",
-                ""
-            )
-        ).strip()
+    if not announcements:
+        return
 
-        title = str(
-            row.get(
-                "標題",
-                ""
-            )
-        ).strip()
+    st.subheader(
+        "📢 公告"
+    )
 
-        content = str(
-            row.get(
-                "內容",
-                ""
-            )
-        ).strip()
+    for content in announcements:
 
-        with st.container(
-            border=True
-        ):
-
-            if date_text:
-
-                st.caption(
-                    date_text
-                )
-
-            if title:
-
-                st.markdown(
-                    f"### {title}"
-                )
-
-            if content:
-
-                st.write(
-                    content
-                )
+        st.info(
+            content
+        )
