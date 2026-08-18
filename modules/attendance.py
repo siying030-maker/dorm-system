@@ -13,8 +13,12 @@ from core.config import (
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
-)
 
+    UPPER_SHORT_STAY_URL,
+    LOWER_SHORT_STAY_URL,
+    WINTER_SHORT_STAY_URL,
+    SUMMER_SHORT_STAY_URL,
+)
 from core.google_api import (
     open_sheet,
     get_worksheet,
@@ -1116,6 +1120,258 @@ def parse_sheet_date(value):
         errors="coerce"
     )
 
+# ==================================================
+# 短期住宿
+# ==================================================
+
+def get_short_stay_url(term):
+
+    if term in ["上學期", "上學期假日"]:
+        return UPPER_SHORT_STAY_URL
+
+    if term in ["下學期", "下學期假日"]:
+        return LOWER_SHORT_STAY_URL
+
+    if term == "寒假":
+        return WINTER_SHORT_STAY_URL
+
+    if term == "暑假":
+        return SUMMER_SHORT_STAY_URL
+
+    return ""
+
+
+def find_short_stay_header_index(values):
+
+    for index, row in enumerate(values[:10]):
+
+        row_text = "|".join(
+            str(value).strip()
+            for value in row
+        )
+
+        if (
+            "離開日期" in row_text
+            and (
+                "房號" in row_text
+                or "床位" in row_text
+                or "姓名" in row_text
+            )
+        ):
+            return index
+
+    return 0
+
+
+@st.cache_data(
+    ttl=10,
+    show_spinner=False
+)
+def load_short_stay(
+    term,
+    attendance_date
+):
+
+    result = {
+        "by_room": {},
+        "by_bed": {},
+        "by_name": {},
+    }
+
+    url = get_short_stay_url(
+        term
+    )
+
+    if not url:
+        return result
+
+    try:
+
+        ss = open_sheet(
+            url
+        )
+
+        worksheets = get_worksheets(
+            ss
+        )
+
+        target_date = pd.to_datetime(
+            attendance_date
+        ).date()
+
+        for ws in worksheets:
+
+            values = get_all_values(
+                ws,
+                value_render_option="UNFORMATTED_VALUE"
+            )
+
+            if not values:
+                continue
+
+            header_index = (
+                find_short_stay_header_index(
+                    values
+                )
+            )
+
+            if len(values) <= header_index + 1:
+                continue
+
+            headers = build_unique_headers(
+                values[header_index]
+            )
+
+            df = pd.DataFrame(
+                values[
+                    header_index + 1:
+                ],
+                columns=headers
+            )
+
+            df.columns = (
+                df.columns
+                .astype(str)
+                .str.strip()
+            )
+
+            room_col = find_col(
+                df,
+                ["房號"]
+            )
+
+            bed_col = find_col(
+                df,
+                ["床位"]
+            )
+
+            name_col = find_col(
+                df,
+                [
+                    "姓名",
+                    "名字",
+                ]
+            )
+
+            leave_col = find_col(
+                df,
+                [
+                    "離開日期",
+                    "離宿日期",
+                    "離開日",
+                ]
+            )
+
+            if leave_col is None:
+                continue
+
+            for _, row in df.iterrows():
+
+                leave_ts = parse_sheet_date(
+                    row.get(
+                        leave_col,
+                        ""
+                    )
+                )
+
+                if pd.isna(
+                    leave_ts
+                ):
+                    continue
+
+                leave_date = (
+                    leave_ts.date()
+                )
+
+                # ======================================
+                # 例如離開日 2026/08/20
+                #
+                # 8/18 ✅
+                # 8/19 ✅
+                # 8/20 ✅
+                # 8/21 ❌
+                # ======================================
+
+                if target_date > leave_date:
+                    continue
+
+                display_date = (
+                    leave_date.strftime(
+                        "%Y.%m.%d"
+                    )
+                )
+
+                room = ""
+                bed = ""
+                name = ""
+
+                # 房號
+                if room_col is not None:
+
+                    room = normalize_value(
+                        row.get(
+                            room_col,
+                            ""
+                        )
+                    )
+
+                # 床位
+                if bed_col is not None:
+
+                    bed = normalize_value(
+                        row.get(
+                            bed_col,
+                            ""
+                        )
+                    )
+
+                # 如果沒有房號
+                # 由 81701-4 取得 81701
+                if not room and bed:
+
+                    room = (
+                        str(bed)
+                        .split("-")[0]
+                        .strip()
+                    )
+
+                # 姓名
+                if name_col is not None:
+
+                    name = str(
+                        row.get(
+                            name_col,
+                            ""
+                        )
+                    ).strip()
+
+                if room:
+
+                    result[
+                        "by_room"
+                    ][room] = display_date
+
+                if bed:
+
+                    result[
+                        "by_bed"
+                    ][bed] = display_date
+
+                if name:
+
+                    result[
+                        "by_name"
+                    ][name] = display_date
+
+        return result
+
+    except Exception as error:
+
+        st.warning(
+            f"讀取短期住宿資料失敗：{error}"
+        )
+
+        return result
 
 def show_attendance():
 
@@ -1273,6 +1529,12 @@ def show_attendance():
         }
 
         loaded_unpaid_ids = set()
+        
+        loaded_short_stay = {
+            "by_room": {},
+            "by_bed": {},
+            "by_name": {},
+        }
 
         try:
 
@@ -1293,7 +1555,16 @@ def show_attendance():
 
                 loaded_unpaid_ids = load_unpaid_ids()
 
+                loaded_short_stay = load_short_stay(
+                    term,
+                    attendance_date
+                )
+
             # 寫入 session_state
+
+            st.session_state[
+                "attendance_short_stay"
+            ] = loaded_short_stay
             st.session_state[
                 "attendance_students"
             ] = loaded_students
@@ -1377,6 +1648,15 @@ def show_attendance():
         "attendance_unpaid_ids",
         set()
     )
+
+    short_stay_data = st.session_state.get(
+    "attendance_short_stay",
+    {
+        "by_room": {},
+        "by_bed": {},
+        "by_name": {},
+    }
+)
 
     loaded_context = st.session_state.get(
         "attendance_loaded_context",
@@ -1595,6 +1875,81 @@ def show_attendance():
         is_long_leave = sid in long_leave_ids
         is_late = sid in late_ids
 
+        current_bed = normalize_value(
+            row.get(
+                "床位",
+                ""
+            )
+        )
+
+        current_room = normalize_value(
+            row.get(
+                "房號",
+                ""
+            )
+        )
+
+        if not current_room and current_bed:
+
+            current_room = (
+                str(current_bed)
+                .split("-")[0]
+                .strip()
+            )
+
+        current_name = str(
+            row.get(
+                "姓名",
+                ""
+            )
+        ).strip()
+
+
+        # 先用床位
+        short_stay_date = (
+            short_stay_data
+            .get(
+                "by_bed",
+                {}
+            )
+            .get(
+                current_bed,
+                ""
+            )
+        )
+
+
+        # 床位不同 → 用房號
+        if not short_stay_date:
+
+            short_stay_date = (
+                short_stay_data
+                .get(
+                    "by_room",
+                    {}
+                )
+                .get(
+                    current_room,
+                    ""
+                )
+            )
+
+
+        # 房號也不同 → 用姓名
+        if not short_stay_date:
+
+            short_stay_date = (
+                short_stay_data
+                .get(
+                    "by_name",
+                    {}
+                )
+                .get(
+                    current_name,
+                    ""
+                )
+            )
+
         default_status = "在"
 
         # 先顯示床位、學號、姓名
@@ -1640,6 +1995,17 @@ def show_attendance():
                 "<span style='color:#D32F2F;"
                 "font-size:18px;font-weight:700;'>"
                 "未繳費"
+                "</span>",
+                unsafe_allow_html=True
+            )
+            # 短期住宿離開日期
+        if short_stay_date:
+
+            st.markdown(
+                "<span style='color:#F57C00;"
+                "font-size:18px;"
+                "font-weight:700;'>"
+                f"{short_stay_date}"
                 "</span>",
                 unsafe_allow_html=True
             )
