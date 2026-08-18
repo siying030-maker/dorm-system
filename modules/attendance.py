@@ -1,7 +1,6 @@
 import time
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
 from datetime import date
 
 from core.config import (
@@ -14,10 +13,6 @@ from core.config import (
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
-    UPPER_SHORT_STAY_URL,
-    LOWER_SHORT_STAY_URL,
-    WINTER_SHORT_STAY_URL,
-    SUMMER_SHORT_STAY_URL,
 )
 
 from core.google_api import (
@@ -1122,107 +1117,6 @@ def parse_sheet_date(value):
     )
 
 
-
-# ==================================================
-# 短期住宿
-# ==================================================
-
-def get_short_stay_url(term):
-    if term in ["上學期", "上學期假日"]:
-        return UPPER_SHORT_STAY_URL
-    if term in ["下學期", "下學期假日"]:
-        return LOWER_SHORT_STAY_URL
-    if term == "寒假":
-        return WINTER_SHORT_STAY_URL
-    if term == "暑假":
-        return SUMMER_SHORT_STAY_URL
-    return ""
-
-
-@st.cache_data(ttl=10, show_spinner=False)
-def load_short_stay(term, attendance_date):
-    """
-    讀取短期住宿。
-    點名日期 <= 離開日期 時顯示。
-    先以宿舍+床位比對，床位不同時再以宿舍+姓名比對。
-    """
-    result = {
-        "by_bed": {},
-        "by_name": {},
-    }
-
-    url = get_short_stay_url(term)
-    if not url:
-        return result
-
-    try:
-        ss = open_sheet(url)
-        worksheets = get_worksheets(ss)
-        target_date = pd.to_datetime(attendance_date).date()
-
-        for ws in worksheets:
-            dorm = normalize_dorm(ws.title)
-
-            values = get_all_values(
-                ws,
-                value_render_option="UNFORMATTED_VALUE",
-            )
-
-            if len(values) <= 1:
-                continue
-
-            headers = build_unique_headers(values[0])
-            df = pd.DataFrame(values[1:], columns=headers)
-
-            df.columns = (
-                df.columns
-                .astype(str)
-                .str.strip()
-            )
-
-            bed_col = find_col(df, ["床位"])
-            name_col = find_col(df, ["姓名", "名字"])
-            leave_date_col = find_col(
-                df,
-                ["離開日期", "離宿日期", "離開日"]
-            )
-
-            if leave_date_col is None:
-                continue
-
-            for _, row in df.iterrows():
-                leave_ts = parse_sheet_date(
-                    row.get(leave_date_col, "")
-                )
-
-                if pd.isna(leave_ts):
-                    continue
-
-                leave_date = leave_ts.date()
-
-                # 離開日期當天仍顯示；隔天開始不顯示
-                if target_date > leave_date:
-                    continue
-
-                display_date = leave_date.strftime("%Y.%m.%d")
-
-                if bed_col is not None:
-                    bed = normalize_value(row.get(bed_col, ""))
-                    if bed:
-                        result["by_bed"][(dorm, bed)] = display_date
-
-                if name_col is not None:
-                    name = str(row.get(name_col, "")).strip()
-                    if name:
-                        result["by_name"][(dorm, name)] = display_date
-
-        return result
-
-    except Exception as error:
-        st.warning(f"讀取短期住宿資料失敗：{error}")
-        return result
-
-
 def show_attendance():
 
     st.header("點名系統")
@@ -1337,7 +1231,6 @@ def show_attendance():
         load_attendance_students.clear()
         load_special_status.clear()
         load_unpaid_ids.clear()
-        load_short_stay.clear()
 
         st.session_state.pop(
             "attendance_students",
@@ -1351,11 +1244,6 @@ def show_attendance():
 
         st.session_state.pop(
             "attendance_unpaid_ids",
-            None
-        )
-
-        st.session_state.pop(
-            "attendance_short_stay",
             None
         )
 
@@ -1385,10 +1273,6 @@ def show_attendance():
         }
 
         loaded_unpaid_ids = set()
-        loaded_short_stay = {
-            "by_bed": {},
-            "by_name": {},
-        }
 
         try:
 
@@ -1409,11 +1293,6 @@ def show_attendance():
 
                 loaded_unpaid_ids = load_unpaid_ids()
 
-                loaded_short_stay = load_short_stay(
-                    term,
-                    attendance_date
-                )
-
             # 寫入 session_state
             st.session_state[
                 "attendance_students"
@@ -1426,10 +1305,6 @@ def show_attendance():
             st.session_state[
                 "attendance_unpaid_ids"
             ] = loaded_unpaid_ids
-
-            st.session_state[
-                "attendance_short_stay"
-            ] = loaded_short_stay
 
             st.session_state[
                 "attendance_loaded_context"
@@ -1470,13 +1345,6 @@ def show_attendance():
                 "attendance_unpaid_ids"
             ] = set()
 
-            st.session_state[
-                "attendance_short_stay"
-            ] = {
-                "by_bed": {},
-                "by_name": {},
-            }
-
             st.session_state.pop(
                 "attendance_loaded_context",
                 None
@@ -1510,14 +1378,6 @@ def show_attendance():
         set()
     )
 
-    short_stay_data = st.session_state.get(
-        "attendance_short_stay",
-        {
-            "by_bed": {},
-            "by_name": {},
-        }
-    )
-
     loaded_context = st.session_state.get(
         "attendance_loaded_context",
         {}
@@ -1548,12 +1408,6 @@ def show_attendance():
         set
     ):
         unpaid_ids = set(unpaid_ids)
-
-    if not isinstance(short_stay_data, dict):
-        short_stay_data = {
-            "by_bed": {},
-            "by_name": {},
-        }
 
     # ==================================================
     # 尚未載入時不繼續顯示
@@ -1717,8 +1571,7 @@ def show_attendance():
         "紫色：外宿申請　"
         "藍色：長期外宿　"
         "黃色：長期晚歸　"
-        "紅色：未繳費　"
-        "橘色日期：短期住宿離開日期"
+        "紅色：未繳費"
     )
 
     st.success(
@@ -1741,23 +1594,6 @@ def show_attendance():
         is_leave = sid in leave_ids
         is_long_leave = sid in long_leave_ids
         is_late = sid in late_ids
-
-        bed = normalize_value(row.get("床位", ""))
-        student_name = str(row.get("姓名", "")).strip()
-
-        short_stay_date = (
-            short_stay_data
-            .get("by_bed", {})
-            .get((normalize_dorm(dorm), bed), "")
-        )
-
-        # 床位不同時，再以同宿舍姓名比對
-        if not short_stay_date:
-            short_stay_date = (
-                short_stay_data
-                .get("by_name", {})
-                .get((normalize_dorm(dorm), student_name), "")
-            )
 
         default_status = "在"
 
@@ -1806,12 +1642,6 @@ def show_attendance():
                 "未繳費"
                 "</span>",
                 unsafe_allow_html=True
-            )
-
-        # 短期住宿離開日期：只顯示日期、橘色
-        if short_stay_date:
-            st.markdown(
-                f":orange[**{short_stay_date}**]"
             )
 
         status_options = [
@@ -1923,33 +1753,3 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
-
-    # ==================================================
-    # 回到最上面
-    # ==================================================
-    st.divider()
-
-    components.html(
-        """
-        <div style="text-align:center; margin-top:4px;">
-            <button
-                onclick="window.parent.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });"
-                style="
-                    width:100%;
-                    height:46px;
-                    border:1px solid #d9d9d9;
-                    border-radius:8px;
-                    background:white;
-                    font-size:16px;
-                    cursor:pointer;
-                "
-            >
-                ⬆️ 回到最上面
-            </button>
-        </div>
-        """,
-        height=62,
-    )
