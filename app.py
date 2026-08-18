@@ -28,6 +28,7 @@ from modules.attendance import show_attendance
 from modules.makeup_rollcall import show_makeup_rollcall
 from modules.reward_punishment import show_reward_punishment
 from modules.holiday_rollcall import show_holiday_rollcall
+from modules.room_password import show_room_password
 
 
 # ==============================
@@ -128,6 +129,7 @@ if st.button(
             "reward_",
             "clean_",
             "holiday_",
+            "room_password_",
         ))
         and key not in {"sheet_sync_revision"}
     ]
@@ -256,3 +258,7 @@ elif selected_page == "上學期假日點名單":
 elif selected_page == "下學期假日點名單":
     show_holiday_rollcall("下學期")
 
+
+
+elif selected_page == "密碼表":
+    show_room_password()
