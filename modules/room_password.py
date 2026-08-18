@@ -1,19 +1,36 @@
 import pandas as pd
 import streamlit as st
 
-from core.config import UPPER_ROOM_PASSWORD
+from core.config import (
+    UPPER_ROOM_PASSWORD,
+    LOWER_ROOM_PASSWORD,
+    WINTER_ROOM_PASSWORD,
+    SUMMER_ROOM_PASSWORD,
+)
+
 from core.google_api import (
     open_sheet,
     get_worksheets,
     get_all_values,
     append_row,
     update_cell,
-    clear_sheet_data_cache,
 )
 
 
 # ==================================================
-# 宿舍設定
+# 密碼表試算表設定
+# ==================================================
+
+PASSWORD_SHEETS = {
+    "上學期": UPPER_ROOM_PASSWORD,
+    "下學期": LOWER_ROOM_PASSWORD,
+    "寒假": WINTER_ROOM_PASSWORD,
+    "暑假": SUMMER_ROOM_PASSWORD,
+}
+
+
+# ==================================================
+# 宿舍房號前綴
 # ==================================================
 
 DORM_ROOM_PREFIX = {
@@ -23,6 +40,7 @@ DORM_ROOM_PREFIX = {
     "男一": "82",
     "男三": "83",
 }
+
 
 ALL_DORMS = [
     "女一",
@@ -34,10 +52,15 @@ ALL_DORMS = [
 
 
 # ==================================================
-# 文字整理
+# 基本文字整理
 # ==================================================
 
 def normalize_dorm(value):
+    """
+    統一宿舍名稱，例如：
+    女ㄧ → 女一
+    女一空白 → 女一
+    """
 
     return (
         str(value)
@@ -49,6 +72,9 @@ def normalize_dorm(value):
 
 
 def normalize_room(value):
+    """
+    統一房號格式。
+    """
 
     value = (
         str(value)
@@ -71,6 +97,14 @@ def normalize_room(value):
 
 
 def split_dorms(value):
+    """
+    將：
+    女一,女二
+    女一，女二
+
+    轉成：
+    ["女一", "女二"]
+    """
 
     result = []
 
@@ -80,70 +114,158 @@ def split_dorms(value):
         .split(",")
     ):
 
-        item = normalize_dorm(item)
+        item = normalize_dorm(
+            item
+        )
 
         if (
             item
             and item in ALL_DORMS
         ):
-            result.append(item)
+            result.append(
+                item
+            )
 
     return list(
-        dict.fromkeys(result)
+        dict.fromkeys(
+            result
+        )
     )
 
 
 # ==================================================
-# 找密碼表 Worksheet
+# 找到指定宿舍 Worksheet
 # ==================================================
 
 def get_password_worksheet(
     spreadsheet,
     dorm
 ):
+    """
+    不直接使用 spreadsheet.worksheet("女一")，
+    避免 Sheet 名稱存在空白或「ㄧ / 一」差異。
 
-    dorm = normalize_dorm(dorm)
+    會將所有 Sheet 名稱正規化後再比對。
+    """
+
+    dorm = normalize_dorm(
+        dorm
+    )
 
     worksheets = get_worksheets(
         spreadsheet
     )
 
-    # 正規化後比對
-    for ws in worksheets:
+    for worksheet in worksheets:
 
-        title = normalize_dorm(
-            ws.title
+        worksheet_title = normalize_dorm(
+            worksheet.title
         )
 
-        if title == dorm:
-            return ws
+        if worksheet_title == dorm:
+            return worksheet
 
-    # 找不到時顯示實際工作表名稱
     actual_titles = [
-        ws.title
-        for ws in worksheets
+        worksheet.title
+        for worksheet in worksheets
     ]
 
     raise ValueError(
-        f"找不到宿舍工作表「{dorm}」，"
-        f"目前試算表工作表為："
+        f"找不到宿舍工作表「{dorm}」。"
+        f"目前試算表的工作表為："
         f"{'、'.join(actual_titles)}"
     )
 
 
 # ==================================================
-# 權限
+# 取得登入者可以使用的密碼表類型
 # ==================================================
 
-def get_allowed_dorms():
+def get_allowed_password_terms():
 
     role = st.session_state.get(
         "role",
         ""
     )
 
-    # 行政、生輔工讀：
-    # 可以查全部
+    # ==============================================
+    # 行政 / 生輔工讀
+    # 四種全部可以查詢
+    # ==============================================
+
+    if role in [
+        "行政",
+        "生輔工讀",
+    ]:
+
+        return [
+            "上學期",
+            "下學期",
+            "寒假",
+            "暑假",
+        ]
+
+    # ==============================================
+    # 樓長
+    # ==============================================
+
+    if role == "樓長":
+
+        # 一般樓長一定可以使用上下學期
+        terms = [
+            "上學期",
+            "下學期",
+        ]
+
+        # 有寒假宿舍設定才出現寒假
+        winter_dorms = str(
+            st.session_state.get(
+                "winter_dorms",
+                ""
+            )
+        ).strip()
+
+        if winter_dorms:
+            terms.append(
+                "寒假"
+            )
+
+        # 有暑假宿舍設定才出現暑假
+        summer_dorms = str(
+            st.session_state.get(
+                "summer_dorms",
+                ""
+            )
+        ).strip()
+
+        if summer_dorms:
+            terms.append(
+                "暑假"
+            )
+
+        return terms
+
+    return []
+
+
+# ==================================================
+# 依密碼表類型取得可使用宿舍
+# ==================================================
+
+def get_allowed_dorms(
+    password_term
+):
+
+    role = st.session_state.get(
+        "role",
+        ""
+    )
+
+    # ==============================================
+    # 行政 / 生輔工讀
+    # 可查詢所有宿舍
+    # ==============================================
+
     if role in [
         "行政",
         "生輔工讀",
@@ -151,45 +273,104 @@ def get_allowed_dorms():
 
         return ALL_DORMS.copy()
 
-    # 樓長：
-    # 只看自己管理的宿舍
-    if role == "樓長":
+    # ==============================================
+    # 只有樓長繼續往下
+    # ==============================================
 
-        allowed = []
+    if role != "樓長":
+        return []
 
-        for value in [
-            st.session_state.get(
-                "dorm",
-                ""
-            ),
-            st.session_state.get(
-                "manage_dorms",
-                ""
-            ),
+    # ==============================================
+    # 寒假
+    # 只使用 winter_dorms
+    # ==============================================
+
+    if password_term == "寒假":
+
+        winter_dorms = (
             st.session_state.get(
                 "winter_dorms",
                 ""
-            ),
+            )
+        )
+
+        return split_dorms(
+            winter_dorms
+        )
+
+    # ==============================================
+    # 暑假
+    # 只使用 summer_dorms
+    # ==============================================
+
+    if password_term == "暑假":
+
+        summer_dorms = (
             st.session_state.get(
                 "summer_dorms",
                 ""
-            ),
-        ]:
-
-            allowed.extend(
-                split_dorms(value)
-            )
-
-        return list(
-            dict.fromkeys(
-                allowed
             )
         )
+
+        return split_dorms(
+            summer_dorms
+        )
+
+    # ==============================================
+    # 上學期 / 下學期
+    # 使用 manage_dorms
+    # ==============================================
+
+    manage_dorms = (
+        st.session_state.get(
+            "manage_dorms",
+            ""
+        )
+    )
+
+    if manage_dorms:
+
+        allowed = split_dorms(
+            manage_dorms
+        )
+
+        if allowed:
+            return allowed
+
+    # ==============================================
+    # manage_dorms 沒資料時
+    # fallback 到 dorm
+    # ==============================================
+
+    dorm = normalize_dorm(
+        st.session_state.get(
+            "dorm",
+            ""
+        )
+    )
+
+    if (
+        dorm
+        and dorm in ALL_DORMS
+    ):
+
+        return [
+            dorm
+        ]
 
     return []
 
 
+# ==================================================
+# 是否可以寫入密碼
+# ==================================================
+
 def can_write_password():
+    """
+    只有樓長可以新增 / 修改密碼。
+
+    行政、生輔工讀只能查詢。
+    """
 
     return (
         st.session_state.get(
@@ -202,16 +383,35 @@ def can_write_password():
 
 
 # ==================================================
-# 讀取密碼
+# 取得密碼表網址
+# ==================================================
+
+def get_password_sheet_url(
+    password_term
+):
+
+    return PASSWORD_SHEETS.get(
+        password_term,
+        ""
+    )
+
+
+# ==================================================
+# 讀取房間密碼
 # ==================================================
 
 @st.cache_data(
     ttl=10,
     show_spinner=False
 )
-def load_room_passwords(dorm):
+def load_room_passwords(
+    password_term,
+    dorm
+):
 
-    dorm = normalize_dorm(dorm)
+    dorm = normalize_dorm(
+        dorm
+    )
 
     if dorm not in ALL_DORMS:
 
@@ -222,22 +422,37 @@ def load_room_passwords(dorm):
             ]
         )
 
-    try:
+    url = get_password_sheet_url(
+        password_term
+    )
 
-        ss = open_sheet(
-            UPPER_ROOM_PASSWORD
+    if not url:
+
+        return pd.DataFrame(
+            columns=[
+                "房號",
+                "密碼",
+            ]
         )
 
-        # 不直接用 worksheet("女一")
-        # 改成正規化搜尋
-        ws = get_password_worksheet(
-            ss,
+    try:
+
+        spreadsheet = open_sheet(
+            url
+        )
+
+        worksheet = get_password_worksheet(
+            spreadsheet,
             dorm
         )
 
         values = get_all_values(
-            ws
+            worksheet
         )
+
+        # ==============================================
+        # 完全沒有資料
+        # ==============================================
 
         if not values:
 
@@ -248,12 +463,15 @@ def load_room_passwords(dorm):
                 ]
             )
 
+        # ==============================================
+        # 標題
+        # ==============================================
+
         headers = [
             str(value).strip()
             for value in values[0]
         ]
 
-        # 如果只有一欄也避免錯誤
         if len(headers) < 2:
 
             return pd.DataFrame(
@@ -262,6 +480,10 @@ def load_room_passwords(dorm):
                     "密碼",
                 ]
             )
+
+        # ==============================================
+        # DataFrame
+        # ==============================================
 
         df = pd.DataFrame(
             values[1:],
@@ -274,6 +496,10 @@ def load_room_passwords(dorm):
             .str.strip()
         )
 
+        # ==============================================
+        # 必須存在房號 / 密碼
+        # ==============================================
+
         if (
             "房號" not in df.columns
             or
@@ -281,7 +507,8 @@ def load_room_passwords(dorm):
         ):
 
             st.warning(
-                f"{dorm} 工作表必須有「房號」與「密碼」欄"
+                f"{password_term} / {dorm} "
+                "工作表必須有「房號」與「密碼」欄位"
             )
 
             return pd.DataFrame(
@@ -298,18 +525,25 @@ def load_room_passwords(dorm):
             ]
         ].copy()
 
+        # ==============================================
+        # 整理房號
+        # ==============================================
+
         df["房號"] = (
             df["房號"]
             .astype(str)
             .map(normalize_room)
         )
 
+        # 密碼不能轉數字
+        # 避免 0012 被轉成 12
         df["密碼"] = (
             df["密碼"]
             .astype(str)
             .str.strip()
         )
 
+        # 移除空房號
         df = df[
             df["房號"] != ""
         ].copy()
@@ -321,7 +555,8 @@ def load_room_passwords(dorm):
     except Exception as error:
 
         st.error(
-            f"讀取 {dorm} 房間密碼失敗：{error}"
+            f"讀取 {password_term} / "
+            f"{dorm} 房間密碼失敗：{error}"
         )
 
         return pd.DataFrame(
@@ -333,14 +568,25 @@ def load_room_passwords(dorm):
 
 
 # ==================================================
-# 儲存 / 修改密碼
+# 新增 / 修改密碼
 # ==================================================
 
 def save_room_password(
+    password_term,
     dorm,
     room,
     password
 ):
+
+    # ==============================================
+    # 權限保險
+    # ==============================================
+
+    if not can_write_password():
+
+        raise PermissionError(
+            "目前帳號沒有修改密碼的權限"
+        )
 
     dorm = normalize_dorm(
         dorm
@@ -354,11 +600,19 @@ def save_room_password(
         password
     ).strip()
 
+    # ==============================================
+    # 驗證宿舍
+    # ==============================================
+
     if dorm not in ALL_DORMS:
 
         raise ValueError(
             "宿舍設定錯誤"
         )
+
+    # ==============================================
+    # 驗證房號
+    # ==============================================
 
     if room == "":
 
@@ -366,11 +620,19 @@ def save_room_password(
             "請輸入房號"
         )
 
+    # ==============================================
+    # 驗證密碼
+    # ==============================================
+
     if password == "":
 
         raise ValueError(
             "請輸入密碼"
         )
+
+    # ==============================================
+    # 驗證房號前綴
+    # ==============================================
 
     expected_prefix = (
         DORM_ROOM_PREFIX.get(
@@ -379,7 +641,6 @@ def save_room_password(
         )
     )
 
-    # 房號必須符合宿舍前綴
     if (
         expected_prefix
         and
@@ -390,31 +651,45 @@ def save_room_password(
 
         raise ValueError(
             f"{dorm} 房號應以 "
-            f"{expected_prefix} 開頭，"
+            f"{expected_prefix} 開頭。"
             f"例如：{expected_prefix}101"
         )
 
-    ss = open_sheet(
-        UPPER_ROOM_PASSWORD
+    # ==============================================
+    # 取得試算表
+    # ==============================================
+
+    url = get_password_sheet_url(
+        password_term
     )
 
-    ws = get_password_worksheet(
-        ss,
+    if not url:
+
+        raise ValueError(
+            f"找不到「{password_term}」密碼表設定"
+        )
+
+    spreadsheet = open_sheet(
+        url
+    )
+
+    worksheet = get_password_worksheet(
+        spreadsheet,
         dorm
     )
 
     values = get_all_values(
-        ws
+        worksheet
     )
 
     # ==============================================
-    # 工作表完全空白
+    # Sheet 完全空白
     # ==============================================
 
     if not values:
 
         append_row(
-            ws,
+            worksheet,
             [
                 "房號",
                 "密碼",
@@ -428,6 +703,10 @@ def save_room_password(
             ]
         ]
 
+    # ==============================================
+    # 標題
+    # ==============================================
+
     headers = [
         str(value).strip()
         for value in values[0]
@@ -440,8 +719,8 @@ def save_room_password(
     ):
 
         raise ValueError(
-            f"{dorm} 工作表必須有"
-            "「房號」與「密碼」欄位"
+            f"{password_term} / {dorm} "
+            "工作表必須有「房號」與「密碼」欄位"
         )
 
     room_col = (
@@ -461,7 +740,7 @@ def save_room_password(
     )
 
     # ==============================================
-    # 已有房號 → 更新
+    # 房號已存在 → 修改密碼
     # ==============================================
 
     for row_index, row in enumerate(
@@ -482,23 +761,19 @@ def save_room_password(
         if existing_room == room:
 
             update_cell(
-                ws,
+                worksheet,
                 row_index,
                 password_col,
                 password
             )
 
+            # 清除密碼表快取
             load_room_passwords.clear()
-
-            try:
-                clear_sheet_data_cache()
-            except Exception:
-                pass
 
             return "updated"
 
     # ==============================================
-    # 新房號 → 新增
+    # 房號不存在 → 新增
     # ==============================================
 
     new_row = [
@@ -517,22 +792,17 @@ def save_room_password(
     ] = password
 
     append_row(
-        ws,
+        worksheet,
         new_row
     )
 
     load_room_passwords.clear()
 
-    try:
-        clear_sheet_data_cache()
-    except Exception:
-        pass
-
     return "created"
 
 
 # ==================================================
-# 主頁面
+# 主畫面
 # ==================================================
 
 def show_room_password():
@@ -546,11 +816,15 @@ def show_room_password():
         ""
     )
 
-    allowed_dorms = (
-        get_allowed_dorms()
+    # ==============================================
+    # 可使用的密碼表類型
+    # ==============================================
+
+    allowed_terms = (
+        get_allowed_password_terms()
     )
 
-    if not allowed_dorms:
+    if not allowed_terms:
 
         st.warning(
             "目前沒有密碼表權限"
@@ -558,27 +832,27 @@ def show_room_password():
 
         return
 
-    # ==============================================
-    # 重新整理
-    # ==============================================
-
-    if st.button(
-        "重新整理密碼表",
-        key="refresh_room_password",
-    ):
-
-        load_room_passwords.clear()
-
-        try:
-            clear_sheet_data_cache()
-        except Exception:
-            pass
-
-        st.rerun()
+    password_term = st.selectbox(
+        "密碼表類型",
+        allowed_terms,
+        key="room_password_term",
+    )
 
     # ==============================================
-    # 宿舍
+    # 可使用宿舍
     # ==============================================
+
+    allowed_dorms = get_allowed_dorms(
+        password_term
+    )
+
+    if not allowed_dorms:
+
+        st.warning(
+            f"沒有「{password_term}」密碼表的宿舍權限"
+        )
+
+        return
 
     dorm = st.selectbox(
         "宿舍",
@@ -599,6 +873,19 @@ def show_room_password():
     )
 
     # ==============================================
+    # 重新整理
+    # ==============================================
+
+    if st.button(
+        "重新整理密碼表",
+        key="refresh_room_password",
+    ):
+
+        load_room_passwords.clear()
+
+        st.rerun()
+
+    # ==============================================
     # 查詢
     # ==============================================
 
@@ -614,18 +901,27 @@ def show_room_password():
         ),
     )
 
+    # ==============================================
+    # 載入資料
+    # ==============================================
+
     df = load_room_passwords(
+        password_term,
         dorm
     )
 
+    # ==============================================
+    # 搜尋
+    # ==============================================
+
     if search_room:
 
-        target = normalize_room(
+        target_room = normalize_room(
             search_room
         )
 
         result = df[
-            df["房號"] == target
+            df["房號"] == target_room
         ].copy()
 
         if result.empty:
@@ -635,6 +931,10 @@ def show_room_password():
             )
 
         else:
+
+            st.success(
+                "查詢成功"
+            )
 
             st.dataframe(
                 result[
@@ -654,21 +954,27 @@ def show_room_password():
         )
 
     # ==============================================
-    # 行政 / 生輔工讀只能查詢
+    # 行政、生輔工讀只能查詢
     # ==============================================
 
     if not can_write_password():
 
+        st.divider()
+
         if role == "行政":
 
             st.caption(
-                "行政權限：僅可查詢房間密碼"
+                "行政權限："
+                "可查詢上學期、下學期、寒假、暑假密碼表，"
+                "不可修改密碼。"
             )
 
         elif role == "生輔工讀":
 
             st.caption(
-                "生輔工讀權限：僅可查詢房間密碼"
+                "生輔工讀權限："
+                "可查詢上學期、下學期、寒假、暑假密碼表，"
+                "不可修改密碼。"
             )
 
         return
@@ -708,11 +1014,16 @@ def show_room_password():
             )
         )
 
+    # ==============================================
+    # 儲存
+    # ==============================================
+
     if submitted:
 
         try:
 
             action = save_room_password(
+                password_term,
                 dorm,
                 room,
                 password,
@@ -721,14 +1032,23 @@ def show_room_password():
             if action == "updated":
 
                 st.success(
-                    "房號已存在，密碼已更新。"
+                    f"{password_term} / "
+                    f"{dorm} / "
+                    f"{normalize_room(room)} "
+                    "密碼已更新。"
                 )
 
-            else:
+            elif action == "created":
 
                 st.success(
-                    "房號與密碼已新增。"
+                    f"{password_term} / "
+                    f"{dorm} / "
+                    f"{normalize_room(room)} "
+                    "密碼已新增。"
                 )
+
+            # 清快取
+            load_room_passwords.clear()
 
             st.rerun()
 
