@@ -2006,7 +2006,6 @@ def show_attendance():
                 "font-size:18px;"
                 "font-weight:700;'>"
                 f"{short_stay_date}"
-                "短期住宿"
                 "</span>",
                 unsafe_allow_html=True
             )
