@@ -56,3 +56,15 @@ WINTER_ROOM_PASSWORD="https://docs.google.com/spreadsheets/d/14iC6oLhTeV8C3UaxS2
 
 #暑假密碼表
 SUMMER_ROOM_PASSWORD="https://docs.google.com/spreadsheets/d/1fbPCS1QHUHALTsDcWQ_DWVBXvIXt7o-tV6Sitj4bpSE/edit"
+
+#暑假短期住宿
+SUMMER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1kyd3X1BvdfhwFjApN6eaQ8fR2Fl3Nncg9EFLYu28LiI/edit"
+
+#寒假短期住宿
+WINTER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1EXVVo54Vs9ZYAoj8eW9wV4guux1X_v7v8emiMFXSOdI/edit"
+
+#上學期短期住宿
+UPPER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1hjvK3-oDxr2xGqbsW5mB8IVxwah-btXS2ipGNSL7hy4/edit"
+
+#下學期短期住宿
+LOWER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1fp_CwSnUu2UG6CwVkhp5BjG4WAqj9VqeQqFpV_hDwD8/edit"
