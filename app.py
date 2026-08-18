@@ -1,5 +1,7 @@
 import streamlit as st
 
+from modules.announcement import show_announcement
+
 from core.session import (
     init_session,
     restore_login_session,
@@ -182,6 +184,14 @@ for i, name in enumerate(tab_names):
         ):
             st.session_state.selected_page = name
             st.rerun()
+
+st.divider()
+
+# ==============================
+# 公告
+# ==============================
+
+show_announcement()
 
 st.divider()
 

@@ -68,3 +68,6 @@ UPPER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1hjvK3-oDxr2xGqbs
 
 #下學期短期住宿
 LOWER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1fp_CwSnUu2UG6CwVkhp5BjG4WAqj9VqeQqFpV_hDwD8/edit"
+
+#公告
+ANNOUNCEMENT_URL = "https://docs.google.com/spreadsheets/d/1eHdv22eH1kKfOYGD8XvJekxSqlNxyGoqWDSwNPWPskU/edit"
