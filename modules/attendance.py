@@ -1375,6 +1375,16 @@ def load_short_stay(
 
 def show_attendance():
 
+    # ==================================================
+    # 頁面最上方定位點
+    # ==================================================
+    st.markdown(
+        '<div id="attendance-top"></div>',
+        unsafe_allow_html=True
+    )
+
+    st.header("點名系統")
+
     st.header("點名系統")
 
     # ==================================================
@@ -2119,3 +2129,30 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
+
+    # ==================================================
+    # 回到最上面
+    # ==================================================
+    st.divider()
+
+    st.markdown(
+        """
+        <a href="#attendance-top"
+           style="
+               display:block;
+               width:100%;
+               padding:12px 16px;
+               box-sizing:border-box;
+               text-align:center;
+               text-decoration:none;
+               border:1px solid rgba(49, 51, 63, 0.2);
+               border-radius:8px;
+               font-size:16px;
+               font-weight:600;
+               color:inherit;
+           ">
+            ⬆️ 回到最上面
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
