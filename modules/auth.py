@@ -115,7 +115,7 @@ def login_page():
 
     role = st.selectbox(
         "登入權限",
-        ["舍監", "行政", "樓長"]
+        ["舍監", "行政", "樓長", "生輔工讀"]
     )
     user_df = load_users(role)
 
