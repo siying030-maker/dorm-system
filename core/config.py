@@ -44,3 +44,8 @@ REWARD_LOWER_URL = "https://docs.google.com/spreadsheets/d/1kymMcZ7M69he0ZkE7pCQ
 
 #未繳費
 UNPAID_URL = "https://docs.google.com/spreadsheets/d/1-pDlEcx3ScEyo9dQQncHh32_8QuXlrsVkQch5b6x4SY/edit"
+
+#上學期密碼表
+UPPER_ROOM_PASSWORD= "https://docs.google.com/spreadsheets/d/1hv9dR-3XdDCk9roUkMv2Pl8PxkogqDjj-b9uShfRpDw/edit"
+
+#下學期密碼表

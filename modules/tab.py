@@ -17,7 +17,8 @@ def build_tabs(role, is_main):
             "上學期門禁",
             "下學期門禁",
             "整潔比賽(檢視)",
-            "獎懲查詢"
+            "獎懲查詢",
+            "密碼表"
         ]
 
     if role == "樓長":
@@ -25,10 +26,14 @@ def build_tabs(role, is_main):
             "點名系統",
             "補點名單",
             "每日點名未到名單",
-            "獎懲查詢"
+            "獎懲查詢",
+            "密碼表"
         ]
 
         if is_main:
             tab_names += ["整潔比賽"]
+
+    if role == "生輔工讀":
+        tab_names = ["密碼表"]
 
     return list(dict.fromkeys(tab_names))
