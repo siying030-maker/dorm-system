@@ -49,3 +49,10 @@ UNPAID_URL = "https://docs.google.com/spreadsheets/d/1-pDlEcx3ScEyo9dQQncHh32_8Q
 UPPER_ROOM_PASSWORD= "https://docs.google.com/spreadsheets/d/1hv9dR-3XdDCk9roUkMv2Pl8PxkogqDjj-b9uShfRpDw/edit"
 
 #下學期密碼表
+LOWER_ROOM_PASSWORD="https://docs.google.com/spreadsheets/d/1Y5LZge_6r4xgSg91sJeiOkZ4v1e1MqwTdGZ-D6BgkMI/edit"
+
+#寒假密碼表
+WINTER_ROOM_PASSWORD="https://docs.google.com/spreadsheets/d/14iC6oLhTeV8C3UaxS23XA0rGfjcTVn-UgBL63rPFUEk/edit"
+
+#暑假密碼表
+SUMMER_ROOM_PASSWORD="https://docs.google.com/spreadsheets/d/1fbPCS1QHUHALTsDcWQ_DWVBXvIXt7o-tV6Sitj4bpSE/edit"
