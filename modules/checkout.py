@@ -9,6 +9,7 @@ from core.google_api import (
     open_sheet,
     get_worksheet,
     get_all_values,
+    update_cell,
 )
 
 
@@ -39,20 +40,11 @@ def normalize_dorm(value):
         .replace(" ", "")
     )
 
-    # ==============================================
-    # 涵青館名稱
-    # ==============================================
-
     value = (
         value
         .replace("(涵青館)", "")
         .replace("（涵青館）", "")
     )
-
-    # ==============================================
-    # 女一宿 → 女一
-    # 男三宿 → 男三
-    # ==============================================
 
     if value.endswith("宿"):
         value = value[:-1]
@@ -61,7 +53,7 @@ def normalize_dorm(value):
 
 
 # ==================================================
-# 拆分多個宿舍
+# 拆分多宿舍
 # ==================================================
 
 def split_dorms(value):
@@ -80,15 +72,13 @@ def split_dorms(value):
 
         if (
             item
-            and
-            item in ALL_DORMS
+            and item in ALL_DORMS
         ):
 
             result.append(
                 item
             )
 
-    # 去除重複
     return list(
         dict.fromkeys(
             result
@@ -97,7 +87,53 @@ def split_dorms(value):
 
 
 # ==================================================
-# 取得登入者可以看的宿舍
+# 房號整理
+# ==================================================
+
+def normalize_room(value):
+
+    value = (
+        str(value)
+        .strip()
+        .replace(" ", "")
+        .replace("　", "")
+    )
+
+    if value.endswith(".0"):
+        value = value[:-2]
+
+    if value.upper() in [
+        "NAN",
+        "NONE",
+        "NA",
+    ]:
+        return ""
+
+    return value
+
+
+# ==================================================
+# 一般文字整理
+# ==================================================
+
+def normalize_text(value):
+
+    value = str(
+        value
+    ).strip()
+
+    if value.upper() in [
+        "NAN",
+        "NONE",
+        "NA",
+    ]:
+        return ""
+
+    return value
+
+
+# ==================================================
+# 權限：可查看哪些宿舍
 # ==================================================
 
 def get_allowed_checkout_dorms():
@@ -155,10 +191,6 @@ def get_allowed_checkout_dorms():
 
         allowed = []
 
-        # ==============================================
-        # 一般學期宿舍
-        # ==============================================
-
         for value in [
             st.session_state.get(
                 "manage_dorms",
@@ -190,60 +222,24 @@ def get_allowed_checkout_dorms():
             )
         )
 
-    # ==================================================
-    # 其他角色
-    # ==================================================
-
     return []
 
 
 # ==================================================
-# 清理房號
+# 是否可修改檢查狀態
 # ==================================================
 
-def normalize_room(value):
+def can_update_checkout_check():
 
-    value = str(
-        value
+    role = str(
+        st.session_state.get(
+            "role",
+            ""
+        )
     ).strip()
 
-    value = (
-        value
-        .replace(" ", "")
-        .replace("　", "")
-    )
-
-    if value.endswith(".0"):
-        value = value[:-2]
-
-    if value.upper() in [
-        "NAN",
-        "NONE",
-        "NA",
-    ]:
-        return ""
-
-    return value
-
-
-# ==================================================
-# 清理文字
-# ==================================================
-
-def normalize_text(value):
-
-    value = str(
-        value
-    ).strip()
-
-    if value.upper() in [
-        "NAN",
-        "NONE",
-        "NA",
-    ]:
-        return ""
-
-    return value
+    # 目前設定：只有樓長可以勾選檢查
+    return role == "樓長"
 
 
 # ==================================================
@@ -262,40 +258,28 @@ def load_checkout_data(
         dorm
     )
 
-    # ==================================================
-    # 驗證宿舍
-    # ==================================================
-
     if dorm not in ALL_DORMS:
 
         return pd.DataFrame(
             columns=[
+                "試算表列",
                 "房號",
                 "姓名",
                 "離宿日期",
                 "離宿時間",
+                "檢查",
             ]
         )
 
     try:
 
         # ==================================================
-        # 開啟離宿預約試算表
+        # 開啟試算表
         # ==================================================
 
         spreadsheet = open_sheet(
             CHECKOUT_RESERVATION_URL
         )
-
-        # ==================================================
-        # 每個宿舍有自己的 Sheet
-        #
-        # 女一
-        # 女二
-        # 女三
-        # 男一
-        # 男三
-        # ==================================================
 
         worksheet = get_worksheet(
             spreadsheet,
@@ -306,56 +290,41 @@ def load_checkout_data(
             worksheet
         )
 
-        # ==================================================
-        # 沒資料
-        # ==================================================
-
         if len(values) <= 1:
 
             return pd.DataFrame(
                 columns=[
+                    "試算表列",
                     "房號",
                     "姓名",
                     "離宿日期",
                     "離宿時間",
+                    "檢查",
                 ]
             )
 
+        rows = []
+
         # ==================================================
-        # 重要：
-        #
-        # 不使用 Google Sheet 第一列作為 DataFrame 欄名
-        #
-        # 因為之前你的試算表有：
-        #
-        # 房號
-        # 姓名
-        # 離宿時間
-        # 離宿時間
-        #
-        # 會造成 Duplicate column names
-        #
-        # 所以固定：
+        # 固定欄位
         #
         # A = 房號
         # B = 姓名
         # C = 離宿日期
         # D = 離宿時間
+        # E = 檢查
         # ==================================================
 
-        rows = []
-
-        for raw_row in values[1:]:
+        for sheet_row, raw_row in enumerate(
+            values[1:],
+            start=2
+        ):
 
             row = list(
                 raw_row
             )
 
-            # ==============================================
-            # 至少補到 4 欄
-            # ==============================================
-
-            while len(row) < 4:
+            while len(row) < 5:
                 row.append("")
 
             room = normalize_room(
@@ -374,8 +343,12 @@ def load_checkout_data(
                 row[3]
             )
 
+            check_status = normalize_text(
+                row[4]
+            )
+
             # ==============================================
-            # 完全空白列略過
+            # 空白列略過
             # ==============================================
 
             if (
@@ -389,10 +362,6 @@ def load_checkout_data(
             ):
                 continue
 
-            # ==============================================
-            # 至少需要房號或姓名
-            # ==============================================
-
             if (
                 room == ""
                 and
@@ -402,44 +371,38 @@ def load_checkout_data(
 
             rows.append(
                 {
+                    "試算表列": sheet_row,
                     "房號": room,
                     "姓名": name,
                     "離宿日期": checkout_date,
                     "離宿時間": checkout_time,
+                    "檢查": check_status,
                 }
             )
 
         # ==================================================
-        # 沒有有效資料
+        # 沒資料
         # ==================================================
 
         if not rows:
 
             return pd.DataFrame(
                 columns=[
+                    "試算表列",
                     "房號",
                     "姓名",
                     "離宿日期",
                     "離宿時間",
+                    "檢查",
                 ]
             )
 
-        # ==================================================
-        # 建立 DataFrame
-        # ==================================================
-
         df = pd.DataFrame(
-            rows,
-            columns=[
-                "房號",
-                "姓名",
-                "離宿日期",
-                "離宿時間",
-            ]
+            rows
         )
 
         # ==================================================
-        # 日期轉換，只拿來排序
+        # 日期轉換
         # ==================================================
 
         df["_排序日期"] = pd.to_datetime(
@@ -447,16 +410,44 @@ def load_checkout_data(
             errors="coerce"
         )
 
+        # ==================================================
+        # 只顯示今天～未來
+        #
+        # 例如：
+        # 今天 8/19
+        #
+        # 8/18 ❌
+        # 8/19 ✅
+        # 8/20 ✅
+        # ==================================================
+
         today = pd.Timestamp.now().normalize()
 
         df = df[
             df["_排序日期"].notna()
             &
-            (df["_排序日期"] >= today)
+            (
+                df["_排序日期"]
+                >=
+                today
+            )
         ].copy()
 
+        if df.empty:
+
+            return pd.DataFrame(
+                columns=[
+                    "試算表列",
+                    "房號",
+                    "姓名",
+                    "離宿日期",
+                    "離宿時間",
+                    "檢查",
+                ]
+            )
+
         # ==================================================
-        # 時間也建立排序欄
+        # 時間排序
         # ==================================================
 
         df["_排序時間"] = pd.to_datetime(
@@ -464,10 +455,6 @@ def load_checkout_data(
             format="%H:%M",
             errors="coerce"
         )
-
-        # ==================================================
-        # 日期 → 時間排序
-        # ==================================================
 
         df = df.sort_values(
             by=[
@@ -483,10 +470,6 @@ def load_checkout_data(
             na_position="last"
         )
 
-        # ==================================================
-        # 移除排序用欄位
-        # ==================================================
-
         df = df.drop(
             columns=[
                 "_排序日期",
@@ -494,27 +477,6 @@ def load_checkout_data(
             ],
             errors="ignore"
         )
-
-        # ==================================================
-        # 最後再次強制欄位順序
-        # 防止 PyArrow Duplicate Column Error
-        # ==================================================
-
-        df = df[
-            [
-                "房號",
-                "姓名",
-                "離宿日期",
-                "離宿時間",
-            ]
-        ].copy()
-
-        df.columns = [
-            "房號",
-            "姓名",
-            "離宿日期",
-            "離宿時間",
-        ]
 
         return df.reset_index(
             drop=True
@@ -528,12 +490,64 @@ def load_checkout_data(
 
         return pd.DataFrame(
             columns=[
+                "試算表列",
                 "房號",
                 "姓名",
                 "離宿日期",
                 "離宿時間",
+                "檢查",
             ]
         )
+
+
+# ==================================================
+# 更新檢查狀態
+# ==================================================
+
+def update_checkout_check(
+    dorm,
+    sheet_row,
+    checked
+):
+
+    dorm = normalize_dorm(
+        dorm
+    )
+
+    if dorm not in ALL_DORMS:
+
+        raise ValueError(
+            "宿舍設定錯誤"
+        )
+
+    spreadsheet = open_sheet(
+        CHECKOUT_RESERVATION_URL
+    )
+
+    worksheet = get_worksheet(
+        spreadsheet,
+        dorm
+    )
+
+    # ==================================================
+    # E欄 = 第5欄
+    # ==================================================
+
+    value = (
+        "已檢查"
+        if checked
+        else ""
+    )
+
+    update_cell(
+        worksheet,
+        int(sheet_row),
+        5,
+        value
+    )
+
+    # 清除離宿快取
+    load_checkout_data.clear()
 
 
 # ==================================================
@@ -586,7 +600,7 @@ def show_checkout():
         st.rerun()
 
     # ==================================================
-    # 讀取資料
+    # 讀取
     # ==================================================
 
     with st.spinner(
@@ -598,7 +612,7 @@ def show_checkout():
         )
 
     # ==================================================
-    # 沒有預約
+    # 沒資料
     # ==================================================
 
     if df.empty:
@@ -629,48 +643,31 @@ def show_checkout():
             index=df.index
         )
 
-        # ==============================================
-        # 房號
-        # ==============================================
+        for column in [
+            "房號",
+            "姓名",
+        ]:
 
-        if "房號" in df.columns:
+            if column in df.columns:
 
-            condition = (
-                condition
-                |
-                df["房號"]
-                .astype(str)
-                .str.contains(
-                    keyword,
-                    na=False,
-                    regex=False
+                condition = (
+                    condition
+                    |
+                    df[column]
+                    .astype(str)
+                    .str.contains(
+                        keyword,
+                        na=False,
+                        regex=False
+                    )
                 )
-            )
-
-        # ==============================================
-        # 姓名
-        # ==============================================
-
-        if "姓名" in df.columns:
-
-            condition = (
-                condition
-                |
-                df["姓名"]
-                .astype(str)
-                .str.contains(
-                    keyword,
-                    na=False,
-                    regex=False
-                )
-            )
 
         df = df[
             condition
         ].copy()
 
     # ==================================================
-    # 搜尋後沒結果
+    # 搜尋後沒資料
     # ==================================================
 
     if df.empty:
@@ -689,29 +686,202 @@ def show_checkout():
         f"{dorm}目前共有 {len(df)} 筆離宿預約"
     )
 
-    # ==================================================
-    # 顯示資料
-    # ==================================================
-
-    display_df = df[
-        [
-            "房號",
-            "姓名",
-            "離宿日期",
-            "離宿時間",
-        ]
-    ].copy()
-
-    # 再次保險：欄名一定唯一
-    display_df.columns = [
-        "房號",
-        "姓名",
-        "離宿日期",
-        "離宿時間",
-    ]
-
-    st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True
+    st.caption(
+        "離宿日期當天仍會顯示；隔天開始自動隱藏。"
     )
+
+    st.divider()
+
+    # ==================================================
+    # 標題列
+    # ==================================================
+
+    header_cols = st.columns(
+        [
+            1.3,
+            1.4,
+            1.5,
+            1.1,
+            1.1,
+        ]
+    )
+
+    with header_cols[0]:
+        st.markdown(
+            "**房號**"
+        )
+
+    with header_cols[1]:
+        st.markdown(
+            "**姓名**"
+        )
+
+    with header_cols[2]:
+        st.markdown(
+            "**離宿日期**"
+        )
+
+    with header_cols[3]:
+        st.markdown(
+            "**離宿時間**"
+        )
+
+    with header_cols[4]:
+        st.markdown(
+            "**檢查**"
+        )
+
+    st.divider()
+
+    # ==================================================
+    # 每一筆離宿資料
+    # ==================================================
+
+    can_update = (
+        can_update_checkout_check()
+    )
+
+    for _, row in df.iterrows():
+
+        cols = st.columns(
+            [
+                1.3,
+                1.4,
+                1.5,
+                1.1,
+                1.1,
+            ]
+        )
+
+        # ==============================================
+        # 房號
+        # ==============================================
+
+        with cols[0]:
+
+            st.write(
+                row.get(
+                    "房號",
+                    ""
+                )
+            )
+
+        # ==============================================
+        # 姓名
+        # ==============================================
+
+        with cols[1]:
+
+            st.write(
+                row.get(
+                    "姓名",
+                    ""
+                )
+            )
+
+        # ==============================================
+        # 日期
+        # ==============================================
+
+        with cols[2]:
+
+            st.write(
+                row.get(
+                    "離宿日期",
+                    ""
+                )
+            )
+
+        # ==============================================
+        # 時間
+        # ==============================================
+
+        with cols[3]:
+
+            st.write(
+                row.get(
+                    "離宿時間",
+                    ""
+                )
+            )
+
+        # ==============================================
+        # 檢查
+        # ==============================================
+
+        with cols[4]:
+
+            current_checked = (
+                str(
+                    row.get(
+                        "檢查",
+                        ""
+                    )
+                ).strip()
+                ==
+                "已檢查"
+            )
+
+            # ==========================================
+            # 樓長：可修改
+            # ==========================================
+
+            if can_update:
+
+                checked = st.checkbox(
+                    "已檢查",
+                    value=current_checked,
+                    key=(
+                        f"checkout_check_"
+                        f"{dorm}_"
+                        f"{row.get('試算表列')}"
+                    )
+                )
+
+                # ======================================
+                # 有改變才寫入
+                # ======================================
+
+                if checked != current_checked:
+
+                    try:
+
+                        update_checkout_check(
+                            dorm=dorm,
+                            sheet_row=row.get(
+                                "試算表列"
+                            ),
+                            checked=checked
+                        )
+
+                        st.success(
+                            "已更新"
+                        )
+
+                        st.rerun()
+
+                    except Exception as error:
+
+                        st.error(
+                            f"更新失敗：{error}"
+                        )
+
+            # ==========================================
+            # 行政 / 舍監：只檢視
+            # ==========================================
+
+            else:
+
+                if current_checked:
+
+                    st.success(
+                        "已檢查"
+                    )
+
+                else:
+
+                    st.write(
+                        "未檢查"
+                    )
+
+        st.divider()
