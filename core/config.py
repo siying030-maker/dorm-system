@@ -71,3 +71,6 @@ LOWER_SHORT_STAY_URL = "https://docs.google.com/spreadsheets/d/1fp_CwSnUu2UG6CwV
 
 #公告
 ANNOUNCEMENT_URL = "https://docs.google.com/spreadsheets/d/1eHdv22eH1kKfOYGD8XvJekxSqlNxyGoqWDSwNPWPskU/edit"
+
+#離宿
+CHECKOUT_RESERVATION_URL = "https://docs.google.com/spreadsheets/d/1H0mwVCby43p8UGT8BiNT9ZQTvMH2LFD58Cf9OarxZtE/edit"

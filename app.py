@@ -1,4 +1,5 @@
 import streamlit as st
+from modules.checkout import show_checkout
 
 from modules.announcement import show_announcement
 
@@ -272,3 +273,6 @@ elif selected_page == "下學期假日點名單":
 
 elif selected_page == "密碼表":
     show_room_password()
+
+elif selected_page == "離宿":
+    show_checkout()
