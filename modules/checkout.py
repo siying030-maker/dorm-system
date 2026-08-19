@@ -447,6 +447,14 @@ def load_checkout_data(
             errors="coerce"
         )
 
+        today = pd.Timestamp.now().normalize()
+
+        df = df[
+            df["_排序日期"].notna()
+            &
+            (df["_排序日期"] >= today)
+        ].copy()
+
         # ==================================================
         # 時間也建立排序欄
         # ==================================================
