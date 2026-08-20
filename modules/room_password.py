@@ -980,7 +980,7 @@ def show_room_password():
         elif role == "舍監":
         
                     st.caption(
-                        "舍監:"
+                        "舍監權限："
                         "可查詢上學期、下學期、寒假、暑假密碼表，"
                         "不可修改密碼。"
                     )
