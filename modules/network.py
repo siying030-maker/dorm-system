@@ -1,5 +1,5 @@
 import re
-
+import pandas as pd
 import streamlit as st
 
 from core.config import (
@@ -58,7 +58,7 @@ def normalize_dorm(value):
 
 
 # ==================================================
-# 床位 / 房號整理
+# 房號 / 床位整理
 # ==================================================
 
 def normalize_value(value):
@@ -90,7 +90,6 @@ def split_dorms(value):
         )
 
         if dorm in DORM_TO_BUILDING:
-
             result.append(
                 dorm
             )
@@ -103,7 +102,7 @@ def split_dorms(value):
 
 
 # ==================================================
-# 樓長權限
+# 樓長可查詢宿舍
 # ==================================================
 
 def get_allowed_network_dorms():
@@ -115,9 +114,8 @@ def get_allowed_network_dorms():
         )
     ).strip()
 
-    # 只有樓長
+    # 只有樓長可以使用
     if role != "樓長":
-
         return []
 
     allowed = []
@@ -155,7 +153,7 @@ def get_allowed_network_dorms():
 
 
 # ==================================================
-# 判斷工作表是否屬於登入宿舍
+# 工作表是否屬於目前宿舍
 # ==================================================
 
 def worksheet_matches_dorm(
@@ -179,7 +177,6 @@ def worksheet_matches_dorm(
     )
 
     if not building:
-
         return False
 
     # ==================================================
@@ -255,7 +252,7 @@ def is_room_number(value):
     )
 
     # 例如：
-    # 81701
+    # 81500
     # 82201
     # 83303
 
@@ -278,7 +275,7 @@ def is_bed_number(value):
     )
 
     # 例如：
-    # 81701-1
+    # 81500-1
     # 82201-4
 
     return bool(
@@ -315,7 +312,6 @@ def find_network_room(
     )
 
     if not building:
-
         return []
 
     url = BUILDING_URLS.get(
@@ -323,7 +319,6 @@ def find_network_room(
     )
 
     if not url:
-
         return []
 
     results = []
@@ -339,7 +334,7 @@ def find_network_room(
         )
 
         # ==================================================
-        # 只搜尋目前宿舍相關的 sheet
+        # 只搜尋目前宿舍對應工作表
         # ==================================================
 
         matched_worksheets = [
@@ -351,16 +346,13 @@ def find_network_room(
             )
         ]
 
-        # 如果名稱比對不到
-        # 才退回整份試算表搜尋
+        # 如果工作表名稱比對不到
+        # 才退回搜尋整份試算表
         if not matched_worksheets:
-
-            matched_worksheets = (
-                worksheets
-            )
+            matched_worksheets = worksheets
 
         # ==================================================
-        # 搜尋所有符合這個房號的床位
+        # 搜尋整間房
         # ==================================================
 
         for worksheet in matched_worksheets:
@@ -377,38 +369,25 @@ def find_network_room(
                 )
 
                 while len(row) < 5:
-
                     row.append("")
 
                 bed = normalize_value(
                     row[0]
                 )
 
-                # 不是床位資料
+                # 排除標題列
                 if not is_bed_number(
                     bed
                 ):
-
                     continue
 
-                # ==================================================
-                # 81701-1
-                # 81701-2
-                #
-                # 取 "-" 前面的 81701
-                # ==================================================
-
+                # 81500-1 → 81500
                 bed_room = (
                     bed
                     .split("-")[0]
                 )
 
-                if (
-                    bed_room
-                    !=
-                    room_number
-                ):
-
+                if bed_room != room_number:
                     continue
 
                 results.append(
@@ -426,9 +405,6 @@ def find_network_room(
                         "密碼002": str(
                             row[4]
                         ).strip(),
-                        "工作表": (
-                            worksheet.title
-                        ),
                     }
                 )
 
@@ -453,54 +429,6 @@ def find_network_room(
         raise RuntimeError(
             f"網路資料讀取失敗：{error}"
         )
-
-
-# ==================================================
-# 顯示單一帳號 / 密碼
-# ==================================================
-
-def show_value_card(
-    title,
-    value
-):
-
-    value = str(
-        value
-    ).strip()
-
-    if not value:
-
-        value = "無資料"
-
-    st.markdown(
-        f"""
-        <div style="
-            border:1px solid #d9d9d9;
-            border-radius:10px;
-            padding:16px 18px;
-            margin-bottom:8px;
-            background-color:rgba(240,242,246,0.65);
-        ">
-            <div style="
-                font-size:15px;
-                opacity:0.7;
-                margin-bottom:5px;
-            ">
-                {title}
-            </div>
-
-            <div style="
-                font-size:25px;
-                font-weight:700;
-                letter-spacing:1px;
-                word-break:break-all;
-            ">
-                {value}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
 
 # ==================================================
@@ -570,19 +498,18 @@ def show_network():
 
     room_number = st.text_input(
         "輸入房號",
-        placeholder="例如：81701",
+        placeholder="例如：81500",
         key="network_room_search"
     )
 
     search_clicked = st.button(
-        "查詢整間房間網路資料",
+        "查詢整間房間",
         key="network_room_search_btn",
         type="primary",
         use_container_width=True
     )
 
     if not search_clicked:
-
         return
 
     room_number = normalize_value(
@@ -606,7 +533,7 @@ def show_network():
     ):
 
         st.warning(
-            "請輸入完整房號，例如：81701"
+            "請輸入完整房號，例如：81500"
         )
 
         return
@@ -637,14 +564,12 @@ def show_network():
     try:
 
         with st.spinner(
-            "正在查詢整個房間..."
+            "正在查詢整間房間..."
         ):
 
-            results = (
-                find_network_room(
-                    dorm,
-                    room_number
-                )
+            results = find_network_room(
+                dorm,
+                room_number
             )
 
     except Exception as error:
@@ -668,84 +593,128 @@ def show_network():
         return
 
     # ==================================================
-    # 查詢結果
+    # 查詢成功
     # ==================================================
 
     st.success(
-        f"查詢成功：{room_number} "
+        f"查詢成功：{room_number}　"
         f"共 {len(results)} 個床位"
     )
 
     st.divider()
 
     # ==================================================
-    # 每個床位
+    # 說明
     # ==================================================
+
+    col1, col2 = st.columns(
+        2
+    )
+
+    with col1:
+
+        st.info(
+            "🌐 帳號001 / 密碼001："
+            "Hinet 撥接網路（含 WIFI 上網）"
+        )
+
+    with col2:
+
+        st.info(
+            '📶 帳號002 / 密碼002：'
+            '僅限 WIFI 上網'
+        )
+
+    # ==================================================
+    # 建立表格
+    # ==================================================
+
+    table_data = []
 
     for result in results:
 
-        st.subheader(
-            f"🛏️ 床位 {result['床位']}"
+        table_data.append(
+            {
+                "床位": result.get(
+                    "床位",
+                    ""
+                ),
+
+                "帳號001": result.get(
+                    "帳號001",
+                    ""
+                ),
+
+                "密碼001": result.get(
+                    "密碼001",
+                    ""
+                ),
+
+                "帳號002": result.get(
+                    "帳號002",
+                    ""
+                ),
+
+                "密碼002": result.get(
+                    "密碼002",
+                    ""
+                ),
+            }
         )
 
-        # ==================================================
-        # Hinet
-        # ==================================================
+    result_df = pd.DataFrame(
+        table_data,
+        columns=[
+            "床位",
+            "帳號001",
+            "密碼001",
+            "帳號002",
+            "密碼002",
+        ]
+    )
 
-        st.markdown(
-            "### 🌐 Hinet 撥接網路（含 WIFI 上網）"
-        )
+    # ==================================================
+    # 房號標題
+    # ==================================================
 
-        col1, col2 = st.columns(
-            2
-        )
+    st.subheader(
+        f"房號 {room_number}"
+    )
 
-        with col1:
+    # ==================================================
+    # 整間房直接表格顯示
+    # ==================================================
 
-            show_value_card(
+    st.dataframe(
+        result_df,
+        use_container_width=True,
+        hide_index=True,
+        row_height=48,
+        column_config={
+
+            "床位": st.column_config.TextColumn(
+                "床位",
+                width="medium",
+            ),
+
+            "帳號001": st.column_config.TextColumn(
                 "帳號001",
-                result[
-                    "帳號001"
-                ]
-            )
+                width="medium",
+            ),
 
-        with col2:
-
-            show_value_card(
+            "密碼001": st.column_config.TextColumn(
                 "密碼001",
-                result[
-                    "密碼001"
-                ]
-            )
+                width="medium",
+            ),
 
-        # ==================================================
-        # WIFI
-        # ==================================================
-
-        st.markdown(
-            '### 📶 僅限 WIFI 上網'
-        )
-
-        col3, col4 = st.columns(
-            2
-        )
-
-        with col3:
-
-            show_value_card(
+            "帳號002": st.column_config.TextColumn(
                 "帳號002",
-                result[
-                    "帳號002"
-                ]
-            )
+                width="medium",
+            ),
 
-        with col4:
-
-            show_value_card(
+            "密碼002": st.column_config.TextColumn(
                 "密碼002",
-                result[
-                    "密碼002"
-                ]
-            )
-
-        st.divider()
+                width="medium",
+            ),
+        }
+    )
