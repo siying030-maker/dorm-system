@@ -196,6 +196,7 @@ def get_allowed_password_terms():
     if role in [
         "行政",
         "生輔工讀",
+        "舍監"
     ]:
 
         return [
@@ -211,13 +212,10 @@ def get_allowed_password_terms():
 
     if role == "樓長":
 
-        # 一般樓長一定可以使用上下學期
-        terms = [
-            "上學期",
-            "下學期",
-        ]
+    # ==============================================
+    # 取得寒假 / 暑假樓長設定
+    # ==============================================
 
-        # 有寒假宿舍設定才出現寒假
         winter_dorms = str(
             st.session_state.get(
                 "winter_dorms",
@@ -225,12 +223,6 @@ def get_allowed_password_terms():
             )
         ).strip()
 
-        if winter_dorms:
-            terms.append(
-                "寒假"
-            )
-
-        # 有暑假宿舍設定才出現暑假
         summer_dorms = str(
             st.session_state.get(
                 "summer_dorms",
@@ -238,14 +230,34 @@ def get_allowed_password_terms():
             )
         ).strip()
 
+        # ==============================================
+        # 寒暑假樓長
+        # 有寒假 / 暑假設定時
+        # 只顯示對應假期，不顯示上下學期
+        # ==============================================
+
+        holiday_terms = []
+
+        if winter_dorms:
+            holiday_terms.append("寒假")
+
         if summer_dorms:
-            terms.append(
-                "暑假"
-            )
+            holiday_terms.append("暑假")
 
-        return terms
+        if holiday_terms:
+            return holiday_terms
 
-    return []
+        # ==============================================
+        # 一般學期樓長
+        # 沒有寒暑假設定才顯示上下學期
+        # ==============================================
+
+            return [
+            "上學期",
+            "下學期",
+            ]
+
+        return []
 
 
 # ==================================================
