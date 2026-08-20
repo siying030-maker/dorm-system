@@ -252,12 +252,12 @@ def get_allowed_password_terms():
         # 沒有寒暑假設定才顯示上下學期
         # ==============================================
 
-            return [
+        return [
             "上學期",
             "下學期",
             ]
 
-        return []
+    return []
 
 
 # ==================================================
@@ -281,6 +281,7 @@ def get_allowed_dorms(
     if role in [
         "行政",
         "生輔工讀",
+        "舍監"
     ]:
 
         return ALL_DORMS.copy()
