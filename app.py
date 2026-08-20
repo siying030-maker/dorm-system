@@ -1,5 +1,6 @@
 import streamlit as st
 from modules.checkout import show_checkout
+from modules.network import show_network
 
 from modules.announcement import show_announcement
 
@@ -133,6 +134,7 @@ if st.button(
             "clean_",
             "holiday_",
             "room_password_",
+            "network_",
         ))
         and key not in {"sheet_sync_revision"}
     ]
@@ -276,3 +278,6 @@ elif selected_page == "密碼表":
 
 elif selected_page == "離宿":
     show_checkout()
+
+elif selected_page == "網路查詢":
+    show_network()

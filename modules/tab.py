@@ -2,14 +2,15 @@ def build_tabs(role, is_main):
 
     tab_names = []
 
-    '''
+    
     if role in ["舍監"]:
         tab_names += [
             "每日點名未到名單",
             "補點名單",
-            "獎懲查詢"
+            "獎懲查詢",
+            "密碼表"
         ]
-    '''
+    
     
     if role == "行政":
         tab_names += [
@@ -27,6 +28,7 @@ def build_tabs(role, is_main):
             "補點名單",
             "每日點名未到名單",
             "密碼表",
+            "網路查詢",
             "離宿",
             "獎懲查詢"
         ]

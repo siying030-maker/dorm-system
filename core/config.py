@@ -74,3 +74,8 @@ ANNOUNCEMENT_URL = "https://docs.google.com/spreadsheets/d/1eHdv22eH1kKfOYGD8XvJ
 
 #離宿
 CHECKOUT_RESERVATION_URL = "https://docs.google.com/spreadsheets/d/1H0mwVCby43p8UGT8BiNT9ZQTvMH2LFD58Cf9OarxZtE/edit"
+
+#網路
+NETWORK_81_URL = "https://docs.google.com/spreadsheets/d/1TCT-MGxNY93qeTCDvkuVSYXvTmVEyVXGvrSQaUhHTp8/edit"
+NETWORK_82_URL = "https://docs.google.com/spreadsheets/d/1w7s9uqzt7Wd89r0LuKQ8TkdWisC0z9ypYcDdJmVHtb8/edit"
+NETWORK_83_URL = "https://docs.google.com/spreadsheets/d/1camXUxBtXd6R1P4sTsj6mmhKPPX1Cijyi97fgir9fH8/edit"
