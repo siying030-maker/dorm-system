@@ -256,19 +256,60 @@ def login_page():
             # 額外加入女一一樓
             # ==========================================
 
+            # ==========================================
+            # 一般管理宿舍
+            # ==========================================
+
+            manage_dorms = clean_text(
+                row.get(
+                    "宿舍",
+                    ""
+                )
+            )
+
+            # ==========================================
+            # 男一樓長額外管理女一一樓
+            # ==========================================
+
             if current_dorm == "男一":
 
-                if "女一一樓" not in manage_dorms:
+                if manage_dorms:
 
-                    if manage_dorms:
-
-                        manage_dorms += "、女一一樓"
-
-                    else:
+                    if "女一一樓" not in manage_dorms:
 
                         manage_dorms = (
-                            "男一、女一一樓"
+                            manage_dorms
+                            + "、女一一樓"
                         )
+
+                else:
+
+                    manage_dorms = (
+                        "男一、女一一樓"
+                    )
+
+            st.session_state.manage_dorms = manage_dorms
+
+            # ==========================================
+            # 保留原本登入的宿舍別
+            # ==========================================
+
+            st.session_state.dorm = current_dorm
+
+            # ==========================================
+            # 額外建立樓層選擇範圍
+            # ==========================================
+
+            if current_dorm == "男一":
+
+                st.session_state.extra_dorms = [
+                    "男一",
+                    "女一一樓",
+                ]
+
+            else:
+
+                st.session_state.extra_dorms = []
 
             st.session_state.manage_dorms = (
                 manage_dorms
