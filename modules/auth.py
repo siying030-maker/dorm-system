@@ -131,186 +131,186 @@ def login_page():
 
     if role == "樓長":
 
-    if "宿舍別" not in user_df.columns:
-        st.error("樓長帳號表缺少「宿舍別」欄位")
-        return
-
-    dorm_selected = st.selectbox(
-        "宿舍別",
-        user_df["宿舍別"]
-        .astype(str)
-        .str.strip()
-        .unique(),
-        key="login_leader_dorm"
-    )
-
-    temp = user_df[
-        user_df["宿舍別"]
-        .astype(str)
-        .str.strip()
-        ==
-        str(dorm_selected).strip()
-    ]
-
-    username = st.selectbox(
-        "使用者",
-        temp["使用者"]
-        .astype(str)
-        .tolist(),
-        key="login_leader_user"
-    )
-
-    password = st.text_input(
-        "密碼",
-        type="password",
-        key="login_leader_password"
-    )
-
-    if st.button(
-        "登入",
-        key="login_leader_btn"
-    ):
-
-        match = temp[
-            (
-                temp["使用者"]
-                .astype(str)
-                .str.strip()
-                ==
-                username
-            )
-            &
-            (
-                temp["密碼"]
-                .astype(str)
-                .str.strip()
-                ==
-                password
-            )
-        ]
-
-        if match.empty:
-            st.error("密碼錯誤")
+        if "宿舍別" not in user_df.columns:
+            st.error("樓長帳號表缺少「宿舍別」欄位")
             return
 
-        row = match.iloc[0]
-
-        # ==========================================
-        # 基本登入資訊
-        # ==========================================
-
-        st.session_state.login = True
-        st.session_state.role = "樓長"
-        st.session_state.user = username
-        st.session_state.supervisor_type = ""
-
-        # ==========================================
-        # 宿舍
-        # ==========================================
-
-        current_dorm = normalize_dorm(
-            row.get(
-                "宿舍別",
-                ""
-            )
+        dorm_selected = st.selectbox(
+            "宿舍別",
+            user_df["宿舍別"]
+            .astype(str)
+            .str.strip()
+            .unique(),
+            key="login_leader_dorm"
         )
 
-        st.session_state.dorm = current_dorm
+        temp = user_df[
+            user_df["宿舍別"]
+            .astype(str)
+            .str.strip()
+            ==
+            str(dorm_selected).strip()
+        ]
 
-        # ==========================================
-        # 性別
-        # ==========================================
-
-        st.session_state.gender = get_row_gender(
-            row
+        username = st.selectbox(
+            "使用者",
+            temp["使用者"]
+            .astype(str)
+            .tolist(),
+            key="login_leader_user"
         )
 
-        # ==========================================
-        # 總樓
-        # ==========================================
+        password = st.text_input(
+            "密碼",
+            type="password",
+            key="login_leader_password"
+        )
 
-        st.session_state.is_main = (
-            clean_text(
+        if st.button(
+            "登入",
+            key="login_leader_btn"
+        ):
+
+            match = temp[
+                (
+                    temp["使用者"]
+                    .astype(str)
+                    .str.strip()
+                    ==
+                    username
+                )
+                &
+                (
+                    temp["密碼"]
+                    .astype(str)
+                    .str.strip()
+                    ==
+                    password
+                )
+            ]
+
+            if match.empty:
+                st.error("密碼錯誤")
+                return
+
+            row = match.iloc[0]
+
+            # ==========================================
+            # 基本登入資訊
+            # ==========================================
+
+            st.session_state.login = True
+            st.session_state.role = "樓長"
+            st.session_state.user = username
+            st.session_state.supervisor_type = ""
+
+            # ==========================================
+            # 宿舍
+            # ==========================================
+
+            current_dorm = normalize_dorm(
                 row.get(
-                    "總樓",
+                    "宿舍別",
                     ""
                 )
             )
-            ==
-            "是"
-        )
 
-        # ==========================================
-        # 一般管理宿舍
-        # ==========================================
+            st.session_state.dorm = current_dorm
 
-        manage_dorms = clean_text(
-            row.get(
-                "宿舍",
-                ""
+            # ==========================================
+            # 性別
+            # ==========================================
+
+            st.session_state.gender = get_row_gender(
+                row
             )
-        )
 
-        # ==========================================
-        # 男一樓長
-        # 額外加入女一一樓
-        # ==========================================
+            # ==========================================
+            # 總樓
+            # ==========================================
 
-        if current_dorm == "男一":
-
-            if "女一一樓" not in manage_dorms:
-
-                if manage_dorms:
-
-                    manage_dorms += "、女一一樓"
-
-                else:
-
-                    manage_dorms = (
-                        "男一、女一一樓"
+            st.session_state.is_main = (
+                clean_text(
+                    row.get(
+                        "總樓",
+                        ""
                     )
-
-        st.session_state.manage_dorms = (
-            manage_dorms
-        )
-
-        # ==========================================
-        # 寒假
-        # ==========================================
-
-        st.session_state.winter_dorms = clean_text(
-            row.get(
-                "寒假宿舍別",
-                ""
+                )
+                ==
+                "是"
             )
-        )
 
-        st.session_state.winter_floors = clean_text(
-            row.get(
-                "寒假樓層",
-                ""
+            # ==========================================
+            # 一般管理宿舍
+            # ==========================================
+
+            manage_dorms = clean_text(
+                row.get(
+                    "宿舍",
+                    ""
+                )
             )
-        )
 
-        # ==========================================
-        # 暑假
-        # ==========================================
+            # ==========================================
+            # 男一樓長
+            # 額外加入女一一樓
+            # ==========================================
 
-        st.session_state.summer_dorms = clean_text(
-            row.get(
-                "暑假宿舍別",
-                ""
+            if current_dorm == "男一":
+
+                if "女一一樓" not in manage_dorms:
+
+                    if manage_dorms:
+
+                        manage_dorms += "、女一一樓"
+
+                    else:
+
+                        manage_dorms = (
+                            "男一、女一一樓"
+                        )
+
+            st.session_state.manage_dorms = (
+                manage_dorms
             )
-        )
 
-        st.session_state.summer_floors = clean_text(
-            row.get(
-                "暑假樓層",
-                ""
+            # ==========================================
+            # 寒假
+            # ==========================================
+
+            st.session_state.winter_dorms = clean_text(
+                row.get(
+                    "寒假宿舍別",
+                    ""
+                )
             )
-        )
 
-        st.rerun()
+            st.session_state.winter_floors = clean_text(
+                row.get(
+                    "寒假樓層",
+                    ""
+                )
+            )
+
+            # ==========================================
+            # 暑假
+            # ==========================================
+
+            st.session_state.summer_dorms = clean_text(
+                row.get(
+                    "暑假宿舍別",
+                    ""
+                )
+            )
+
+            st.session_state.summer_floors = clean_text(
+                row.get(
+                    "暑假樓層",
+                    ""
+                )
+            )
+
+            st.rerun()
 
     else:
 
