@@ -257,7 +257,7 @@ def login_page():
             )
 
             # ==========================================
-            # 男一樓長額外管理「女一一樓」
+            # 男一樓長額外管理 81宿_男
             # ==========================================
 
             if current_dorm == "男一":
@@ -273,8 +273,8 @@ def login_page():
                 if "男一" not in manage_list:
                     manage_list.insert(0, "男一")
 
-                if "女一一樓" not in manage_list:
-                    manage_list.append("女一一樓")
+                if "81宿_男" not in manage_list:
+                    manage_list.append("81宿_男")
 
                 manage_dorms = "、".join(
                     manage_list
@@ -290,7 +290,7 @@ def login_page():
 
                 st.session_state.extra_dorms = [
                     "男一",
-                    "女一一樓",
+                    "81宿_男",
                 ]
 
             else:
