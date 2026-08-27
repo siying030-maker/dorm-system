@@ -265,8 +265,9 @@ def login_page():
                 manage_list = [
                     x.strip()
                     for x in manage_dorms
-                    .replace("，", ",")
-                    .split(",")
+                    .replace("，", "、")
+                    .replace(",", "、")
+                    .split("、")
                     if x.strip()
                 ]
 
