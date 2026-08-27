@@ -52,10 +52,6 @@ ATTENDANCE_SHEETS = {
 }
 
 
-# =========================================================
-# 寒暑假
-# =========================================================
-
 VACATION_SHEETS = {
     "寒假": {
         "女一": "https://docs.google.com/spreadsheets/d/1svJOTt-BQmws2Xsy2e3mrHrsqZAi_GD1rYX4t2LxE6Y/edit",
@@ -85,14 +81,20 @@ FLOOR_OPTIONS = {
     "女三": ["6F"],
     "男一": ["0F", "1F", "2F", "3F", "4F", "5F"],
     "男三": ["3F", "4F", "5F", "6F"],
-
-    # 81宿_男 一樓
-    "81宿_男": ["1F"],
 }
 
 
 # =========================================================
-# 宿舍 Prefix
+# 81宿_男 是獨立點名表，不需要樓層
+# =========================================================
+
+SPECIAL_NO_FLOOR_DORMS = [
+    "81宿_男",
+]
+
+
+# =========================================================
+# 宿舍前綴
 # =========================================================
 
 DORM_PREFIX = {
@@ -101,9 +103,6 @@ DORM_PREFIX = {
     "女三": "83",
     "男一": "82",
     "男三": "83",
-
-    # 81宿_男 的工作表名稱為 81-1F
-    "81宿_男": "81",
 }
 
 
@@ -112,11 +111,22 @@ DORM_PREFIX = {
 # =========================================================
 
 def normalize_dorm(value):
-    return str(value).strip().replace("ㄧ", "一")
+
+    return (
+        str(value)
+        .strip()
+        .replace("ㄧ", "一")
+    )
 
 
 def normalize_value(value):
-    value = str(value).strip().upper().replace(" ", "")
+
+    value = (
+        str(value)
+        .strip()
+        .upper()
+        .replace(" ", "")
+    )
 
     if value.endswith(".0"):
         value = value[:-2]
@@ -128,9 +138,11 @@ def normalize_value(value):
 
 
 def split_items(value):
+
     result = []
 
     for item in str(value).replace("，", ",").split(","):
+
         item = normalize_dorm(item)
 
         if item:
@@ -140,9 +152,11 @@ def split_items(value):
 
 
 def split_floors(value):
+
     result = []
 
     for item in str(value).replace("，", ",").split(","):
+
         item = item.strip().upper()
 
         if item:
@@ -151,8 +165,17 @@ def split_floors(value):
     return list(dict.fromkeys(result))
 
 
+# =========================================================
+# 判斷宿舍性別
+# =========================================================
+
 def get_dorm_gender(dorm):
+
     dorm = normalize_dorm(dorm)
+
+    # 81宿_男 特別處理
+    if dorm == "81宿_男":
+        return "男生"
 
     if dorm.startswith("女"):
         return "女生"
@@ -160,14 +183,15 @@ def get_dorm_gender(dorm):
     if dorm.startswith("男"):
         return "男生"
 
-    # 81宿_男
-    if dorm == "81宿_男":
-        return "男生"
-
     return ""
 
 
+# =========================================================
+# 一般樓層 Sheet 名稱
+# =========================================================
+
 def get_floor_sheet_name(dorm, floor):
+
     dorm = normalize_dorm(dorm)
 
     if dorm not in DORM_PREFIX:
@@ -177,7 +201,7 @@ def get_floor_sheet_name(dorm, floor):
 
 
 # =========================================================
-# 取得點名 URL
+# 取得點名 Google Sheet URL
 # =========================================================
 
 def get_attendance_url(term, dorm):
@@ -199,6 +223,10 @@ def get_attendance_url(term, dorm):
     return ""
 
 
+# =========================================================
+# 外宿／門禁 Sheet
+# =========================================================
+
 def get_gate_sheet_url(term):
 
     if term in ["上學期", "上學期假日"]:
@@ -217,93 +245,73 @@ def get_gate_sheet_url(term):
 
 
 def is_holiday_term(term):
-    return term in ["上學期假日", "下學期假日"]
 
-
-# =========================================================
-# 男一樓長額外管理
-# =========================================================
-
-def is_boy1_floor_leader():
-    return (
-        st.session_state.get("role") == "樓長"
-        and
-        normalize_dorm(
-            st.session_state.get("dorm", "")
-        ) == "男一"
-    )
-
-
-def get_extra_attendance_dorms(term, dorm, floor):
-
-    # 只有男一樓長
-    if not is_boy1_floor_leader():
-        return []
-
-    # 必須是男一
-    if normalize_dorm(dorm) != "男一":
-        return []
-
-    # 必須是一樓
-    if str(floor).strip().upper() != "1F":
-        return []
-
-    # 只有上下學期
-    if term not in [
-        "上學期",
-        "下學期",
+    return term in [
         "上學期假日",
-        "下學期假日",
-    ]:
-        return []
-
-    return ["81宿_男"]
+        "下學期假日"
+    ]
 
 
 # =========================================================
-# 可使用的點名類型
+# 點名類型
 # =========================================================
 
 def get_available_terms():
 
-    role = st.session_state.get("role", "")
+    role = st.session_state.get(
+        "role",
+        ""
+    )
 
     if role in ["舍監", "行政"]:
+
         return [
             "上學期",
             "下學期",
             "上學期假日",
             "下學期假日",
             "寒假",
-            "暑假",
+            "暑假"
         ]
 
     # 樓長
-    if st.session_state.get("winter_dorms", ""):
+    if st.session_state.get(
+        "winter_dorms",
+        ""
+    ):
+
         return ["寒假"]
 
-    if st.session_state.get("summer_dorms", ""):
+    if st.session_state.get(
+        "summer_dorms",
+        ""
+    ):
+
         return ["暑假"]
 
     return [
         "上學期",
         "下學期",
         "上學期假日",
-        "下學期假日",
+        "下學期假日"
     ]
 
 
 # =========================================================
-# 登入後可使用宿舍
+# 取得登入者可以管理的宿舍
 # =========================================================
 
 def get_login_dorm_options(term):
 
-    role = st.session_state.get("role", "")
+    role = st.session_state.get(
+        "role",
+        ""
+    )
 
     if role in ["舍監", "行政"]:
 
         if term in ["寒假", "暑假"]:
+
             return list(
                 VACATION_SHEETS[term].keys()
             )
@@ -314,8 +322,10 @@ def get_login_dorm_options(term):
             "女三",
             "男一",
             "男三",
+            "81宿_男",
         ]
 
+    # 寒假
     if term == "寒假":
 
         return [
@@ -329,6 +339,7 @@ def get_login_dorm_options(term):
             if d in VACATION_SHEETS["寒假"]
         ]
 
+    # 暑假
     if term == "暑假":
 
         return [
@@ -342,15 +353,20 @@ def get_login_dorm_options(term):
             if d in VACATION_SHEETS["暑假"]
         ]
 
+    # 樓長管理宿舍
     manage_dorms = st.session_state.get(
         "manage_dorms",
         ""
     )
 
     if manage_dorms:
-        return split_items(
+
+        result = split_items(
             manage_dorms
         )
+
+        # 保證 81宿_男 正確存在
+        return result
 
     dorm = normalize_dorm(
         st.session_state.get(
@@ -363,15 +379,33 @@ def get_login_dorm_options(term):
 
 
 # =========================================================
-# 樓層選項
+# 取得樓層
 # =========================================================
 
 def get_floor_options(term, dorm):
 
     dorm = normalize_dorm(dorm)
 
-    if term in ["寒假", "暑假"] and dorm.startswith("女"):
+    # =====================================================
+    # 81宿_男 是獨立點名表
+    # 完全不需要樓層
+    # =====================================================
+
+    if dorm in SPECIAL_NO_FLOOR_DORMS:
+
         return ["全部"]
+
+    # =====================================================
+    # 寒假、暑假女生
+    # =====================================================
+
+    if term in ["寒假", "暑假"] and dorm.startswith("女"):
+
+        return ["全部"]
+
+    # =====================================================
+    # 寒假
+    # =====================================================
 
     if term == "寒假":
 
@@ -385,6 +419,10 @@ def get_floor_options(term, dorm):
         if floors:
             return floors
 
+    # =====================================================
+    # 暑假
+    # =====================================================
+
     if term == "暑假":
 
         floors = split_floors(
@@ -397,8 +435,17 @@ def get_floor_options(term, dorm):
         if floors:
             return floors
 
+    # =====================================================
+    # 假日
+    # =====================================================
+
     if is_holiday_term(term):
+
         return ["全部"]
+
+    # =====================================================
+    # 一般宿舍
+    # =====================================================
 
     return FLOOR_OPTIONS.get(
         dorm,
@@ -407,7 +454,7 @@ def get_floor_options(term, dorm):
 
 
 # =========================================================
-# 取得指定宿舍要讀取的 Sheet
+# 取得要讀取的 Sheet
 # =========================================================
 
 def get_sheet_names_for_attendance(
@@ -418,8 +465,20 @@ def get_sheet_names_for_attendance(
 
     dorm = normalize_dorm(dorm)
 
-    if dorm not in DORM_PREFIX:
-        return []
+    # =====================================================
+    # 81宿_男
+    #
+    # 它的 Google Sheet 本身就是點名表
+    # 不需要 81-1F、81-2F 之類 Sheet
+    # =====================================================
+
+    if dorm == "81宿_男":
+
+        return ["81宿_男"]
+
+    # =====================================================
+    # 假日
+    # =====================================================
 
     if is_holiday_term(term):
 
@@ -434,10 +493,13 @@ def get_sheet_names_for_attendance(
             )
         ]
 
+    # =====================================================
+    # 寒假、暑假女生
+    # =====================================================
+
     if (
         term in ["寒假", "暑假"]
-        and
-        dorm.startswith("女")
+        and dorm.startswith("女")
     ):
 
         return [
@@ -451,16 +513,23 @@ def get_sheet_names_for_attendance(
             )
         ]
 
-    return [
-        get_floor_sheet_name(
-            dorm,
-            floor
-        )
-    ]
+    # =====================================================
+    # 一般樓層
+    # =====================================================
+
+    sheet_name = get_floor_sheet_name(
+        dorm,
+        floor
+    )
+
+    if sheet_name:
+        return [sheet_name]
+
+    return []
 
 
 # =========================================================
-# Header 處理
+# Google Sheet 欄位處理
 # =========================================================
 
 def build_unique_headers(headers):
@@ -478,6 +547,7 @@ def build_unique_headers(headers):
         if h in used:
 
             used[h] += 1
+
             h = f"{h}_{used[h]}"
 
         else:
@@ -505,10 +575,8 @@ def find_header_index(values):
             and
             (
                 "姓名" in row_text
-                or
-                "申請日期" in row_text
-                or
-                "結束日期" in row_text
+                or "申請日期" in row_text
+                or "結束日期" in row_text
             )
         ):
 
@@ -516,10 +584,6 @@ def find_header_index(values):
 
     return 0
 
-
-# =========================================================
-# 讀取一般 Worksheet
-# =========================================================
 
 def read_worksheet_df(
     ss,
@@ -539,6 +603,7 @@ def read_worksheet_df(
         )
 
         if len(values) <= 1:
+
             return pd.DataFrame()
 
         header_index = find_header_index(
@@ -554,6 +619,7 @@ def read_worksheet_df(
         ]
 
         if not data:
+
             return pd.DataFrame(
                 columns=headers
             )
@@ -579,10 +645,6 @@ def read_worksheet_df(
 
         return pd.DataFrame()
 
-
-# =========================================================
-# 找欄位
-# =========================================================
 
 def find_col(
     df,
@@ -637,7 +699,7 @@ def get_overseas_col(df):
         [
             "本地/境外",
             "本地境外",
-            "原始資料備註",
+            "原始資料備註"
         ]
     )
 
@@ -651,13 +713,7 @@ def get_overseas_col(df):
 
 
 # =========================================================
-# 讀取點名學生
-#
-# 特別功能：
-# 男一樓長 + 男一 + 1F
-# 自動讀取：
-# 1. 男一
-# 2. 81宿_男
+# 載入點名學生
 # =========================================================
 
 @st.cache_data(
@@ -672,375 +728,256 @@ def load_attendance_students(
 
     try:
 
-        dorm = normalize_dorm(
+        dorm = normalize_dorm(dorm)
+
+        url = get_attendance_url(
+            term,
             dorm
         )
 
-        # ==============================================
-        # 本次要讀取的宿舍
-        # ==============================================
+        if url == "":
 
-        source_dorms = [
-            dorm
-        ]
+            return pd.DataFrame()
 
-        # ==============================================
-        # 男一樓長特殊功能
-        # 男一 1F 額外加入 81宿_男
-        # ==============================================
-
-        if (
-            st.session_state.get("role")
-            == "樓長"
-            and
-            normalize_dorm(
-                st.session_state.get(
-                    "dorm",
-                    ""
-                )
-            ) == "男一"
-            and
-            dorm == "男一"
-            and
-            str(floor).strip().upper()
-            == "1F"
-            and
-            term in [
-                "上學期",
-                "下學期",
-                "上學期假日",
-                "下學期假日",
-            ]
-        ):
-
-            source_dorms.append(
-                "81宿_男"
-            )
+        ss = open_sheet(url)
 
         result_list = []
 
-        # ==============================================
-        # 逐一讀取宿舍
-        # ==============================================
-
-        for source_dorm in source_dorms:
-
-            source_dorm = normalize_dorm(
-                source_dorm
-            )
-
-            url = get_attendance_url(
+        sheet_names = (
+            get_sheet_names_for_attendance(
                 term,
-                source_dorm
+                dorm,
+                floor
+            )
+        )
+
+        for sheet_name in sheet_names:
+
+            df = read_worksheet_df(
+                ss,
+                sheet_name
             )
 
-            if url == "":
+            if df.empty:
+
                 st.warning(
-                    f"{source_dorm} 沒有設定點名試算表"
+                    f"{sheet_name} 暫時讀不到，正在略過"
                 )
+
                 continue
 
-            ss = open_sheet(
-                url
-            )
+            temp = pd.DataFrame()
 
-            # ==========================================
-            # 81宿_男 固定讀 1F
-            # ==========================================
+            # =================================================
+            # 寒假、暑假
+            # =================================================
 
-            if source_dorm == "81宿_男":
+            if term in ["寒假", "暑假"]:
 
-                source_floor = "1F"
-
-            else:
-
-                source_floor = floor
-
-            sheet_names = (
-                get_sheet_names_for_attendance(
-                    term,
-                    source_dorm,
-                    source_floor
-                )
-            )
-
-            # ==========================================
-            # 逐一讀取 Sheet
-            # ==========================================
-
-            for sheet_name in sheet_names:
-
-                df = read_worksheet_df(
-                    ss,
-                    sheet_name
-                )
-
-                if df.empty:
+                if len(df.columns) < 17:
 
                     st.warning(
-                        f"{sheet_name} 暫時讀不到，正在略過"
+                        f"{sheet_name} 欄位不足，至少需要 A~Q 欄"
                     )
 
                     continue
 
-                temp = pd.DataFrame()
-
-                # ======================================
-                # 寒假、暑假
-                #
-                # B 房號
-                # D 學號
-                # E 班級
-                # F 姓名
-                # I 本地/境外
-                # J 手機
-                # P 家長姓名
-                # Q 連絡電話1
-                # ======================================
-
-                if term in [
-                    "寒假",
-                    "暑假",
-                ]:
-
-                    if len(df.columns) < 17:
-
-                        st.warning(
-                            f"{sheet_name} 欄位不足，"
-                            "至少需要 A~Q 欄"
-                        )
-
-                        continue
-
-                    temp["房號"] = (
-                        df.iloc[:, 1]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
-
-                    temp["床位"] = (
-                        temp["房號"]
-                    )
-
-                    temp["學號"] = (
-                        df.iloc[:, 3]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
-
-                    temp["班級"] = (
-                        df.iloc[:, 4]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["姓名"] = (
-                        df.iloc[:, 5]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["本地/境外"] = (
-                        df.iloc[:, 8]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["手機"] = (
-                        df.iloc[:, 9]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["家長姓名"] = (
-                        df.iloc[:, 15]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["連絡電話1"] = (
-                        df.iloc[:, 16]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                # ======================================
-                # 上學期、下學期、假日
-                #
-                # B 床位
-                # E 學號
-                # F 班級
-                # G 姓名
-                # I 電話
-                # O 家長姓名
-                # Q 連絡電話1
-                # AQ 本地/境外
-                # ======================================
-
-                else:
-
-                    if len(df.columns) < 43:
-
-                        st.warning(
-                            f"{sheet_name} 欄位不足，"
-                            "至少需要 A~AQ 欄"
-                        )
-
-                        continue
-
-                    temp["床位"] = (
-                        df.iloc[:, 1]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
-
-                    temp["房號"] = (
-                        temp["床位"]
-                        .astype(str)
-                        .str.split("-")
-                        .str[0]
-                    )
-
-                    temp["學號"] = (
-                        df.iloc[:, 4]
-                        .astype(str)
-                        .map(normalize_value)
-                    )
-
-                    temp["班級"] = (
-                        df.iloc[:, 5]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["姓名"] = (
-                        df.iloc[:, 6]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["手機"] = (
-                        df.iloc[:, 8]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["家長姓名"] = (
-                        df.iloc[:, 14]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["連絡電話1"] = (
-                        df.iloc[:, 16]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp["本地/境外"] = (
-                        df.iloc[:, 42]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                # ======================================
-                # 性別
-                # ======================================
-
-                temp["性別"] = (
-                    get_dorm_gender(
-                        source_dorm
-                    )
-                    .replace(
-                        "生",
-                        ""
-                    )
-                )
-
-                # ======================================
-                # 真正來源宿舍
-                #
-                # 這個欄位很重要：
-                # 儲存時可以知道學生來自哪一個宿舍
-                # ======================================
-
-                temp["點名宿舍"] = (
-                    source_dorm
-                )
-
-                temp["讀取Sheet"] = (
-                    f"{source_dorm}｜{sheet_name}"
-                )
-
-                # ======================================
-                # 假日點名只顯示境外生
-                # ======================================
-
-                if is_holiday_term(term):
-
-                    temp["本地/境外"] = (
-                        temp["本地/境外"]
-                        .astype(str)
-                        .str.strip()
-                    )
-
-                    temp = temp[
-                        temp["本地/境外"].isin(
-                            [
-                                "境外",
-                                "其他",
-                            ]
-                        )
-                    ].copy()
-
-                # ======================================
-                # 過濾無效學生
-                # ======================================
-
-                temp = temp[
-                    (
-                        temp["學號"]
-                        .astype(str)
-                        .str.strip()
-                        != ""
-                    )
-                    &
-                    (
-                        temp["姓名"]
-                        .astype(str)
-                        .str.strip()
-                        != ""
-                    )
-                    &
-                    (
-                        temp["床位"]
-                        .astype(str)
-                        .str.strip()
-                        != ""
-                    )
-                ].copy()
-
-                temp = temp[
-                    ~temp["學號"]
+                temp["房號"] = (
+                    df.iloc[:, 1]
                     .astype(str)
-                    .str.upper()
-                    .isin(
+                    .map(normalize_value)
+                )
+
+                temp["床位"] = temp["房號"]
+
+                temp["學號"] = (
+                    df.iloc[:, 3]
+                    .astype(str)
+                    .map(normalize_value)
+                )
+
+                temp["班級"] = (
+                    df.iloc[:, 4]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["姓名"] = (
+                    df.iloc[:, 5]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["本地/境外"] = (
+                    df.iloc[:, 8]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["手機"] = (
+                    df.iloc[:, 9]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["家長姓名"] = (
+                    df.iloc[:, 15]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["連絡電話1"] = (
+                    df.iloc[:, 16]
+                    .astype(str)
+                    .str.strip()
+                )
+
+            # =================================================
+            # 上學期、下學期、假日
+            # =================================================
+
+            else:
+
+                if len(df.columns) < 43:
+
+                    st.warning(
+                        f"{sheet_name} 欄位不足，至少需要 A~AQ 欄"
+                    )
+
+                    continue
+
+                temp["床位"] = (
+                    df.iloc[:, 1]
+                    .astype(str)
+                    .map(normalize_value)
+                )
+
+                temp["房號"] = (
+                    temp["床位"]
+                    .astype(str)
+                    .str.split("-")
+                    .str[0]
+                )
+
+                temp["學號"] = (
+                    df.iloc[:, 4]
+                    .astype(str)
+                    .map(normalize_value)
+                )
+
+                temp["班級"] = (
+                    df.iloc[:, 5]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["姓名"] = (
+                    df.iloc[:, 6]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["手機"] = (
+                    df.iloc[:, 8]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["家長姓名"] = (
+                    df.iloc[:, 14]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["連絡電話1"] = (
+                    df.iloc[:, 16]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp["本地/境外"] = (
+                    df.iloc[:, 42]
+                    .astype(str)
+                    .str.strip()
+                )
+
+            # =================================================
+            # 性別
+            # =================================================
+
+            temp["性別"] = (
+                get_dorm_gender(dorm)
+                .replace("生", "")
+            )
+
+            temp["讀取Sheet"] = sheet_name
+
+            # =================================================
+            # 假日點名只顯示境外生
+            # =================================================
+
+            if is_holiday_term(term):
+
+                temp["本地/境外"] = (
+                    temp["本地/境外"]
+                    .astype(str)
+                    .str.strip()
+                )
+
+                temp = temp[
+                    temp["本地/境外"].isin(
                         [
-                            "NAN",
-                            "NONE",
-                            "NA",
+                            "境外",
+                            "其他",
                         ]
                     )
                 ].copy()
 
-                if not temp.empty:
-                    result_list.append(
-                        temp
-                    )
+            # =================================================
+            # 過濾無效資料
+            # =================================================
 
-        # ==============================================
-        # 合併
-        # ==============================================
+            temp = temp[
+                (
+                    temp["學號"]
+                    .astype(str)
+                    .str.strip()
+                    != ""
+                )
+                &
+                (
+                    temp["姓名"]
+                    .astype(str)
+                    .str.strip()
+                    != ""
+                )
+                &
+                (
+                    temp["床位"]
+                    .astype(str)
+                    .str.strip()
+                    != ""
+                )
+            ].copy()
+
+            temp = temp[
+                ~temp["學號"]
+                .astype(str)
+                .str.upper()
+                .isin(
+                    [
+                        "NAN",
+                        "NONE",
+                        "NA"
+                    ]
+                )
+            ].copy()
+
+            if not temp.empty:
+
+                result_list.append(
+                    temp
+                )
 
         if result_list:
 
@@ -1061,8 +998,7 @@ def load_attendance_students(
                     "家長姓名",
                     "連絡電話1",
                     "性別",
-                    "點名宿舍",
-                    "讀取Sheet",
+                    "讀取Sheet"
                 ]
             ]
 
@@ -1078,7 +1014,7 @@ def load_attendance_students(
 
 
 # =========================================================
-# 未繳費
+# 未繳費名單
 # =========================================================
 
 @st.cache_data(
@@ -1142,7 +1078,7 @@ def load_unpaid_ids():
 
 
 # =========================================================
-# 讀取原始 Sheet
+# 原始 Sheet
 # =========================================================
 
 def read_raw_sheet_df(
@@ -1162,6 +1098,7 @@ def read_raw_sheet_df(
         )
 
         if len(values) <= 2:
+
             return pd.DataFrame()
 
         headers = build_unique_headers(
@@ -1190,6 +1127,44 @@ def read_raw_sheet_df(
         )
 
         return pd.DataFrame()
+
+
+# =========================================================
+# 日期
+# =========================================================
+
+def parse_sheet_date(value):
+
+    if value is None:
+        return pd.NaT
+
+    value_str = str(value).strip()
+
+    if value_str == "":
+        return pd.NaT
+
+    try:
+
+        num = float(value_str)
+
+        if 20000 <= num <= 60000:
+
+            return (
+                pd.Timestamp("1899-12-30")
+                +
+                pd.to_timedelta(
+                    num,
+                    unit="D"
+                )
+            )
+
+    except:
+        pass
+
+    return pd.to_datetime(
+        value_str,
+        errors="coerce"
+    )
 
 
 # =========================================================
@@ -1229,21 +1204,19 @@ def load_special_status(
             url
         )
 
-        target_date = pd.to_datetime(
-            attendance_date
-        ).date()
+        target_date = (
+            pd.to_datetime(
+                attendance_date
+            ).date()
+        )
 
         leave_ids = set()
         long_leave_ids = set()
         late_ids = set()
 
-        # ==============================================
+        # =================================================
         # 外宿申請
-        #
-        # C = 學號
-        # N = 開始日期
-        # O = 結束日期
-        # ==============================================
+        # =================================================
 
         try:
 
@@ -1303,10 +1276,9 @@ def load_special_status(
                 f"外宿申請讀取失敗：{error}"
             )
 
-        # ==============================================
+        # =================================================
         # 長期外宿
-        # C = 學號
-        # ==============================================
+        # =================================================
 
         try:
 
@@ -1315,10 +1287,8 @@ def load_special_status(
                 "長期外宿"
             )
 
-            long_leave_values = (
-                get_all_values(
-                    long_leave_ws
-                )
+            long_leave_values = get_all_values(
+                long_leave_ws
             )
 
             for row in long_leave_values:
@@ -1346,10 +1316,9 @@ def load_special_status(
                 f"長期外宿讀取失敗：{error}"
             )
 
-        # ==============================================
+        # =================================================
         # 長期晚歸
-        # C = 學號
-        # ==============================================
+        # =================================================
 
         try:
 
@@ -1358,10 +1327,8 @@ def load_special_status(
                 "長期晚歸"
             )
 
-            late_values = (
-                get_all_values(
-                    late_ws
-                )
+            late_values = get_all_values(
+                late_ws
             )
 
             for row in late_values:
@@ -1405,7 +1372,7 @@ def load_special_status(
 
 
 # =========================================================
-# 批次寫入 Sheet
+# 寫入 Sheet
 # =========================================================
 
 def append_rows_to_sheet(
@@ -1448,20 +1415,12 @@ def append_rows_to_sheet(
 
         worksheet_created = True
 
-    # ==============================================
-    # 新建 Sheet 加標題
-    # ==============================================
-
     if worksheet_created:
 
         append_row(
             worksheet,
             headers
         )
-
-        # ==========================================
-        # 新 Sheet 移到最前面
-        # ==========================================
 
         try:
 
@@ -1491,11 +1450,6 @@ def append_rows_to_sheet(
 
     else:
 
-        # ==========================================
-        # 已存在 Sheet 若完全空白
-        # 自動補標題
-        # ==========================================
-
         try:
 
             current_values = get_all_values(
@@ -1512,10 +1466,6 @@ def append_rows_to_sheet(
         except Exception:
             pass
 
-    # ==============================================
-    # 批次寫入
-    # ==============================================
-
     append_rows(
         worksheet,
         rows
@@ -1526,10 +1476,6 @@ def append_rows_to_sheet(
 
 # =========================================================
 # 儲存點名結果
-#
-# 注意：
-# final_df 裡面有「點名宿舍」
-# 所以男一與 81宿_男 可以分開儲存
 # =========================================================
 
 def save_rollcall_result(
@@ -1538,28 +1484,6 @@ def save_rollcall_result(
     floor,
     final_df
 ):
-
-    """
-    將狀態為「缺」的學生寫入：
-
-    女生：
-    - 女生點名回報
-    - 點名單總表
-
-    男生：
-    - 男生點名回報
-    - 點名單總表
-
-    男一樓長：
-    - 男一
-    - 81宿_男
-
-    會依照「點名宿舍」分開處理。
-    """
-
-    # ==============================================
-    # 男／女總表 URL
-    # ==============================================
 
     gender = get_dorm_gender(
         dorm
@@ -1595,10 +1519,6 @@ def save_rollcall_result(
         attendance_date
     )
 
-    # ==============================================
-    # 欄位
-    # ==============================================
-
     rollcall_headers = [
         "學號",
         "班級",
@@ -1624,190 +1544,78 @@ def save_rollcall_result(
         "備註",
     ]
 
-    # ==============================================
-    # 如果沒有「點名宿舍」
-    # 就使用目前 dorm
-    # ==============================================
+    absent_rollcall_rows = []
+    absent_makeup_rows = []
 
-    working_df = final_df.copy()
+    for _, student_row in final_df.iterrows():
 
-    if "點名宿舍" not in working_df.columns:
-
-        working_df["點名宿舍"] = (
-            dorm
-        )
-
-    # ==============================================
-    # 分宿舍處理
-    # ==============================================
-
-    all_absent_count = 0
-
-    source_dorms = (
-        working_df["點名宿舍"]
-        .astype(str)
-        .map(normalize_dorm)
-        .dropna()
-        .unique()
-        .tolist()
-    )
-
-    for source_dorm in source_dorms:
-
-        source_df = working_df[
-            working_df["點名宿舍"]
-            .astype(str)
-            .map(normalize_dorm)
-            ==
-            source_dorm
-        ].copy()
-
-        absent_rollcall_rows = []
-        absent_makeup_rows = []
-
-        # ==========================================
-        # 只處理「缺」
-        # ==========================================
-
-        for _, student_row in source_df.iterrows():
-
-            status = str(
-                student_row.get(
-                    "狀態",
-                    ""
-                )
-            ).strip()
-
-            if status != "缺":
-                continue
-
-            # ======================================
-            # 點名回報
-            # ======================================
-
-            rollcall_row = [
-                student_row.get(
-                    "學號",
-                    ""
-                ),
-                student_row.get(
-                    "班級",
-                    ""
-                ),
-                student_row.get(
-                    "姓名",
-                    ""
-                ),
-                student_row.get(
-                    "床位",
-                    ""
-                ),
-                student_row.get(
-                    "房號",
-                    ""
-                ),
-                student_row.get(
-                    "本地/境外",
-                    ""
-                ),
-                student_row.get(
-                    "手機",
-                    ""
-                ),
-                student_row.get(
-                    "家長姓名",
-                    ""
-                ),
-                student_row.get(
-                    "連絡電話1",
-                    ""
-                ),
-                status,
-                student_row.get(
-                    "備註",
-                    ""
-                ),
-            ]
-
-            # ======================================
-            # 補點名單
-            # ======================================
-
-            makeup_row = [
-                source_dorm,
-                student_row.get(
-                    "床位",
-                    ""
-                ),
-                student_row.get(
-                    "房號",
-                    ""
-                ),
-                student_row.get(
-                    "學號",
-                    ""
-                ),
-                student_row.get(
-                    "班級",
-                    ""
-                ),
-                student_row.get(
-                    "姓名",
-                    ""
-                ),
-                status,
-                student_row.get(
-                    "備註",
-                    ""
-                ),
-            ]
-
-            absent_rollcall_rows.append(
-                rollcall_row
+        status = str(
+            student_row.get(
+                "狀態",
+                ""
             )
+        ).strip()
 
-            absent_makeup_rows.append(
-                makeup_row
-            )
-
-        # ==========================================
-        # 此宿舍沒有缺席
-        # ==========================================
-
-        if not absent_rollcall_rows:
+        if status != "缺":
             continue
 
-        # ==========================================
-        # 寫入男／女生點名回報
-        # ==========================================
+        rollcall_row = [
+            student_row.get("學號", ""),
+            student_row.get("班級", ""),
+            student_row.get("姓名", ""),
+            student_row.get("床位", ""),
+            student_row.get("房號", ""),
+            student_row.get("本地/境外", ""),
+            student_row.get("手機", ""),
+            student_row.get("家長姓名", ""),
+            student_row.get("連絡電話1", ""),
+            status,
+            student_row.get("備註", ""),
+        ]
 
-        append_rows_to_sheet(
-            spreadsheet_url=rollcall_url,
-            sheet_name=sheet_name,
-            headers=rollcall_headers,
-            rows=absent_rollcall_rows,
+        makeup_row = [
+            dorm,
+            student_row.get("床位", ""),
+            student_row.get("房號", ""),
+            student_row.get("學號", ""),
+            student_row.get("班級", ""),
+            student_row.get("姓名", ""),
+            status,
+            student_row.get("備註", ""),
+        ]
+
+        absent_rollcall_rows.append(
+            rollcall_row
         )
 
-        # ==========================================
-        # 寫入點名單總表
-        # ==========================================
-
-        append_rows_to_sheet(
-            spreadsheet_url=need_makeup_url,
-            sheet_name=sheet_name,
-            headers=makeup_headers,
-            rows=absent_makeup_rows,
+        absent_makeup_rows.append(
+            makeup_row
         )
 
-        all_absent_count += len(
-            absent_rollcall_rows
-        )
+    if not absent_rollcall_rows:
+        return 0
 
-    return all_absent_count
+    append_rows_to_sheet(
+        spreadsheet_url=rollcall_url,
+        sheet_name=sheet_name,
+        headers=rollcall_headers,
+        rows=absent_rollcall_rows,
+    )
+
+    append_rows_to_sheet(
+        spreadsheet_url=need_makeup_url,
+        sheet_name=sheet_name,
+        headers=makeup_headers,
+        rows=absent_makeup_rows,
+    )
+
+    return len(
+        absent_rollcall_rows
+    )
 
 
 # =========================================================
-# 顏色文字
+# 顯示文字顏色
 # =========================================================
 
 def color_text(
@@ -1822,74 +1630,18 @@ def color_text(
 
 
 # =========================================================
-# 日期解析
-# =========================================================
-
-def parse_sheet_date(value):
-
-    if value is None:
-        return pd.NaT
-
-    value_str = str(
-        value
-    ).strip()
-
-    if value_str == "":
-        return pd.NaT
-
-    # ==============================================
-    # Google Sheet / Excel 日期序號
-    # ==============================================
-
-    try:
-
-        num = float(
-            value_str
-        )
-
-        if (
-            20000
-            <= num
-            <= 60000
-        ):
-
-            return (
-                pd.Timestamp(
-                    "1899-12-30"
-                )
-                +
-                pd.to_timedelta(
-                    num,
-                    unit="D"
-                )
-            )
-
-    except Exception:
-        pass
-
-    return pd.to_datetime(
-        value_str,
-        errors="coerce"
-    )
-
-
-# =========================================================
-# 點名畫面
+# 點名主畫面
 # =========================================================
 
 def show_attendance():
 
-    st.header(
-        "點名系統"
-    )
+    st.header("點名系統")
 
-    # ==================================================
+    # =====================================================
     # 點名類型
-    # ==================================================
+    # =====================================================
 
-    term_options = (
-        get_available_terms()
-    )
+    term_options = get_available_terms()
 
     if not term_options:
 
@@ -1905,14 +1657,12 @@ def show_attendance():
         key="attendance_term"
     )
 
-    # ==================================================
+    # =====================================================
     # 宿舍
-    # ==================================================
+    # =====================================================
 
-    dorm_options = (
-        get_login_dorm_options(
-            term
-        )
+    dorm_options = get_login_dorm_options(
+        term
     )
 
     if not dorm_options:
@@ -1929,9 +1679,9 @@ def show_attendance():
         key="attendance_dorm"
     )
 
-    # ==================================================
+    # =====================================================
     # 性別
-    # ==================================================
+    # =====================================================
 
     gender = get_dorm_gender(
         dorm
@@ -1944,9 +1694,9 @@ def show_attendance():
         key="attendance_gender"
     )
 
-    # ==================================================
+    # =====================================================
     # 樓層
-    # ==================================================
+    # =====================================================
 
     floors = get_floor_options(
         term,
@@ -1956,12 +1706,24 @@ def show_attendance():
     if not floors:
 
         st.warning(
-            "此宿舍沒有樓層設定"
+            f"{dorm} 沒有樓層設定"
         )
 
         return
 
-    if is_holiday_term(term):
+    # =====================================================
+    # 81宿_男 特別處理
+    # =====================================================
+
+    if dorm == "81宿_男":
+
+        floor = "全部"
+
+        st.info(
+            "81宿_男：使用獨立點名表，不分樓層"
+        )
+
+    elif is_holiday_term(term):
 
         floor = "全部"
 
@@ -1977,9 +1739,9 @@ def show_attendance():
             key="attendance_floor"
         )
 
-    # ==================================================
+    # =====================================================
     # 日期
-    # ==================================================
+    # =====================================================
 
     attendance_date = st.date_input(
         "點名日期",
@@ -1987,9 +1749,9 @@ def show_attendance():
         key="attendance_date"
     )
 
-    # ==================================================
+    # =====================================================
     # 顯示目前讀取 Sheet
-    # ==================================================
+    # =====================================================
 
     sheet_names = (
         get_sheet_names_for_attendance(
@@ -1999,71 +1761,17 @@ def show_attendance():
         )
     )
 
-    # ==============================================
-    # 男一樓長特殊顯示
-    # ==============================================
+    if sheet_names:
 
-    extra_dorms = (
-        get_extra_attendance_dorms(
-            term,
-            dorm,
-            floor
-        )
-    )
-
-    display_sheet_names = list(
-        sheet_names
-    )
-
-    for extra_dorm in extra_dorms:
-
-        extra_sheets = (
-            get_sheet_names_for_attendance(
-                term,
-                extra_dorm,
-                "1F"
-            )
+        st.info(
+            "目前讀取 Sheet："
+            +
+            "、".join(sheet_names)
         )
 
-        display_sheet_names.extend(
-            extra_sheets
-        )
-
-    st.info(
-        "目前讀取 Sheet："
-        +
-        "、".join(
-            display_sheet_names
-        )
-    )
-
-    # ==================================================
-    # 男一樓長提示
-    # ==================================================
-
-    if (
-        is_boy1_floor_leader()
-        and
-        dorm == "男一"
-        and
-        str(floor).strip().upper()
-        == "1F"
-        and
-        term in [
-            "上學期",
-            "下學期",
-            "上學期假日",
-            "下學期假日",
-        ]
-    ):
-
-        st.success(
-            "男一樓長：本次將同時顯示「男一 1F」及「81一樓（81宿_男）」點名表"
-        )
-
-    # ==================================================
+    # =====================================================
     # 重新讀取
-    # ==================================================
+    # =====================================================
 
     if st.button(
         "重新讀取點名名單",
@@ -2096,18 +1804,16 @@ def show_attendance():
 
         st.rerun()
 
-    # ==================================================
+    # =====================================================
     # 載入點名名單
-    # ==================================================
+    # =====================================================
 
     if st.button(
         "載入點名名單",
         key="load_attendance"
     ):
 
-        loaded_students = (
-            pd.DataFrame()
-        )
+        loaded_students = pd.DataFrame()
 
         loaded_special_status = {
             "leave_ids": set(),
@@ -2142,10 +1848,6 @@ def show_attendance():
                     load_unpaid_ids()
                 )
 
-            # ==========================================
-            # Session
-            # ==========================================
-
             st.session_state[
                 "attendance_students"
             ] = loaded_students
@@ -2161,13 +1863,9 @@ def show_attendance():
             st.session_state[
                 "attendance_loaded_context"
             ] = {
-
                 "term": term,
-
                 "dorm": dorm,
-
                 "floor": floor,
-
                 "attendance_date": str(
                     attendance_date
                 ),
@@ -2194,11 +1892,8 @@ def show_attendance():
             st.session_state[
                 "attendance_special_status"
             ] = {
-
                 "leave_ids": set(),
-
                 "long_leave_ids": set(),
-
                 "late_ids": set(),
             }
 
@@ -2215,9 +1910,9 @@ def show_attendance():
                 f"載入點名名單失敗：{error}"
             )
 
-    # ==================================================
-    # Session 取得資料
-    # ==================================================
+    # =====================================================
+    # 取得 Session
+    # =====================================================
 
     students = st.session_state.get(
         "attendance_students",
@@ -2243,9 +1938,9 @@ def show_attendance():
         {}
     )
 
-    # ==================================================
-    # 資料型態
-    # ==================================================
+    # =====================================================
+    # 型態確認
+    # =====================================================
 
     if not isinstance(
         students,
@@ -2260,11 +1955,8 @@ def show_attendance():
     ):
 
         special_status = {
-
             "leave_ids": set(),
-
             "long_leave_ids": set(),
-
             "late_ids": set(),
         }
 
@@ -2277,9 +1969,9 @@ def show_attendance():
             unpaid_ids
         )
 
-    # ==================================================
+    # =====================================================
     # 尚未載入
-    # ==================================================
+    # =====================================================
 
     if students.empty:
 
@@ -2289,18 +1981,14 @@ def show_attendance():
 
         return
 
-    # ==================================================
+    # =====================================================
     # Context
-    # ==================================================
+    # =====================================================
 
     current_context = {
-
         "term": term,
-
         "dorm": dorm,
-
         "floor": floor,
-
         "attendance_date": str(
             attendance_date
         ),
@@ -2309,9 +1997,7 @@ def show_attendance():
     if (
         loaded_context
         and
-        loaded_context
-        !=
-        current_context
+        loaded_context != current_context
     ):
 
         st.warning(
@@ -2320,9 +2006,9 @@ def show_attendance():
 
         return
 
-    # ==================================================
+    # =====================================================
     # 必要欄位
-    # ==================================================
+    # =====================================================
 
     required_columns = [
         "床位",
@@ -2331,14 +2017,9 @@ def show_attendance():
     ]
 
     missing_columns = [
-
         column
-
-        for column
-        in required_columns
-
-        if column
-        not in students.columns
+        for column in required_columns
+        if column not in students.columns
     ]
 
     if missing_columns:
@@ -2346,23 +2027,19 @@ def show_attendance():
         st.error(
             "點名資料缺少欄位："
             +
-            "、".join(
-                missing_columns
-            )
+            "、".join(missing_columns)
         )
 
         st.write(
             "目前實際讀取欄位：",
-            list(
-                students.columns
-            )
+            list(students.columns)
         )
 
         return
 
-    # ==================================================
+    # =====================================================
     # 清理
-    # ==================================================
+    # =====================================================
 
     students = students.copy()
 
@@ -2385,20 +2062,11 @@ def show_attendance():
     )
 
     students = students[
-        (
-            students["床位"]
-            != ""
-        )
+        (students["床位"] != "")
         &
-        (
-            students["學號"]
-            != ""
-        )
+        (students["學號"] != "")
         &
-        (
-            students["姓名"]
-            != ""
-        )
+        (students["姓名"] != "")
     ].copy()
 
     students = students[
@@ -2439,9 +2107,9 @@ def show_attendance():
 
         return
 
-    # ==================================================
+    # =====================================================
     # 特殊狀態
-    # ==================================================
+    # =====================================================
 
     leave_ids = special_status.get(
         "leave_ids",
@@ -2458,9 +2126,9 @@ def show_attendance():
         set()
     )
 
-    # ==================================================
+    # =====================================================
     # 點名畫面
-    # ==================================================
+    # =====================================================
 
     st.divider()
 
@@ -2481,36 +2149,9 @@ def show_attendance():
 
     final_rows = []
 
-    # ==================================================
-    # 判斷是否為雙宿舍模式
-    # ==================================================
-
-    is_dual_dorm_mode = (
-        is_boy1_floor_leader()
-        and
-        dorm == "男一"
-        and
-        str(floor).strip().upper()
-        == "1F"
-        and
-        term in [
-            "上學期",
-            "下學期",
-            "上學期假日",
-            "下學期假日",
-        ]
-    )
-
-    # ==================================================
-    # 記錄目前顯示的來源宿舍
-    # 用來顯示分區標題
-    # ==================================================
-
-    last_source_dorm = None
-
-    # ==================================================
+    # =====================================================
     # 每位學生
-    # ==================================================
+    # =====================================================
 
     for i, row in students.iterrows():
 
@@ -2521,109 +2162,27 @@ def show_attendance():
             )
         )
 
-        source_dorm = normalize_dorm(
-            row.get(
-                "點名宿舍",
-                dorm
-            )
-        )
-
-        # ==============================================
-        # 雙宿舍模式：
-        # 來源改變時顯示分區
-        # ==============================================
-
-        if (
-            is_dual_dorm_mode
-            and
-            source_dorm
-            !=
-            last_source_dorm
-        ):
-
-            st.divider()
-
-            if source_dorm == "男一":
-
-                st.markdown(
-                    "## 🏠 男一 1F"
-                )
-
-                st.caption(
-                    "男一宿舍一樓點名表"
-                )
-
-            elif source_dorm == "81宿_男":
-
-                st.markdown(
-                    "## 🏠 81一樓（81宿_男）"
-                )
-
-                st.caption(
-                    "81宿男生一樓點名表"
-                )
-
-            else:
-
-                st.markdown(
-                    f"## 🏠 {source_dorm}"
-                )
-
-            st.divider()
-
-            last_source_dorm = (
-                source_dorm
-            )
-
-        # ==============================================
-        # 一般模式第一次顯示來源
-        # ==============================================
-
-        elif (
-            not is_dual_dorm_mode
-            and
-            last_source_dorm is None
-        ):
-
-            st.markdown(
-                f"## 🏠 {source_dorm}"
-            )
-
-            st.divider()
-
-            last_source_dorm = (
-                source_dorm
-            )
-
-        # ==============================================
-        # 特殊狀態
-        # ==============================================
-
         is_unpaid = (
-            sid
-            in unpaid_ids
+            sid in unpaid_ids
         )
 
         is_leave = (
-            sid
-            in leave_ids
+            sid in leave_ids
         )
 
         is_long_leave = (
-            sid
-            in long_leave_ids
+            sid in long_leave_ids
         )
 
         is_late = (
-            sid
-            in late_ids
+            sid in late_ids
         )
 
         default_status = "在"
 
-        # ==============================================
+        # =================================================
         # 學生基本資料
-        # ==============================================
+        # =================================================
 
         st.subheader(
             f"{row.get('床位', '')}　"
@@ -2631,9 +2190,9 @@ def show_attendance():
             f"{row.get('姓名', '')}"
         )
 
-        # ==============================================
+        # =================================================
         # 外宿
-        # ==============================================
+        # =================================================
 
         if is_leave:
 
@@ -2645,9 +2204,9 @@ def show_attendance():
                 unsafe_allow_html=True
             )
 
-        # ==============================================
+        # =================================================
         # 長期外宿
-        # ==============================================
+        # =================================================
 
         if is_long_leave:
 
@@ -2659,9 +2218,9 @@ def show_attendance():
                 unsafe_allow_html=True
             )
 
-        # ==============================================
+        # =================================================
         # 長期晚歸
-        # ==============================================
+        # =================================================
 
         if is_late:
 
@@ -2673,9 +2232,9 @@ def show_attendance():
                 unsafe_allow_html=True
             )
 
-        # ==============================================
+        # =================================================
         # 未繳費
-        # ==============================================
+        # =================================================
 
         if is_unpaid:
 
@@ -2687,9 +2246,9 @@ def show_attendance():
                 unsafe_allow_html=True
             )
 
-        # ==============================================
+        # =================================================
         # 狀態
-        # ==============================================
+        # =================================================
 
         status_options = [
             "在",
@@ -2705,104 +2264,80 @@ def show_attendance():
             ),
             key=(
                 f"attendance_status_"
-                f"{term}_"
-                f"{dorm}_"
-                f"{floor}_"
-                f"{source_dorm}_"
-                f"{sid}_"
-                f"{i}"
+                f"{term}_{dorm}_{floor}_{sid}_{i}"
             )
         )
 
-        # ==============================================
+        # =================================================
         # 備註
-        # ==============================================
+        # =================================================
 
         note = st.text_input(
             "備註",
             key=(
                 f"attendance_note_"
-                f"{term}_"
-                f"{dorm}_"
-                f"{floor}_"
-                f"{source_dorm}_"
-                f"{sid}_"
-                f"{i}"
+                f"{term}_{dorm}_{floor}_{sid}_{i}"
             )
         )
 
-        # ==============================================
-        # 最終資料
-        # ==============================================
+        final_rows.append(
+            {
+                "學號": row.get(
+                    "學號",
+                    ""
+                ),
 
-        final_rows.append({
+                "班級": row.get(
+                    "班級",
+                    ""
+                ),
 
-            "學號": row.get(
-                "學號",
-                ""
-            ),
+                "姓名": row.get(
+                    "姓名",
+                    ""
+                ),
 
-            "班級": row.get(
-                "班級",
-                ""
-            ),
+                "床位": row.get(
+                    "床位",
+                    ""
+                ),
 
-            "姓名": row.get(
-                "姓名",
-                ""
-            ),
+                "房號": row.get(
+                    "房號",
+                    ""
+                ),
 
-            "床位": row.get(
-                "床位",
-                ""
-            ),
+                "本地/境外": row.get(
+                    "本地/境外",
+                    ""
+                ),
 
-            "房號": row.get(
-                "房號",
-                ""
-            ),
+                "手機": row.get(
+                    "手機",
+                    ""
+                ),
 
-            "本地/境外": row.get(
-                "本地/境外",
-                ""
-            ),
+                "家長姓名": row.get(
+                    "家長姓名",
+                    ""
+                ),
 
-            "手機": row.get(
-                "手機",
-                ""
-            ),
+                "連絡電話1": row.get(
+                    "連絡電話1",
+                    ""
+                ),
 
-            "家長姓名": row.get(
-                "家長姓名",
-                ""
-            ),
+                "狀態": status,
 
-            "連絡電話1": row.get(
-                "連絡電話1",
-                ""
-            ),
-
-            "狀態": status,
-
-            "備註": note,
-
-            # ==========================================
-            # 真正來源宿舍
-            # ==========================================
-
-            "點名宿舍": source_dorm,
-
-            "讀取Sheet": row.get(
-                "讀取Sheet",
-                ""
-            ),
-        })
+                "備註": note,
+            }
+        )
 
         st.divider()
 
-    # ==================================================
-    # Final DataFrame
-    # ==================================================
+    # =====================================================
+    # DataFrame
+    # =====================================================
 
     final_df = pd.DataFrame(
         final_rows
@@ -2816,9 +2351,9 @@ def show_attendance():
 
         return
 
-    # ==================================================
-    # 點名結果預覽
-    # ==================================================
+    # =====================================================
+    # 預覽
+    # =====================================================
 
     st.subheader(
         "點名結果預覽"
@@ -2827,7 +2362,6 @@ def show_attendance():
     preview_columns = [
         column
         for column in [
-            "點名宿舍",
             "床位",
             "學號",
             "班級",
@@ -2835,8 +2369,7 @@ def show_attendance():
             "狀態",
             "備註",
         ]
-        if column
-        in final_df.columns
+        if column in final_df.columns
     ]
 
     st.dataframe(
@@ -2847,9 +2380,9 @@ def show_attendance():
         hide_index=True
     )
 
-    # ==================================================
-    # 儲存按鈕
-    # ==================================================
+    # =====================================================
+    # 儲存
+    # =====================================================
 
     if st.button(
         "儲存點名結果",
