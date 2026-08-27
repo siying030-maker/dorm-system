@@ -13,12 +13,8 @@ from core.config import (
     ROLLCALL_BOY_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
-
-    UPPER_SHORT_STAY_URL,
-    LOWER_SHORT_STAY_URL,
-    WINTER_SHORT_STAY_URL,
-    SUMMER_SHORT_STAY_URL,
 )
+
 from core.google_api import (
     open_sheet,
     get_worksheet,
@@ -36,7 +32,6 @@ ATTENDANCE_SHEETS = {
         "女一": "https://docs.google.com/spreadsheets/d/1U9bdg8CWASheYE7XxLt5p-otLDxKiotju4s72Car9rk/edit",
         "女二": "https://docs.google.com/spreadsheets/d/1jNbe--UINl7NS6dpBU82AZJuT6wQ9VwVAlglyG7infQ/edit",
         "女三": "https://docs.google.com/spreadsheets/d/1Vrst2-bqPE7flCIXeAI-lyN51Os9QwStx388DWx11w8/edit",
-        "女一一樓":"https://docs.google.com/spreadsheets/d/1AXXoriPJTo7Uk-e72Oz_0NHxWQw66H414rV0RXRxe7U/edit",
         "男一": "https://docs.google.com/spreadsheets/d/1S2axgu2BWP8HnEs0RJdDcccdD1bvPdH26qrx3c4DeWo/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1RcRTslmv4s_C_7AH-WuqtLrty9l0A7YECvaGJETnpis/edit",
     },
@@ -44,7 +39,6 @@ ATTENDANCE_SHEETS = {
         "女一": "https://docs.google.com/spreadsheets/d/1Nf7U106SxRZUu1pb35Fu2xrN2BTV80lit43BcgE6GnA/edit",
         "女二": "https://docs.google.com/spreadsheets/d/1NVt6M8SVc64zmRmxh268NlZqzT3JLpcGwuRBlkCe8oE/edit",
         "女三": "https://docs.google.com/spreadsheets/d/1y2YB118Xg2Mq8w6NeabTXgZ-n1gN56kCalyJ5KlMk1I/edit",
-        "女一一樓":"https://docs.google.com/spreadsheets/d/10PubIXAC5-rjBUY0NGIzKN0AXSXfeKAuj_kqAo0pCZI/edit",
         "男一": "https://docs.google.com/spreadsheets/d/1JSJx0cLdUxfIeYoe6dldeBe3Xeewm3uuIYrJkeYi_A8/edit",
         "男三": "https://docs.google.com/spreadsheets/d/1KpqeWBWIR0g6RxZ_oFUFXbn34PbH7r18UI9NBsfWIPY/edit",
     },
@@ -71,16 +65,14 @@ FLOOR_OPTIONS = {
     "女一": ["1F", "2F", "3F", "5F", "6F", "7F"],
     "女二": ["1F", "2F", "3F"],
     "女三": ["6F"],
-    "女一一樓":["81-1F"],
     "男一": ["0F", "1F", "2F", "3F","4F","5F"],
-    "男三": ["3F", "4F", "5F","6F"],
+    "男三": ["3F", "4F", "5F"],
 }
 
 DORM_PREFIX = {
     "女一": "81",
     "女二": "82",
     "女三": "83",
-    "女一一樓":"82",
     "男一": "82",
     "男三": "83",
 }
@@ -1124,268 +1116,8 @@ def parse_sheet_date(value):
         errors="coerce"
     )
 
-# ==================================================
-# 短期住宿
-# ==================================================
-
-def get_short_stay_url(term):
-
-    if term in ["上學期", "上學期假日"]:
-        return UPPER_SHORT_STAY_URL
-
-    if term in ["下學期", "下學期假日"]:
-        return LOWER_SHORT_STAY_URL
-
-    if term == "寒假":
-        return WINTER_SHORT_STAY_URL
-
-    if term == "暑假":
-        return SUMMER_SHORT_STAY_URL
-
-    return ""
-
-
-def find_short_stay_header_index(values):
-
-    for index, row in enumerate(values[:10]):
-
-        row_text = "|".join(
-            str(value).strip()
-            for value in row
-        )
-
-        if (
-            "離開日期" in row_text
-            and (
-                "房號" in row_text
-                or "床位" in row_text
-                or "姓名" in row_text
-            )
-        ):
-            return index
-
-    return 0
-
-
-@st.cache_data(
-    ttl=10,
-    show_spinner=False
-)
-def load_short_stay(
-    term,
-    attendance_date
-):
-
-    result = {
-        "by_room": {},
-        "by_bed": {},
-        "by_name": {},
-    }
-
-    url = get_short_stay_url(
-        term
-    )
-
-    if not url:
-        return result
-
-    try:
-
-        ss = open_sheet(
-            url
-        )
-
-        worksheets = get_worksheets(
-            ss
-        )
-
-        target_date = pd.to_datetime(
-            attendance_date
-        ).date()
-
-        for ws in worksheets:
-
-            values = get_all_values(
-                ws,
-                value_render_option="UNFORMATTED_VALUE"
-            )
-
-            if not values:
-                continue
-
-            header_index = (
-                find_short_stay_header_index(
-                    values
-                )
-            )
-
-            if len(values) <= header_index + 1:
-                continue
-
-            headers = build_unique_headers(
-                values[header_index]
-            )
-
-            df = pd.DataFrame(
-                values[
-                    header_index + 1:
-                ],
-                columns=headers
-            )
-
-            df.columns = (
-                df.columns
-                .astype(str)
-                .str.strip()
-            )
-
-            room_col = find_col(
-                df,
-                ["房號"]
-            )
-
-            bed_col = find_col(
-                df,
-                ["床位"]
-            )
-
-            name_col = find_col(
-                df,
-                [
-                    "姓名",
-                    "名字",
-                ]
-            )
-
-            leave_col = find_col(
-                df,
-                [
-                    "離開日期",
-                    "離宿日期",
-                    "離開日",
-                ]
-            )
-
-            if leave_col is None:
-                continue
-
-            for _, row in df.iterrows():
-
-                leave_ts = parse_sheet_date(
-                    row.get(
-                        leave_col,
-                        ""
-                    )
-                )
-
-                if pd.isna(
-                    leave_ts
-                ):
-                    continue
-
-                leave_date = (
-                    leave_ts.date()
-                )
-
-                # ======================================
-                # 例如離開日 2026/08/20
-                #
-                # 8/18 ✅
-                # 8/19 ✅
-                # 8/20 ✅
-                # 8/21 ❌
-                # ======================================
-
-                if target_date > leave_date:
-                    continue
-
-                display_date = (
-                    leave_date.strftime(
-                        "%Y.%m.%d"
-                    )
-                )
-
-                room = ""
-                bed = ""
-                name = ""
-
-                # 房號
-                if room_col is not None:
-
-                    room = normalize_value(
-                        row.get(
-                            room_col,
-                            ""
-                        )
-                    )
-
-                # 床位
-                if bed_col is not None:
-
-                    bed = normalize_value(
-                        row.get(
-                            bed_col,
-                            ""
-                        )
-                    )
-
-                # 如果沒有房號
-                # 由 81701-4 取得 81701
-                if not room and bed:
-
-                    room = (
-                        str(bed)
-                        .split("-")[0]
-                        .strip()
-                    )
-
-                # 姓名
-                if name_col is not None:
-
-                    name = str(
-                        row.get(
-                            name_col,
-                            ""
-                        )
-                    ).strip()
-
-                if room:
-
-                    result[
-                        "by_room"
-                    ][room] = display_date
-
-                if bed:
-
-                    result[
-                        "by_bed"
-                    ][bed] = display_date
-
-                if name:
-
-                    result[
-                        "by_name"
-                    ][name] = display_date
-
-        return result
-
-    except Exception as error:
-
-        st.warning(
-            f"讀取短期住宿資料失敗：{error}"
-        )
-
-        return result
 
 def show_attendance():
-
-    # ==================================================
-    # 頁面最上方定位點
-    # ==================================================
-    st.markdown(
-        '<div id="attendance-top"></div>',
-        unsafe_allow_html=True
-    )
 
     st.header("點名系統")
 
@@ -1541,12 +1273,6 @@ def show_attendance():
         }
 
         loaded_unpaid_ids = set()
-        
-        loaded_short_stay = {
-            "by_room": {},
-            "by_bed": {},
-            "by_name": {},
-        }
 
         try:
 
@@ -1567,16 +1293,7 @@ def show_attendance():
 
                 loaded_unpaid_ids = load_unpaid_ids()
 
-                loaded_short_stay = load_short_stay(
-                    term,
-                    attendance_date
-                )
-
             # 寫入 session_state
-
-            st.session_state[
-                "attendance_short_stay"
-            ] = loaded_short_stay
             st.session_state[
                 "attendance_students"
             ] = loaded_students
@@ -1660,15 +1377,6 @@ def show_attendance():
         "attendance_unpaid_ids",
         set()
     )
-
-    short_stay_data = st.session_state.get(
-    "attendance_short_stay",
-    {
-        "by_room": {},
-        "by_bed": {},
-        "by_name": {},
-    }
-)
 
     loaded_context = st.session_state.get(
         "attendance_loaded_context",
@@ -1887,81 +1595,6 @@ def show_attendance():
         is_long_leave = sid in long_leave_ids
         is_late = sid in late_ids
 
-        current_bed = normalize_value(
-            row.get(
-                "床位",
-                ""
-            )
-        )
-
-        current_room = normalize_value(
-            row.get(
-                "房號",
-                ""
-            )
-        )
-
-        if not current_room and current_bed:
-
-            current_room = (
-                str(current_bed)
-                .split("-")[0]
-                .strip()
-            )
-
-        current_name = str(
-            row.get(
-                "姓名",
-                ""
-            )
-        ).strip()
-
-
-        # 先用床位
-        short_stay_date = (
-            short_stay_data
-            .get(
-                "by_bed",
-                {}
-            )
-            .get(
-                current_bed,
-                ""
-            )
-        )
-
-
-        # 床位不同 → 用房號
-        if not short_stay_date:
-
-            short_stay_date = (
-                short_stay_data
-                .get(
-                    "by_room",
-                    {}
-                )
-                .get(
-                    current_room,
-                    ""
-                )
-            )
-
-
-        # 房號也不同 → 用姓名
-        if not short_stay_date:
-
-            short_stay_date = (
-                short_stay_data
-                .get(
-                    "by_name",
-                    {}
-                )
-                .get(
-                    current_name,
-                    ""
-                )
-            )
-
         default_status = "在"
 
         # 先顯示床位、學號、姓名
@@ -2007,17 +1640,6 @@ def show_attendance():
                 "<span style='color:#D32F2F;"
                 "font-size:18px;font-weight:700;'>"
                 "未繳費"
-                "</span>",
-                unsafe_allow_html=True
-            )
-            # 短期住宿離開日期
-        if short_stay_date:
-
-            st.markdown(
-                "<span style='color:#F57C00;"
-                "font-size:18px;"
-                "font-weight:700;'>"
-                f"{short_stay_date}"
                 "</span>",
                 unsafe_allow_html=True
             )
@@ -2130,31 +1752,4 @@ def show_attendance():
         except Exception as error:
             st.error(
                 f"儲存失敗：{error}"
-            )
-
-    # ==================================================
-    # 回到最上面
-    # ==================================================
-    st.divider()
-
-    st.markdown(
-        """
-        <a href="#attendance-top"
-           style="
-               display:block;
-               width:100%;
-               padding:12px 16px;
-               box-sizing:border-box;
-               text-align:center;
-               text-decoration:none;
-               border:1px solid rgba(49, 51, 63, 0.2);
-               border-radius:8px;
-               font-size:16px;
-               font-weight:600;
-               color:inherit;
-           ">
-            ⬆️ 回到最上面
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
+)
