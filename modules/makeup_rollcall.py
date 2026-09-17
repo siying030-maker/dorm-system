@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from core.google_api import (
     open_sheet,
@@ -102,7 +102,16 @@ def normalize_text(value):
 
 
 @st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=15, show_spinner=False)
 def load_need_makeup_source(gender):
+    """
+    補點名單：
+    - 「缺」與「未入住」都顯示。
+    - 00:00～05:59 使用前一天的點名資料。
+    - 06:00 起切換成當天資料。
+    - 每 15 秒重新抓取一次 Google Sheet。
+    """
+
     source_url = (
         NEED_MAKEUP_GIRL_URL
         if gender == "女生"
@@ -111,29 +120,34 @@ def load_need_makeup_source(gender):
 
     ss = open_sheet(source_url)
 
-    today1 = str(date.today())
-    today2 = today1.replace("-", "/")
+    # 00:00～05:59 仍屬前一天的補點時段
+    now = datetime.now()
+
+    if now.hour < 6:
+        target_date = now.date() - timedelta(days=1)
+    else:
+        target_date = now.date()
+
+    date_formats = [
+        target_date.strftime("%Y-%m-%d"),
+        target_date.strftime("%Y/%m/%d"),
+    ]
 
     ws = None
+    values = None
 
-    for sheet_name in [today1, today2]:
-
+    for sheet_name in date_formats:
         try:
             ws = get_worksheet(ss, sheet_name)
             values = get_all_values(ws)
             break
-
-        except:
+        except Exception:
             pass
 
     if ws is None:
         return pd.DataFrame()
 
-    from core.google_api import get_all_values
-
-    values = get_all_values(ws)
-
-    if len(values) <= 1:
+    if not values or len(values) <= 1:
         return pd.DataFrame()
 
     df = pd.DataFrame(
@@ -141,7 +155,11 @@ def load_need_makeup_source(gender):
         columns=values[0]
     )
 
-    df.columns = df.columns.astype(str).str.strip()
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.strip()
+    )
 
     if "狀態" not in df.columns:
         return pd.DataFrame()
@@ -152,13 +170,10 @@ def load_need_makeup_source(gender):
         .str.strip()
     )
 
+    # 「缺」＋「未入住」都列入補點名單
     df = df[
-        df["狀態"] == "缺"
+        df["狀態"].isin(["缺", "未入住"])
     ].copy()
-
-    df = df[
-            df["狀態"] == "未入住"
-        ].copy()
 
     if df.empty:
         return pd.DataFrame()
@@ -187,19 +202,24 @@ def load_need_makeup_source(gender):
 
     df["來源Sheet"] = ws.title
 
-    df = df[
-        df["學號"]
-        .astype(str)
-        .str.strip() != ""
-    ]
+    if "日期" not in df.columns:
+        df["日期"] = target_date.strftime("%Y-%m-%d")
 
-    df = df[
-        df["姓名"]
-        .astype(str)
-        .str.strip() != ""
-    ]
+    if "學號" in df.columns:
+        df = df[
+            df["學號"]
+            .astype(str)
+            .str.strip() != ""
+        ]
 
-    return df
+    if "姓名" in df.columns:
+        df = df[
+            df["姓名"]
+            .astype(str)
+            .str.strip() != ""
+        ]
+
+    return df.reset_index(drop=True)
 
 
 def find_col_index(headers, col_name):
@@ -461,6 +481,7 @@ def filter_by_leader_scope(df):
 def show_makeup_rollcall():
 
     st.header("補點名單")
+    st.caption("00:00～05:59 顯示前一天資料；06:00 起切換當天資料，並每 15 秒自動刷新。")
 
     
 
@@ -484,7 +505,7 @@ def show_makeup_rollcall():
             dfs.append(df)
 
     if not dfs:
-        st.warning("目前沒有當日須補點資料")
+        st.warning("目前沒有「缺／未入住」補點資料")
         return
 
     df = pd.concat(
