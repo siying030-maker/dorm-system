@@ -102,7 +102,6 @@ def normalize_text(value):
 
 
 @st.cache_data(ttl=15, show_spinner=False)
-@st.cache_data(ttl=15, show_spinner=False)
 def load_need_makeup_source(gender):
     """
     補點名單：
@@ -395,6 +394,70 @@ def update_need_makeup_status_to_done(gender, target_row):
                 return
 
 
+def _prepare_dorm_column(df):
+    """
+    補點資料的宿舍欄位相容處理。
+
+    新版點名資料通常使用「宿舍」，但舊版或不同來源可能使用：
+    「宿舍別」、「宿舍名稱」、「宿別」。
+    找不到時不直接刪掉資料，先建立空白「宿舍」欄位，讓男／女舍監仍可看到
+    對應性別的補點資料。樓長若無法從資料判斷宿舍，則會在權限篩選時安全地顯示提示。
+    """
+    result = df.copy()
+
+    if "宿舍" in result.columns:
+        source_col = "宿舍"
+    else:
+        source_col = None
+        for candidate in [
+            "宿舍別",
+            "宿舍名稱",
+            "宿別",
+            "住宿宿舍",
+        ]:
+            if candidate in result.columns:
+                source_col = candidate
+                break
+
+        if source_col is not None:
+            result["宿舍"] = result[source_col]
+        else:
+            result["宿舍"] = ""
+
+    result["宿舍"] = (
+        result["宿舍"]
+        .astype(str)
+        .str.strip()
+        .str.replace("ㄧ", "一", regex=False)
+        .str.replace("女一宿", "女一", regex=False)
+        .str.replace("女二宿", "女二", regex=False)
+        .str.replace("女三宿", "女三", regex=False)
+        .str.replace("男一宿", "男一", regex=False)
+        .str.replace("男二宿", "男二", regex=False)
+        .str.replace("男三宿", "男三", regex=False)
+    )
+
+    return result
+
+
+def _infer_dorm_from_row(row, allowed_dorms):
+    """
+    舊資料沒有宿舍欄位時，嘗試從整列資料找出宿舍名稱。
+    只接受帳號本身被允許管理的宿舍，避免擴大樓長權限。
+    """
+    text = " ".join(
+        str(value).strip().replace("ㄧ", "一")
+        for value in row.tolist()
+        if str(value).strip()
+    )
+
+    for dorm in allowed_dorms:
+        if dorm and dorm in text:
+            return dorm
+
+    return ""
+
+
 def filter_by_leader_scope(df):
 
     role = str(st.session_state.get("role", "")).strip()
@@ -402,26 +465,14 @@ def filter_by_leader_scope(df):
     if df.empty:
         return df
 
-    if "宿舍" not in df.columns:
-        st.warning(
-            "目前補點資料沒有「宿舍」欄位，無法依宿舍權限篩選。"
-            "請使用新版點名系統重新儲存缺席資料。"
-        )
-        return df.iloc[0:0].copy()
-
-    result = df.copy()
-    result["宿舍"] = (
-        result["宿舍"]
-        .astype(str)
-        .str.strip()
-        .str.replace("ㄧ", "一", regex=False)
-    )
+    result = _prepare_dorm_column(df)
 
     # 行政：可查看全部宿舍
     if role == "行政":
         return result
 
-    # 舍監：依男舍監／女舍監篩選
+    # 舍監：男／女資料來源本身已經依性別分開。
+    # 如果舊資料沒有宿舍欄位，不應因此把整份補點資料清空。
     if role == "舍監":
         supervisor_type = str(
             st.session_state.get("supervisor_type", "")
@@ -431,6 +482,17 @@ def filter_by_leader_scope(df):
 
         if not login_gender:
             login_gender = get_login_gender()
+
+        # 補點資料來源本身已依「男生／女生」分開讀取，
+        # 因此這裡只在資料真的有宿舍資訊時再做第二層性別確認。
+        dorm_has_value = result["宿舍"].astype(str).str.strip().ne("").any()
+
+        if not dorm_has_value:
+            if login_gender in ["男", "女"]:
+                return result
+
+            st.warning("無法判斷舍監管理的宿舍性別")
+            return result.iloc[0:0].copy()
 
         if login_gender == "男":
             return result[
@@ -457,10 +519,24 @@ def filter_by_leader_scope(df):
         ]:
             raw_value = st.session_state.get(state_key, "")
 
-            for item in str(raw_value).replace("，", ",").split(","):
+            # 支援「、」「，」「,」「/」等常見分隔方式。
+            raw_value = (
+                str(raw_value)
+                .replace("，", ",")
+                .replace("、", ",")
+                .replace("/", ",")
+                .replace("／", ",")
+            )
+
+            for item in raw_value.split(","):
                 item = item.strip().replace("ㄧ", "一")
 
                 if item:
+                    # 舊帳號可能寫成「男一宿」等名稱，統一成「男一」。
+                    for suffix in ["宿"]:
+                        if item.endswith(suffix) and len(item) > 1:
+                            item = item[:-len(suffix)]
+
                     allowed_dorms.append(item)
 
         allowed_dorms = list(dict.fromkeys(allowed_dorms))
@@ -469,9 +545,33 @@ def filter_by_leader_scope(df):
             st.warning("目前帳號沒有設定可管理的宿舍")
             return result.iloc[0:0].copy()
 
-        return result[
+        # 優先使用真正的宿舍欄位。
+        matched = result[
             result["宿舍"].isin(allowed_dorms)
         ].copy()
+
+        if not matched.empty:
+            return matched
+
+        # 舊版資料沒有宿舍欄位時，嘗試從整列資料辨識。
+        inferred = result.apply(
+            lambda row: _infer_dorm_from_row(row, allowed_dorms),
+            axis=1,
+        )
+
+        if inferred.astype(str).str.strip().ne("").any():
+            result["宿舍"] = inferred
+            return result[
+                result["宿舍"].isin(allowed_dorms)
+            ].copy()
+
+        # 無法安全判斷宿舍時，不直接把其他宿舍資料給樓長。
+        st.warning(
+            "目前男生補點資料沒有可辨識的「宿舍」資訊，"
+            "因此無法安全依樓長權限篩選。"
+            "請先用新版點名系統重新儲存缺席資料。"
+        )
+        return result.iloc[0:0].copy()
 
     # 其他身分不顯示補點資料
     st.warning("目前帳號沒有補點名單權限")
