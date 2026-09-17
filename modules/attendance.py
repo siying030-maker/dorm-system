@@ -50,25 +50,25 @@ SPECIAL_ATTENDANCE_SHEETS = {
     "上學期": {
         "女一一樓": {
             "url": "https://docs.google.com/spreadsheets/d/1AXXoriPJTo7Uk-e72Oz_0NHxWQw66H414rV0RXRxe7U/edit",
-            "sheet": "輸入_上學期_床位_81宿_男",
+            "sheet": "81-1F",
         },
     },
     "下學期": {
         "女一一樓": {
             "url": "https://docs.google.com/spreadsheets/d/10PubIXAC5-rjBUY0NGIzKN0AXSXfeKAuj_kqAo0pCZI/edit",
-            "sheet": "輸入_下學期_床位_81宿_男",
+            "sheet": "81-1F",
         },
     },
     "上學期假日": {
         "女一一樓": {
             "url": "https://docs.google.com/spreadsheets/d/1AXXoriPJTo7Uk-e72Oz_0NHxWQw66H414rV0RXRxe7U/edit",
-            "sheet": "輸入_上學期_床位_81宿_男",
+            "sheet": "81-1F",
         },
     },
     "下學期假日": {
         "女一一樓": {
             "url": "https://docs.google.com/spreadsheets/d/10PubIXAC5-rjBUY0NGIzKN0AXSXfeKAuj_kqAo0pCZI/edit",
-            "sheet": "輸入_下學期_床位_81宿_男",
+            "sheet": "81-1F",
         },
     },
 }
@@ -96,7 +96,6 @@ FLOOR_OPTIONS = {
     "女三": ["6F"],
     "男一": ["0F", "1F", "2F", "3F","4F","5F"],
     "男三": ["3F", "4F", "5F"],
-    "81宿_男": ["女一1F"],
 }
 
 DORM_PREFIX = {
@@ -104,7 +103,6 @@ DORM_PREFIX = {
     "女二": "82",
     "女三": "83",
     "男一": "82",
-    "81宿_男":"81",
     "男三": "83",
 }
 
@@ -321,7 +319,7 @@ def get_floor_options(term, dorm):
 def get_sheet_names_for_attendance(term, dorm, floor):
     dorm = canonical_dorm(dorm)
 
-    # 81 宿男生特殊資料：整份名單在同一張輸入 Sheet，不使用 81-1F 這種樓層 Sheet。
+    # 81 宿男生特殊資料：使用 Google Sheet 中的「81-1F」工作表。
     special = SPECIAL_ATTENDANCE_SHEETS.get(term, {}).get(dorm)
     if special:
         return [special["sheet"]]
@@ -387,11 +385,7 @@ def read_worksheet_df(ss, sheet_name):
             target = normalize_dorm(sheet_name)
             for candidate in get_worksheets(ss):
                 title = normalize_dorm(candidate.title)
-                if title == target or (
-                    "81宿" in title
-                    and "男" in title
-                    and ("上學期" in title or "下學期" in title)
-                ):
+                if title == target or title == "81-1F":
                     ws = candidate
                     break
 
