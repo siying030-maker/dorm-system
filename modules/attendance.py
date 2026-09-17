@@ -1770,7 +1770,7 @@ def show_attendance():
         <style>
         .attendance-back-top {
             position: fixed;
-            right: 25px;
+            left: 25px;
             bottom: 25px;
             z-index: 999999;
             display: inline-block;
