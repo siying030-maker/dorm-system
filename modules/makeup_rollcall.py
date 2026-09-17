@@ -173,7 +173,7 @@ def load_need_makeup_source(gender):
     # 「缺」＋「未入住」都列入補點名單
     df = df[
         df["狀態"].isin(["缺", "未入住"])
-        ].copy()
+    ].copy()
 
     if df.empty:
         return pd.DataFrame()
