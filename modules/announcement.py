@@ -13,7 +13,7 @@ from core.google_api import (
 # ==================================================
 
 @st.cache_data(
-    ttl=10,
+    ttl=1330,
     show_spinner=False
 )
 def load_announcements():
