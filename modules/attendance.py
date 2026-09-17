@@ -1757,38 +1757,59 @@ def show_attendance():
     # 回到最上面按鈕
     # ==============================
     st.markdown(
-        """
-        <style>
-        .back-to-top {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-            background: white;
-            border: 1px solid #cccccc;
-            border-radius: 10px;
-            padding: 8px 14px;
-            font-size: 14px;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
+    """
+    <style>
+    #back-to-top-btn {
+        position: fixed;
+        right: 25px;
+        bottom: 25px;
+        z-index: 999999;
+        padding: 10px 16px;
+        border: 1px solid #cccccc;
+        border-radius: 10px;
+        background-color: white;
+        color: #333333;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+    }
 
-        .back-to-top:hover {
-            background-color: #f5f5f5;
-        }
-        </style>
+    #back-to-top-btn:hover {
+        background-color: #f2f2f2;
+    }
+    </style>
 
-        <button
-            class="back-to-top"
-            onclick="
-                window.parent.document.querySelector('section.main').scrollTo({
+    <button id="back-to-top-btn" onclick="backToTop()">
+        ↑ 回到最上面
+    </button>
+
+    <script>
+    function backToTop() {
+
+        // 找所有可能的 Streamlit 滾動區域
+        const elements = [
+            window.parent.document.querySelector('section.main'),
+            window.parent.document.querySelector('[data-testid="stAppViewContainer"]'),
+            window.parent.document.querySelector('[data-testid="stMain"]')
+        ];
+
+        elements.forEach(function(element) {
+            if (element) {
+                element.scrollTo({
                     top: 0,
                     behavior: 'smooth'
                 });
-            "
-        >
-            ↑ 回到最上面
-        </button>
-        """,
-        unsafe_allow_html=True
-    )
+            }
+        });
+
+        // 同時讓整個視窗回到最上方
+        window.parent.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+    </script>
+    """,
+    unsafe_allow_html=True
+)
