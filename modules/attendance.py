@@ -1,9 +1,8 @@
 import time
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
-
 from datetime import date
+
 from core.config import (
     UPPER_GATE_URL,
     LOWER_GATE_URL,
@@ -45,6 +44,35 @@ ATTENDANCE_SHEETS = {
     },
 }
 
+# 男一樓長額外管理的「女一一樓」
+# 這不是女一宿的 1F，而是獨立的 81 宿男生資料。
+SPECIAL_ATTENDANCE_SHEETS = {
+    "上學期": {
+        "女一一樓": {
+            "url": "https://docs.google.com/spreadsheets/d/1AXXoriPJTo7Uk-e72Oz_0NHxWQw66H414rV0RXRxe7U/edit",
+            "sheet": "輸入_上學期_床位_81宿_男",
+        },
+    },
+    "下學期": {
+        "女一一樓": {
+            "url": "https://docs.google.com/spreadsheets/d/10PubIXAC5-rjBUY0NGIzKN0AXSXfeKAuj_kqAo0pCZI/edit",
+            "sheet": "輸入_下學期_床位_81宿_男",
+        },
+    },
+    "上學期假日": {
+        "女一一樓": {
+            "url": "https://docs.google.com/spreadsheets/d/1AXXoriPJTo7Uk-e72Oz_0NHxWQw66H414rV0RXRxe7U/edit",
+            "sheet": "輸入_上學期_床位_81宿_男",
+        },
+    },
+    "下學期假日": {
+        "女一一樓": {
+            "url": "https://docs.google.com/spreadsheets/d/10PubIXAC5-rjBUY0NGIzKN0AXSXfeKAuj_kqAo0pCZI/edit",
+            "sheet": "輸入_下學期_床位_81宿_男",
+        },
+    },
+}
+
 VACATION_SHEETS = {
     "寒假": {
         "女一": "https://docs.google.com/spreadsheets/d/1svJOTt-BQmws2Xsy2e3mrHrsqZAi_GD1rYX4t2LxE6Y/edit",
@@ -80,7 +108,24 @@ DORM_PREFIX = {
 
 
 def normalize_dorm(value):
-    return str(value).strip().replace("ㄧ", "一")
+    value = str(value).strip().replace("ㄧ", "一")
+    value = value.replace("81宿_男", "女一一樓")
+    value = value.replace("女一一樓", "女一一樓")
+    return value
+
+
+def canonical_dorm(value):
+    """將帳號或畫面可能出現的宿舍名稱統一成系統內部名稱。"""
+    value = normalize_dorm(value)
+    aliases = {
+        "女一宿": "女一",
+        "女二宿": "女二",
+        "女三宿": "女三",
+        "男一宿": "男一",
+        "男三宿": "男三",
+        "81宿_男": "女一一樓",
+    }
+    return aliases.get(value, value)
 
 
 def normalize_value(value):
@@ -96,11 +141,14 @@ def normalize_value(value):
 
 
 def split_items(value):
+    """支援帳號欄位常見的宿舍分隔符號。"""
+    text = str(value)
+    for separator in ["、", "，", ";", "；", "/", "／", "\n"]:
+        text = text.replace(separator, ",")
+
     result = []
-
-    for item in str(value).replace("，", ",").split(","):
-        item = normalize_dorm(item)
-
+    for item in text.split(","):
+        item = canonical_dorm(item)
         if item:
             result.append(item)
 
@@ -120,7 +168,11 @@ def split_floors(value):
 
 
 def get_dorm_gender(dorm):
-    dorm = normalize_dorm(dorm)
+    dorm = canonical_dorm(dorm)
+
+    # 「女一一樓」實際資料來源是 81 宿男生名單。
+    if dorm == "女一一樓":
+        return "男生"
 
     if dorm.startswith("女"):
         return "女生"
@@ -137,8 +189,11 @@ def get_floor_sheet_name(dorm, floor):
 
 
 def get_attendance_url(term, dorm):
+    dorm = canonical_dorm(dorm)
 
-    dorm = normalize_dorm(dorm)
+    special = SPECIAL_ATTENDANCE_SHEETS.get(term, {}).get(dorm)
+    if special:
+        return special["url"]
 
     if term in ["上學期", "上學期假日"]:
         return ATTENDANCE_SHEETS["上學期"].get(dorm, "")
@@ -153,7 +208,6 @@ def get_attendance_url(term, dorm):
         return VACATION_SHEETS["暑假"].get(dorm, "")
 
     return ""
-
 
 def get_gate_sheet_url(term):
 
@@ -228,14 +282,22 @@ def get_login_dorm_options(term):
     if manage_dorms:
         return split_items(manage_dorms)
 
-    dorm = normalize_dorm(st.session_state.get("dorm", ""))
+    dorm = canonical_dorm(st.session_state.get("dorm", ""))
     return [dorm] if dorm else []
 
-
 def get_floor_options(term, dorm):
-    dorm = normalize_dorm(dorm)
+    original_dorm = canonical_dorm(dorm)
 
-   
+    # 男一樓長額外管理的 81 宿男生資料，畫面名稱為「女一一樓」。
+    if original_dorm == "女一一樓":
+        if is_holiday_term(term):
+            return ["全部"]
+        if term in ["上學期", "下學期"]:
+            return ["1F"]
+        return []
+
+    dorm = canonical_dorm(dorm)
+
     if term in ["寒假", "暑假"] and dorm.startswith("女"):
         return ["全部"]
 
@@ -248,15 +310,19 @@ def get_floor_options(term, dorm):
         floors = split_floors(st.session_state.get("summer_floors", ""))
         if floors:
             return floors
-    
+
     if is_holiday_term(term):
         return ["全部"]
 
     return FLOOR_OPTIONS.get(dorm, [])
 
-
 def get_sheet_names_for_attendance(term, dorm, floor):
-    dorm = normalize_dorm(dorm)
+    dorm = canonical_dorm(dorm)
+
+    # 81 宿男生特殊資料：整份名單在同一張輸入 Sheet，不使用 81-1F 這種樓層 Sheet。
+    special = SPECIAL_ATTENDANCE_SHEETS.get(term, {}).get(dorm)
+    if special:
+        return [special["sheet"]]
 
     if is_holiday_term(term):
         return [
@@ -271,7 +337,6 @@ def get_sheet_names_for_attendance(term, dorm, floor):
         ]
 
     return [get_floor_sheet_name(dorm, floor)]
-
 
 def build_unique_headers(headers):
     result = []
@@ -889,7 +954,7 @@ def save_rollcall_result(
     final_df
 ):
     """
-    將狀態為「缺」或「未入住」的學生寫入：
+    將狀態為「缺」的學生寫入：
 
     女生：
     - 女生點名回報
@@ -971,7 +1036,7 @@ def save_rollcall_result(
     absent_makeup_rows = []
 
     # ==================================================
-    # 收集「缺」與「未入住」學生
+    # 只收集狀態為缺的學生
     # ==================================================
 
     for _, student_row in final_df.iterrows():
@@ -1058,7 +1123,7 @@ def save_rollcall_result(
         )
 
     # ==================================================
-    # 沒有「缺」或「未入住」學生，不寫入任何資料
+    # 沒有缺席學生，不寫入任何資料
     # ==================================================
 
     if not absent_rollcall_rows:
@@ -1119,12 +1184,6 @@ def parse_sheet_date(value):
 
 
 def show_attendance():
-
-    # 頁面最上方定位點
-    st.markdown(
-        '<div id="attendance-top"></div>',
-        unsafe_allow_html=True,
-    )
 
     st.header("點名系統")
 
@@ -1676,6 +1735,7 @@ def show_attendance():
         )
 
         final_rows.append({
+            "宿舍": dorm,
             "學號": row.get("學號", ""),
             "班級": row.get("班級", ""),
             "姓名": row.get("姓名", ""),
@@ -1748,19 +1808,18 @@ def show_attendance():
 
             if absent_count == 0:
                 st.info(
-                    "本次沒有「缺」或「未入住」學生，不寫入試算表。"
+                    "本次沒有狀態為「缺」的學生，不寫入試算表。"
                 )
 
             else:
                 st.success(
-                    f"已成功儲存 {absent_count} 位「缺／未入住」學生。"
+                    f"已成功儲存 {absent_count} 位缺席學生。"
                 )
 
         except Exception as error:
             st.error(
                 f"儲存失敗：{error}"
             )
-   
     # ==============================
     # 回到最上面按鈕
     # ==============================
