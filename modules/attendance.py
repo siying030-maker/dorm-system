@@ -1,8 +1,9 @@
 import time
 import streamlit as st
 import pandas as pd
-from datetime import date
+import streamlit.components.v1 as components
 
+from datetime import date
 from core.config import (
     UPPER_GATE_URL,
     LOWER_GATE_URL,
@@ -1755,33 +1756,95 @@ def show_attendance():
             )
    
     # ==============================
-    # 回到最上面
+    # 回到最上面按鈕
     # ==============================
 
     st.markdown(
         """
         <style>
-        div[data-testid="stButton"] > button {
+        .back-top-container {
             position: fixed;
             right: 25px;
             bottom: 25px;
             z-index: 999999;
-            width: auto;
-            min-width: 130px;
-            border-radius: 10px;
-            padding: 8px 15px;
+        }
+
+        .back-top-button {
             background-color: white;
+            color: #333333;
             border: 1px solid #cccccc;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 9px 15px;
             font-size: 15px;
+            font-weight: 600;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+            cursor: pointer;
+        }
+
+        .back-top-button:hover {
+            background-color: #f3f3f3;
         }
         </style>
+
+        <div class="back-top-container">
+            <button
+                class="back-top-button"
+                onclick="backToTop()"
+            >
+                ↑ 回到最上面
+            </button>
+        </div>
         """,
         unsafe_allow_html=True
     )
 
-    if st.button(
-        "↑ 回到最上面",
-        key="attendance_back_to_top"
-    ):
-        st.rerun()
+    components.html(
+        """
+        <script>
+        function backToTop() {
+
+            const parentDoc = window.parent.document;
+
+            // Streamlit 主要內容區
+            const main =
+                parentDoc.querySelector('[data-testid="stMain"]') ||
+                parentDoc.querySelector('section.main');
+
+            if (main) {
+                main.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+
+            // Streamlit App View
+            const appView =
+                parentDoc.querySelector('[data-testid="stAppViewContainer"]');
+
+            if (appView) {
+                appView.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+
+            // 頁面本身
+            parentDoc.documentElement.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+
+            parentDoc.body.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+
+            window.parent.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+        </script>
+        """,
+        height=0,
+    )
