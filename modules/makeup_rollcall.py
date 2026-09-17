@@ -156,6 +156,10 @@ def load_need_makeup_source(gender):
         df["狀態"] == "缺"
     ].copy()
 
+    df = df[
+            df["狀態"] == "未入住"
+        ].copy()
+
     if df.empty:
         return pd.DataFrame()
 
