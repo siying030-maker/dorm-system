@@ -376,7 +376,25 @@ def find_header_index(values):
 def read_worksheet_df(ss, sheet_name):
 
     try:
-        ws = get_worksheet(ss, sheet_name)
+        try:
+            ws = get_worksheet(ss, sheet_name)
+        except Exception:
+            # 特殊 81 宿男生名單：即使 Google Sheet 的實際標題有些微差異，
+            # 也嘗試用正規化後的工作表名稱比對。
+            ws = None
+            target = normalize_dorm(sheet_name)
+            for candidate in get_worksheets(ss):
+                title = normalize_dorm(candidate.title)
+                if title == target or (
+                    "81宿" in title
+                    and "男" in title
+                    and ("上學期" in title or "下學期" in title)
+                ):
+                    ws = candidate
+                    break
+
+            if ws is None:
+                raise
 
         values = get_all_values(
             ws,
@@ -487,9 +505,106 @@ def load_attendance_students(term, dorm, floor):
 
             temp = pd.DataFrame()
 
+            # ==================================================
+            # 特殊宿舍：女一一樓
+            # ==================================================
+            # 注意：畫面上的「女一一樓」其實是獨立的 81 宿男生名單，
+            # 不使用一般女一宿的樓層 Sheet，也不能要求 A~AQ 共 43 欄。
+            if canonical_dorm(dorm) == "女一一樓" and term in [
+                "上學期",
+                "下學期",
+                "上學期假日",
+                "下學期假日",
+            ]:
+
+                # 優先依欄位名稱抓資料，避免特殊 81 宿表格欄位數
+                # 與一般宿舍不同而讀不到。
+                bed_col = find_col(
+                    df,
+                    ["床位", "床位編號", "床號", "房號"]
+                )
+                sid_col = find_col(
+                    df,
+                    ["學號", "學生學號"]
+                )
+                class_col = find_col(
+                    df,
+                    ["班級", "班級名稱", "系級"]
+                )
+                name_col = find_col(
+                    df,
+                    ["姓名", "學生姓名"]
+                )
+                phone_col = find_col(
+                    df,
+                    ["電話", "手機", "手機號碼"]
+                )
+                parent_col = find_col(
+                    df,
+                    ["家長姓名"]
+                )
+                parent_phone_col = find_col(
+                    df,
+                    ["連絡電話1", "家長電話", "家長連絡電話"]
+                )
+                overseas_col = get_overseas_col(df)
+
+                # 如果表格沒有標題名稱，退回一般上學期的 B/E/F/G 位置。
+                if bed_col is None and len(df.columns) >= 2:
+                    bed_col = df.columns[1]
+                if sid_col is None and len(df.columns) >= 5:
+                    sid_col = df.columns[4]
+                if class_col is None and len(df.columns) >= 6:
+                    class_col = df.columns[5]
+                if name_col is None and len(df.columns) >= 7:
+                    name_col = df.columns[6]
+
+                if bed_col is None or sid_col is None or name_col is None:
+                    st.warning(
+                        f"{sheet_name} 找不到必要欄位（床位／學號／姓名），"
+                        "請確認 81 宿男生名單欄位。"
+                    )
+                    continue
+
+                temp["床位"] = df[bed_col].astype(str).map(normalize_value)
+                temp["房號"] = (
+                    temp["床位"]
+                    .astype(str)
+                    .str.split("-")
+                    .str[0]
+                )
+                temp["學號"] = df[sid_col].astype(str).map(normalize_value)
+
+                if class_col is not None:
+                    temp["班級"] = df[class_col].astype(str).str.strip()
+                else:
+                    temp["班級"] = ""
+
+                temp["姓名"] = df[name_col].astype(str).str.strip()
+
+                if phone_col is not None:
+                    temp["手機"] = df[phone_col].astype(str).str.strip()
+                else:
+                    temp["手機"] = ""
+
+                if parent_col is not None:
+                    temp["家長姓名"] = df[parent_col].astype(str).str.strip()
+                else:
+                    temp["家長姓名"] = ""
+
+                if parent_phone_col is not None:
+                    temp["連絡電話1"] = df[parent_phone_col].astype(str).str.strip()
+                else:
+                    temp["連絡電話1"] = ""
+
+                if overseas_col is not None:
+                    temp["本地/境外"] = df[overseas_col].astype(str).str.strip()
+                else:
+                    temp["本地/境外"] = ""
+
             # 寒假、暑假：
             # B房號、D學號、E班級、F姓名、I本地/境外、J手機、P家長姓名、Q連絡電話1
-            if term in ["寒假", "暑假"]:
+            elif term in ["寒假", "暑假"]:
 
                 if len(df.columns) < 17:
                     st.warning(f"{sheet_name} 欄位不足，至少需要 A~Q 欄")
