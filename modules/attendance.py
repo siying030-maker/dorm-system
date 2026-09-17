@@ -1753,3 +1753,42 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
+    # ==============================
+    # 回到最上面按鈕
+    # ==============================
+    st.markdown(
+        """
+        <style>
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: white;
+            border: 1px solid #cccccc;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .back-to-top:hover {
+            background-color: #f5f5f5;
+        }
+        </style>
+
+        <button
+            class="back-to-top"
+            onclick="
+                window.parent.document.querySelector('section.main').scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            "
+        >
+            ↑ 回到最上面
+        </button>
+        """,
+        unsafe_allow_html=True
+    )
