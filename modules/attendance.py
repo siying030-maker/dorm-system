@@ -1753,63 +1753,35 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
+   
     # ==============================
-    # 回到最上面按鈕
+    # 回到最上面
     # ==============================
+
     st.markdown(
-    """
-    <style>
-    #back-to-top-btn {
-        position: fixed;
-        right: 25px;
-        bottom: 25px;
-        z-index: 999999;
-        padding: 10px 16px;
-        border: 1px solid #cccccc;
-        border-radius: 10px;
-        background-color: white;
-        color: #333333;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.18);
-    }
+        """
+        <style>
+        div[data-testid="stButton"] > button {
+            position: fixed;
+            right: 25px;
+            bottom: 25px;
+            z-index: 999999;
+            width: auto;
+            min-width: 130px;
+            border-radius: 10px;
+            padding: 8px 15px;
+            background-color: white;
+            border: 1px solid #cccccc;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            font-size: 15px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-    #back-to-top-btn:hover {
-        background-color: #f2f2f2;
-    }
-    </style>
-
-    <button id="back-to-top-btn" onclick="backToTop()">
-        ↑ 回到最上面
-    </button>
-
-    <script>
-    function backToTop() {
-
-        // 找所有可能的 Streamlit 滾動區域
-        const elements = [
-            window.parent.document.querySelector('section.main'),
-            window.parent.document.querySelector('[data-testid="stAppViewContainer"]'),
-            window.parent.document.querySelector('[data-testid="stMain"]')
-        ];
-
-        elements.forEach(function(element) {
-            if (element) {
-                element.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
-            }
-        });
-
-        // 同時讓整個視窗回到最上方
-        window.parent.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    }
-    </script>
-    """,
-    unsafe_allow_html=True
-)
+    if st.button(
+        "↑ 回到最上面",
+        key="attendance_back_to_top"
+    ):
+        st.rerun()
