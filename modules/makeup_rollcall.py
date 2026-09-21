@@ -135,7 +135,7 @@ def load_need_makeup_source(gender):
     # 00:00～05:59 仍屬前一天的補點時段
     now = datetime.now(ZoneInfo("Asia/Taipei"))
 
-    if now.hour < 6:
+    if now.hour < 4:
         target_date = now.date() - timedelta(days=1)
     else:
         target_date = now.date()
