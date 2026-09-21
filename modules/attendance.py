@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import date
 import streamlit.components.v1 as components
 import streamlit as st
-import streamlit.components.v1 as components
+
 
 
 from core.config import (
@@ -1936,48 +1936,15 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
-    # ==============================
+   
     # ==============================
     # 回到最上面按鈕
     # ==============================
-    def back_to_top_button():
-
+    def scroll_to_top():
         components.html(
             """
             <script>
-
-            // 建立按鈕
-            const button = document.createElement("button");
-
-            button.innerHTML = "↑ 回到最上面";
-
-            // =========================
-            // 固定在畫面最下面
-            // =========================
-            button.style.position = "fixed";
-            button.style.left = "50%";
-            button.style.bottom = "10px";
-            button.style.transform = "translateX(-50%)";
-
-            button.style.zIndex = "999999";
-
-            // =========================
-            // 按鈕樣式
-            // =========================
-            button.style.padding = "8px 16px";
-            button.style.background = "white";
-            button.style.color = "#333";
-            button.style.border = "1px solid #ccc";
-            button.style.borderRadius = "10px";
-            button.style.fontSize = "15px";
-            button.style.fontWeight = "600";
-            button.style.cursor = "pointer";
-            button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
-
-            // =========================
-            // 點擊按鈕
-            // =========================
-            button.onclick = function() {
+            setTimeout(function() {
 
                 const main = window.parent.document
                     .querySelector('section[data-testid="stMain"]');
@@ -1993,27 +1960,35 @@ def show_attendance():
                     top: 0,
                     behavior: "smooth"
                 });
-            };
 
-            // 加入網頁
-            window.parent.document.body.appendChild(button);
-
-            // =========================
-            // 底部預留空間
-            // 避免按鈕遮住最後的內容
-            // =========================
-            const main = window.parent.document
-                .querySelector('section[data-testid="stMain"]');
-
-            if (main) {
-                main.style.paddingBottom = "80px";
-            }
-
+            }, 100);
             </script>
             """,
             height=0,
         )
 
 
-    # 呼叫
-    back_to_top_button()
+    # ============================
+    # 回到最上面按鈕
+    # ============================
+
+    st.markdown(
+        """
+        <style>
+
+        /* 預留底部空間 */
+        section[data-testid="stMain"] {
+            padding-bottom: 80px;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    if st.button(
+        "↑ 回到最上面",
+        key="back_to_top"
+    ):
+        scroll_to_top()
