@@ -2,6 +2,7 @@ import time
 import streamlit as st
 import pandas as pd
 from datetime import date
+import streamlit.components.v1 as components
 
 
 from core.config import (
@@ -1940,58 +1941,46 @@ def show_attendance():
                 f"儲存失敗：{error}"
             )
     # ==============================
+    # ==============================
     # 回到最上面按鈕
     # ==============================
 
-    '''
-    st.markdown(
+    components.html(
         """
-        <style>
-        .attendance-back-top {
-            position: fixed;
-            left: 25px;
-            bottom: 50px;
-            z-index: 999999;
-            display: inline-block;
-            padding: 9px 15px;
-            background: white;
-            color: #333333 !important;
-            border: 1px solid #cccccc;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            text-decoration: none !important;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.18);
-            cursor: pointer;
-        }
+        <script>
+        const button = document.createElement("button");
+        button.innerHTML = "↑ 回到最上面";
 
-        .attendance-back-top:hover {
-            background: #f3f3f3;
-            color: #333333 !important;
-        }
-        </style>
+        button.style.position = "fixed";
+        button.style.left = "25px";
+        button.style.bottom = "50px";
+        button.style.zIndex = "999999";
+        button.style.padding = "9px 15px";
+        button.style.background = "white";
+        button.style.color = "#333";
+        button.style.border = "1px solid #ccc";
+        button.style.borderRadius = "10px";
+        button.style.fontSize = "15px";
+        button.style.fontWeight = "600";
+        button.style.cursor = "pointer";
+        button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
 
-        <a
-            class="attendance-back-top"
-            href="javascript:void(0);"
-            onclick="
-                const main = document.querySelector('section[data-testid="stMain"]');
-                if (main) {
-                    main.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                } else {
-                    window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                }
-            "
-        >
-            ↑ 回到最上面
-        </a>
+        button.onclick = function() {
+            window.parent.document
+                .querySelector('section[data-testid="stMain"]')
+                ?.scrollTo({
+                    top: 0,
+                    behavior: "smooth"
+                });
+
+            window.parent.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+        };
+
+        window.parent.document.body.appendChild(button);
+        </script>
         """,
-        unsafe_allow_html=True,
+        height=0,
     )
-    '''
