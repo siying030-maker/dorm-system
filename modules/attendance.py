@@ -1953,6 +1953,7 @@ def show_attendance():
             font-weight: 600;
             text-decoration: none !important;
             box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+            cursor: pointer;
         }
 
         .attendance-back-top:hover {
@@ -1961,7 +1962,24 @@ def show_attendance():
         }
         </style>
 
-        <a class="attendance-back-top" href="#attendance-top">
+        <a
+            class="attendance-back-top"
+            href="javascript:void(0);"
+            onclick="
+                const main = document.querySelector('section[data-testid="stMain"]');
+                if (main) {
+                    main.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                }
+            "
+        >
             ↑ 回到最上面
         </a>
         """,
