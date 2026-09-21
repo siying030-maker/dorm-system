@@ -409,46 +409,79 @@ def update_need_makeup_status_to_done(gender, target_row):
 
 def _prepare_dorm_column(df):
     """
-    補點資料沒有「宿舍」欄位時，
-    嘗試由房號判斷宿舍。
+    補點資料沒有宿舍欄位時，
+    依登入者性別 + 房號判斷宿舍。
 
-    注意：
-    房號本身沒有性別資訊，因此必須依目前登入者的性別
-    搭配房號規則判斷。
+    男生：
+        81xxx / 82xxx -> 男一
+        83xxx -> 男三
+
+    女生：
+        依目前女生宿舍房號規則處理。
+
+    如果資料本身已有宿舍欄位，優先使用原本資料。
     """
 
     result = df.copy()
 
-    # 如果原本有宿舍欄位，直接使用
-    if "宿舍" in result.columns:
-        result["宿舍"] = (
-            result["宿舍"]
-            .astype(str)
-            .str.strip()
-            .str.replace("ㄧ", "一", regex=False)
-        )
-        return result
+    # ==========================================
+    # 1. 如果原本有宿舍欄位，直接使用
+    # ==========================================
+    source_col = None
 
-    # 沒有宿舍欄位，先建立
-    result["宿舍"] = ""
+    for candidate in [
+        "宿舍",
+        "宿舍別",
+        "宿舍名稱",
+        "宿別",
+        "住宿宿舍",
+    ]:
+        if candidate in result.columns:
+            source_col = candidate
+            break
 
+    if source_col is not None:
+        result["宿舍"] = result[source_col]
+
+    else:
+        result["宿舍"] = ""
+
+    # ==========================================
+    # 2. 統一宿舍名稱
+    # ==========================================
+    result["宿舍"] = (
+        result["宿舍"]
+        .astype(str)
+        .str.strip()
+        .str.replace("ㄧ", "一", regex=False)
+        .str.replace("女一宿", "女一", regex=False)
+        .str.replace("女二宿", "女二", regex=False)
+        .str.replace("女三宿", "女三", regex=False)
+        .str.replace("男一宿", "男一", regex=False)
+        #.str.replace("男二宿", "男", regex=False)
+        .str.replace("男三宿", "男三", regex=False)
+    )
+
+    # ==========================================
+    # 3. 沒有宿舍資料 → 從房號判斷
+    # ==========================================
     if "房號" not in result.columns:
         return result
 
     login_gender = get_login_gender()
 
-    def get_dorm_from_room(room):
+    def infer_dorm_from_room(room):
         room = str(room).strip()
 
         if not room:
             return ""
 
-        # 只取房號前兩碼
+        # 例如 82301 -> 82
         prefix = room[:2]
 
-        # ==========================================
+        # ------------------------------------------
         # 男生
-        # ==========================================
+        # ------------------------------------------
         if login_gender == "男":
 
             if prefix in ["81", "82"]:
@@ -457,9 +490,9 @@ def _prepare_dorm_column(df):
             if prefix == "83":
                 return "男三"
 
-        # ==========================================
+        # ------------------------------------------
         # 女生
-        # ==========================================
+        # ------------------------------------------
         elif login_gender == "女":
 
             if prefix in ["81", "82"]:
@@ -473,8 +506,20 @@ def _prepare_dorm_column(df):
 
         return ""
 
-    result["宿舍"] = result["房號"].apply(
-        get_dorm_from_room
+    inferred_dorm = result["房號"].apply(
+        infer_dorm_from_room
+    )
+
+    # 只有原本沒有宿舍的資料才補上
+    empty_dorm = (
+        result["宿舍"]
+        .astype(str)
+        .str.strip()
+        .eq("")
+    )
+
+    result.loc[empty_dorm, "宿舍"] = (
+        inferred_dorm[empty_dorm]
     )
 
     return result
