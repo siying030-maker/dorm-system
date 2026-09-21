@@ -1299,13 +1299,12 @@ def parse_sheet_date(value):
 def show_attendance():
 
     st.header("點名系統")
+    st.markdown(
+    '<div id="attendance-top"></div>',
+    unsafe_allow_html=True,
+)
 
-    #st.markdown(
-    #"""
-    #<div id="attendance-top"></div>
-    #""",
-    #unsafe_allow_html=True,
-    #)
+   
 
     # ==================================================
     # 點名類型
@@ -1942,45 +1941,38 @@ def show_attendance():
             )
     # ==============================
     # ==============================
-    # 回到最上面按鈕
+    # 回到最上面
     # ==============================
 
-    components.html(
+    st.markdown(
         """
-        <script>
-        const button = document.createElement("button");
-        button.innerHTML = "↑ 回到最上面";
+        <style>
+        .attendance-back-top {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 8px 14px;
+            background: white;
+            color: #333333 !important;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
 
-        button.style.position = "fixed";
-        button.style.left = "25px";
-        button.style.bottom = "50px";
-        button.style.zIndex = "999999";
-        button.style.padding = "9px 15px";
-        button.style.background = "white";
-        button.style.color = "#333";
-        button.style.border = "1px solid #ccc";
-        button.style.borderRadius = "10px";
-        button.style.fontSize = "15px";
-        button.style.fontWeight = "600";
-        button.style.cursor = "pointer";
-        button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
+        .attendance-back-top:hover {
+            background: #f3f3f3;
+            color: #333333 !important;
+        }
+        </style>
 
-        button.onclick = function() {
-            window.parent.document
-                .querySelector('section[data-testid="stMain"]')
-                ?.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                });
-
-            window.parent.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
-        };
-
-        window.parent.document.body.appendChild(button);
-        </script>
+        <a
+            class="attendance-back-top"
+            href="#attendance-top"
+        >
+            ↑ 回到最上面
+        </a>
         """,
-        height=0,
+        unsafe_allow_html=True,
     )
