@@ -2,6 +2,7 @@ import time
 import streamlit as st
 import pandas as pd
 from datetime import date
+from streamlit_scroll_to_top import scroll_to_top
 
 from core.config import (
     UPPER_GATE_URL,
@@ -1298,12 +1299,12 @@ def show_attendance():
 
     st.header("點名系統")
 
-    st.markdown(
-    """
-    <div id="attendance-top"></div>
-    """,
-    unsafe_allow_html=True,
-    )
+    #st.markdown(
+    #"""
+    #<div id="attendance-top"></div>
+    #""",
+    #unsafe_allow_html=True,
+    #)
 
     # ==================================================
     # 點名類型
@@ -1941,7 +1942,11 @@ def show_attendance():
     # ==============================
     # 回到最上面按鈕
     # ==============================
-
+    scroll_to_top(
+    "↑ 回到最上面",
+    key="attendance_back_top"
+    )
+    '''
     st.markdown(
         """
         <style>
@@ -1992,3 +1997,4 @@ def show_attendance():
         """,
         unsafe_allow_html=True,
     )
+    '''

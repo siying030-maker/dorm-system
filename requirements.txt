@@ -4,3 +4,4 @@ gspread
 google-auth
 openpyxl
 schedule
+streamlit-scroll-to-top
