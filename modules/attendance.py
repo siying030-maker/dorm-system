@@ -1299,11 +1299,11 @@ def parse_sheet_date(value):
 def show_attendance():
 
     st.header("點名系統")
+
     st.markdown(
     '<div id="attendance-top"></div>',
     unsafe_allow_html=True,
-)
-
+    )
    
 
     # ==================================================
@@ -1967,12 +1967,13 @@ def show_attendance():
         }
         </style>
 
-        <a
-            class="attendance-back-top"
-            href="#attendance-top"
-        >
+        
+        st.markdown(
+        """
+        <a class="attendance-back-top" href="#attendance-top">
             ↑ 回到最上面
         </a>
         """,
         unsafe_allow_html=True,
+        )
     )
