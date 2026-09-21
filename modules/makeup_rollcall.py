@@ -522,7 +522,9 @@ def filter_by_leader_scope(df):
         return result.iloc[0:0].copy()
 
     # 樓長：只查看登入帳號被指派的宿舍
+    # 樓長：只查看登入帳號被指派的宿舍
     if role == "樓長":
+
         allowed_dorms = []
 
         for state_key in [
@@ -531,9 +533,13 @@ def filter_by_leader_scope(df):
             "winter_dorms",
             "summer_dorms",
         ]:
-            raw_value = st.session_state.get(state_key, "")
 
-            # 支援「、」「，」「,」「/」等常見分隔方式。
+            raw_value = st.session_state.get(
+                state_key,
+                ""
+            )
+
+            # 支援「、」「，」「,」「/」等常見分隔方式
             raw_value = (
                 str(raw_value)
                 .replace("，", ",")
@@ -545,53 +551,93 @@ def filter_by_leader_scope(df):
             )
 
             for item in raw_value.split(","):
+
                 item = canonical_dorm(item)
 
                 if item:
-                    # 舊帳號可能寫成「男一宿」等名稱，統一成「男一」。
+
+                    # 舊帳號可能寫成「女二宿」
                     for suffix in ["宿"]:
+
                         if item.endswith(suffix) and len(item) > 1:
                             item = item[:-len(suffix)]
 
                     allowed_dorms.append(item)
 
-        allowed_dorms = list(dict.fromkeys(allowed_dorms))
+
+        # 去除重複
+        allowed_dorms = list(
+            dict.fromkeys(allowed_dorms)
+        )
+
 
         if not allowed_dorms:
-            st.warning("目前帳號沒有設定可管理的宿舍")
+
+            st.warning(
+                "目前帳號沒有設定可管理的宿舍"
+            )
+
             return result.iloc[0:0].copy()
 
-        # 優先使用真正的宿舍欄位。
+
+        # =========================================
+        # 平日宿舍 OR 假日宿舍
+        # 任一符合樓長管理宿舍即可顯示
+        # =========================================
+
+        normal_match = result[
+            result["宿舍"].isin(allowed_dorms)
+        ]
+
+        holiday_match = result[
+            result["假日宿舍"].isin(allowed_dorms)
+        ]
+
+
         matched = result[
             result["宿舍"].isin(allowed_dorms)
+            |
+            result["假日宿舍"].isin(allowed_dorms)
         ].copy()
+
 
         if not matched.empty:
             return matched
 
-        # 舊版資料沒有宿舍欄位時，嘗試從整列資料辨識。
+
+        # =========================================
+        # 舊版資料：沒有宿舍欄位
+        # =========================================
+
         inferred = result.apply(
-            lambda row: _infer_dorm_from_row(row, allowed_dorms),
+            lambda row: _infer_dorm_from_row(
+                row,
+                allowed_dorms
+            ),
             axis=1,
         )
 
+
         if inferred.astype(str).str.strip().ne("").any():
+
             result["宿舍"] = inferred
+
             return result[
                 result["宿舍"].isin(allowed_dorms)
             ].copy()
 
-        # 無法安全判斷宿舍時，不直接把其他宿舍資料給樓長。
+
+        # =========================================
+        # 無法判斷
+        # =========================================
+
         st.warning(
-            "目前男生補點資料沒有可辨識的「宿舍」資訊，"
+            "目前補點資料沒有可辨識的「宿舍」或「假日宿舍」資訊，"
             "因此無法安全依樓長權限篩選。"
             "請先用新版點名系統重新儲存缺席資料。"
         )
-        return result.iloc[0:0].copy()
 
-    # 其他身分不顯示補點資料
-    st.warning("目前帳號沒有補點名單權限")
-    return result.iloc[0:0].copy()
+        return result.iloc[0:0].copy()
 
 
 def show_makeup_rollcall():
