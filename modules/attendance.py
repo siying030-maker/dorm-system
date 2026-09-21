@@ -1940,45 +1940,18 @@ def show_attendance():
     # ==============================
     # 回到最上面按鈕
     # ==============================
-    def scroll_to_top():
-        components.html(
-            """
-            <script>
-            setTimeout(function() {
-
-                const main = window.parent.document
-                    .querySelector('section[data-testid="stMain"]');
-
-                if (main) {
-                    main.scrollTo({
-                        top: 0,
-                        behavior: "smooth"
-                    });
-                }
-
-                window.parent.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                });
-
-            }, 100);
-            </script>
-            """,
-            height=0,
-        )
-
-
-    # ============================
-    # 回到最上面按鈕
-    # ============================
-
     st.markdown(
         """
         <style>
 
         /* 預留底部空間 */
         section[data-testid="stMain"] {
-            padding-bottom: 80px;
+            padding-bottom: 90px !important;
+        }
+
+        /* 固定回到最上面的按鈕 */
+        div[data-testid="stButton"] {
+            z-index: 999999;
         }
 
         </style>
@@ -1987,8 +1960,85 @@ def show_attendance():
     )
 
 
+    # Streamlit 原生按鈕
     if st.button(
         "↑ 回到最上面",
         key="back_to_top"
     ):
-        scroll_to_top()
+        pass
+
+
+    # JavaScript
+    components.html(
+        """
+        <script>
+
+        setTimeout(function() {
+
+            const buttons =
+                window.parent.document.querySelectorAll(
+                    'button'
+                );
+
+
+            buttons.forEach(function(button) {
+
+                if (
+                    button.innerText.trim() ===
+                    "↑ 回到最上面"
+                ) {
+
+                    // 固定位置
+                    button.style.position = "fixed";
+                    button.style.left = "50%";
+                    button.style.bottom = "10px";
+                    button.style.transform =
+                        "translateX(-50%)";
+
+                    button.style.zIndex = "999999";
+
+
+                    // 點擊
+                    button.addEventListener(
+                        "click",
+                        function() {
+
+                            setTimeout(function() {
+
+                                const main =
+                                    window.parent.document
+                                    .querySelector(
+                                        'section[data-testid="stMain"]'
+                                    );
+
+
+                                if (main) {
+
+                                    main.scrollTo({
+                                        top: 0,
+                                        behavior: "smooth"
+                                    });
+
+                                }
+
+
+                                window.parent.scrollTo({
+                                    top: 0,
+                                    behavior: "smooth"
+                                });
+
+                            }, 50);
+
+                        }
+                    );
+
+                }
+
+            });
+
+        }, 500);
+
+        </script>
+        """,
+        height=0,
+    )
