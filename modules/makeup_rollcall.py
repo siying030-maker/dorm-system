@@ -774,7 +774,7 @@ def filter_by_leader_scope(df):
 def show_makeup_rollcall():
 
     st.header("補點名單")
-    st.caption("00:00～11:59 顯示前一天資料；06:00 起切換當天資料，並每 15 秒自動刷新。")
+    st.caption("00:00～11:59 顯示前一天資料；12:00 起切換當天資料，並每 15 秒自動刷新。")
 
     
 

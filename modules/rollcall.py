@@ -152,8 +152,8 @@ def load_rollcall_data():
                 reverse=True
             )
 
-            # 只讀最近 10 個日期 Sheet
-            date_worksheets = date_worksheets[:10]
+            # 只讀最近 7 個日期 Sheet
+            date_worksheets = date_worksheets[:7]
 
             for ws in date_worksheets:
 
