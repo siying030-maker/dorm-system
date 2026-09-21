@@ -1939,70 +1939,31 @@ def show_attendance():
     # 回到最上面按鈕
     # ==============================
 
-    components.html(
-    """
-    <script>
-    const button = document.createElement("button");
-    button.innerHTML = "↑ 回到最上面";
+    if st.button(
+        "↑ 回到最上面",
+        key="back_to_top"
+    ):
 
-    // =========================
-    // 按鈕固定在畫面最下面
-    // =========================
-    button.style.position = "fixed";
-    button.style.left = "50%";
-    button.style.bottom = "10px";
-    button.style.transform = "translateX(-50%)";
+        components.html(
+            """
+            <script>
 
-    // 確保按鈕在最上層
-    button.style.zIndex = "999999";
+            const main = window.parent.document
+                .querySelector('section[data-testid="stMain"]');
 
-    // =========================
-    // 按鈕外觀
-    // =========================
-    button.style.padding = "8px 16px";
-    button.style.background = "white";
-    button.style.color = "#333";
-    button.style.border = "1px solid #ccc";
-    button.style.borderRadius = "10px";
-    button.style.fontSize = "15px";
-    button.style.fontWeight = "600";
-    button.style.cursor = "pointer";
-    button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
+            if (main) {
+                main.scrollTo({
+                    top: 0,
+                    behavior: "smooth"
+                });
+            }
 
-    // =========================
-    // 點擊回到最上面
-    // =========================
-    button.onclick = function() {
-
-        const main = window.parent.document
-            .querySelector('section[data-testid="stMain"]');
-
-        if (main) {
-            main.scrollTo({
+            window.parent.scrollTo({
                 top: 0,
                 behavior: "smooth"
             });
-        }
 
-        window.parent.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-    };
-
-    // 加入網頁
-    window.parent.document.body.appendChild(button);
-
-    // =========================
-    // 避免按鈕遮住最下面的內容
-    // =========================
-    const main = window.parent.document
-        .querySelector('section[data-testid="stMain"]');
-
-    if (main) {
-        main.style.paddingBottom = "80px";
-    }
-    </script>
-    """,
-    height=0,
-)
+            </script>
+            """,
+            height=0,
+        )
