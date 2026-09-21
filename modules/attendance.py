@@ -1940,41 +1940,49 @@ def show_attendance():
     # ==============================
 
     components.html(
-        """
-        <script>
-        const button = document.createElement("button");
-        button.innerHTML = "↑ 回到最上面";
+    """
+    <script>
+    const button = document.createElement("button");
+    button.innerHTML = "↑ 回到最上面";
 
-        button.style.position = "fixed";
-        button.style.middle = "50px";
-        button.style.bottom = "60px";
-        button.style.zIndex = "999999";
-        button.style.padding = "9px 15px";
-        button.style.background = "white";
-        button.style.color = "#333";
-        button.style.border = "1px solid #ccc";
-        button.style.borderRadius = "10px";
-        button.style.fontSize = "15px";
-        button.style.fontWeight = "600";
-        button.style.cursor = "pointer";
-        button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
+    // 固定在網頁最下面、水平置中
+    button.style.position = "fixed";
+    button.style.left = "50%";
+    button.style.bottom = "20px";
+    button.style.transform = "translateX(-50%)";
 
-        button.onclick = function() {
-            window.parent.document
-                .querySelector('section[data-testid="stMain"]')
-                ?.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                });
+    // 顯示在最上層
+    button.style.zIndex = "999999";
 
-            window.parent.scrollTo({
+    // 按鈕外觀
+    button.style.padding = "9px 15px";
+    button.style.background = "white";
+    button.style.color = "#333";
+    button.style.border = "1px solid #ccc";
+    button.style.borderRadius = "10px";
+    button.style.fontSize = "15px";
+    button.style.fontWeight = "600";
+    button.style.cursor = "pointer";
+    button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
+
+    // 點擊後回到最上面
+    button.onclick = function() {
+        window.parent.document
+            .querySelector('section[data-testid="stMain"]')
+            ?.scrollTo({
                 top: 0,
                 behavior: "smooth"
             });
-        };
 
-        window.parent.document.body.appendChild(button);
-        </script>
-        """,
-        height=0,
-    )
+        window.parent.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    };
+
+    // 加入網頁
+    window.parent.document.body.appendChild(button);
+    </script>
+    """,
+    height=0,
+)
