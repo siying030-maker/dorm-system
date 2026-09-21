@@ -409,46 +409,72 @@ def update_need_makeup_status_to_done(gender, target_row):
 
 def _prepare_dorm_column(df):
     """
-    補點資料的宿舍欄位相容處理。
+    補點資料沒有「宿舍」欄位時，
+    嘗試由房號判斷宿舍。
 
-    新版點名資料通常使用「宿舍」，但舊版或不同來源可能使用：
-    「宿舍別」、「宿舍名稱」、「宿別」。
-    找不到時不直接刪掉資料，先建立空白「宿舍」欄位，讓男／女舍監仍可看到
-    對應性別的補點資料。樓長若無法從資料判斷宿舍，則會在權限篩選時安全地顯示提示。
+    注意：
+    房號本身沒有性別資訊，因此必須依目前登入者的性別
+    搭配房號規則判斷。
     """
+
     result = df.copy()
 
+    # 如果原本有宿舍欄位，直接使用
     if "宿舍" in result.columns:
-        source_col = "宿舍"
-    else:
-        source_col = None
-        for candidate in [
-            "宿舍別",
-            "宿舍名稱",
-            "宿別",
-            "住宿宿舍",
-        ]:
-            if candidate in result.columns:
-                source_col = candidate
-                break
+        result["宿舍"] = (
+            result["宿舍"]
+            .astype(str)
+            .str.strip()
+            .str.replace("ㄧ", "一", regex=False)
+        )
+        return result
 
-        if source_col is not None:
-            result["宿舍"] = result[source_col]
-        else:
-            result["宿舍"] = ""
+    # 沒有宿舍欄位，先建立
+    result["宿舍"] = ""
 
-    result["宿舍"] = (
-        result["宿舍"]
-        .astype(str)
-        .str.strip()
-        .str.replace("ㄧ", "一", regex=False)
-        .str.replace("女一宿", "女一", regex=False)
-        .str.replace("女二宿", "女二", regex=False)
-        .str.replace("女三宿", "女三", regex=False)
-        .str.replace("男一宿", "男一", regex=False)
-        .str.replace("男二宿", "男二", regex=False)
-        .str.replace("男三宿", "男三", regex=False)
-        .str.replace("81宿_男", "女一一樓", regex=False)
+    if "房號" not in result.columns:
+        return result
+
+    login_gender = get_login_gender()
+
+    def get_dorm_from_room(room):
+        room = str(room).strip()
+
+        if not room:
+            return ""
+
+        # 只取房號前兩碼
+        prefix = room[:2]
+
+        # ==========================================
+        # 男生
+        # ==========================================
+        if login_gender == "男":
+
+            if prefix in ["81", "82"]:
+                return "男一"
+
+            if prefix == "83":
+                return "男三"
+
+        # ==========================================
+        # 女生
+        # ==========================================
+        elif login_gender == "女":
+
+            if prefix in ["81", "82"]:
+                return "女一"
+
+            if prefix in ["82"]:
+                return "女二"
+
+            if prefix == "83":
+                return "女三"
+
+        return ""
+
+    result["宿舍"] = result["房號"].apply(
+        get_dorm_from_room
     )
 
     return result
