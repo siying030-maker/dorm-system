@@ -132,10 +132,10 @@ def load_need_makeup_source(gender):
 
     ss = open_sheet(source_url)
 
-    # 00:00～05:59 仍屬前一天的補點時段
+    # 00:00～11:59 仍屬前一天的補點時段
     now = datetime.now(ZoneInfo("Asia/Taipei"))
 
-    if now.hour < 4:
+    if now.hour < 12:
         target_date = now.date() - timedelta(days=1)
     else:
         target_date = now.date()
@@ -774,7 +774,7 @@ def filter_by_leader_scope(df):
 def show_makeup_rollcall():
 
     st.header("補點名單")
-    st.caption("00:00～05:59 顯示前一天資料；06:00 起切換當天資料，並每 15 秒自動刷新。")
+    st.caption("00:00～11:59 顯示前一天資料；06:00 起切換當天資料，並每 15 秒自動刷新。")
 
     
 
