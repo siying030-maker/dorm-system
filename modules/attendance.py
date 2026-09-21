@@ -1298,6 +1298,13 @@ def show_attendance():
 
     st.header("點名系統")
 
+    st.markdown(
+    """
+    <div id="attendance-top"></div>
+    """,
+    unsafe_allow_html=True,
+    )
+
     # ==================================================
     # 點名類型
     # ==================================================
@@ -1941,7 +1948,7 @@ def show_attendance():
         .attendance-back-top {
             position: fixed;
             left: 25px;
-            bottom: 25px;
+            bottom: 50px;
             z-index: 999999;
             display: inline-block;
             padding: 9px 15px;
