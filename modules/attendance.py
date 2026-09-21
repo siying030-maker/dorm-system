@@ -1945,17 +1945,21 @@ def show_attendance():
     const button = document.createElement("button");
     button.innerHTML = "↑ 回到最上面";
 
-    // 固定在網頁最下面、水平置中
+    // =========================
+    // 按鈕固定在畫面最下面
+    // =========================
     button.style.position = "fixed";
     button.style.left = "50%";
-    button.style.bottom = "20px";
+    button.style.bottom = "10px";
     button.style.transform = "translateX(-50%)";
 
-    // 顯示在最上層
+    // 確保按鈕在最上層
     button.style.zIndex = "999999";
 
+    // =========================
     // 按鈕外觀
-    button.style.padding = "9px 15px";
+    // =========================
+    button.style.padding = "8px 16px";
     button.style.background = "white";
     button.style.color = "#333";
     button.style.border = "1px solid #ccc";
@@ -1965,14 +1969,20 @@ def show_attendance():
     button.style.cursor = "pointer";
     button.style.boxShadow = "0 3px 10px rgba(0,0,0,0.18)";
 
-    // 點擊後回到最上面
+    // =========================
+    // 點擊回到最上面
+    // =========================
     button.onclick = function() {
-        window.parent.document
-            .querySelector('section[data-testid="stMain"]')
-            ?.scrollTo({
+
+        const main = window.parent.document
+            .querySelector('section[data-testid="stMain"]');
+
+        if (main) {
+            main.scrollTo({
                 top: 0,
                 behavior: "smooth"
             });
+        }
 
         window.parent.scrollTo({
             top: 0,
@@ -1982,6 +1992,16 @@ def show_attendance():
 
     // 加入網頁
     window.parent.document.body.appendChild(button);
+
+    // =========================
+    // 避免按鈕遮住最下面的內容
+    // =========================
+    const main = window.parent.document
+        .querySelector('section[data-testid="stMain"]');
+
+    if (main) {
+        main.style.paddingBottom = "80px";
+    }
     </script>
     """,
     height=0,
