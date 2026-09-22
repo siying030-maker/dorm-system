@@ -1,7 +1,11 @@
+'''
 import time
 import streamlit as st
 import pandas as pd
 from datetime import date
+import streamlit.components.v1 as components
+import streamlit as st
+
 
 
 from core.config import (
@@ -12,7 +16,6 @@ from core.config import (
     UNPAID_URL,
     ROLLCALL_GIRL_URL,
     ROLLCALL_BOY_URL,
-    ROLLCALL_SHEET_URL,
     NEED_MAKEUP_GIRL_URL,
     NEED_MAKEUP_BOY_URL,
 )
@@ -1060,99 +1063,213 @@ def append_rows_to_sheet(
 
     return len(rows)
 
-def sync_rollcall_to_unified(attendance_date):
-    """從男女點名回報表抓取指定日期「缺／未入住」資料，寫入統一點名單總表。"""
-    sheet_name = str(attendance_date).strip()
-    headers = ["日期","宿舍","床位","房號","學號","班級","姓名","狀態","備註","性別"]
-    rows = []
+def save_rollcall_result(
+    attendance_date,
+    dorm,
+    floor,
+    final_df
+):
+    """
+    將狀態為「缺」的學生寫入：
 
-    for source_gender, source_url in [("女生", ROLLCALL_GIRL_URL), ("男生", ROLLCALL_BOY_URL)]:
-        try:
-            ss = open_sheet(source_url)
-            ws = get_worksheet(ss, sheet_name)
-            values = get_all_values(ws)
-        except Exception:
-            continue
-        if len(values) <= 1:
-            continue
-        source_headers = [str(x).strip() for x in values[0]]
-        df = pd.DataFrame(values[1:], columns=source_headers)
-        if "狀態" not in df.columns or "學號" not in df.columns:
-            continue
-        df["狀態"] = df["狀態"].astype(str).str.strip()
-        df = df[df["狀態"].isin(["缺", "未入住"])].copy()
-        for _, r in df.iterrows():
-            rows.append([
-                sheet_name, str(r.get("宿舍","")).strip(), str(r.get("床位","")).strip(),
-                str(r.get("房號","")).strip(), str(r.get("學號","")).strip(),
-                str(r.get("班級","")).strip(), str(r.get("姓名","")).strip(),
-                str(r.get("狀態","")).strip(), str(r.get("備註","")).strip(), source_gender
-            ])
+    女生：
+    - 女生點名回報
+    - 點名單總表（女）
 
-    if not rows:
+    男生：
+    - 男生點名回報
+    - 點名單總表（男）
+    """
+
+    gender = get_dorm_gender(
+        dorm
+    )
+
+    if gender == "女生":
+
+        need_makeup_url = (
+            NEED_MAKEUP_GIRL_URL
+        )
+
+        rollcall_url = (
+            ROLLCALL_GIRL_URL
+        )
+
+    elif gender == "男生":
+
+        need_makeup_url = (
+            NEED_MAKEUP_BOY_URL
+        )
+
+        rollcall_url = (
+            ROLLCALL_BOY_URL
+        )
+
+    else:
+
+        raise Exception(
+            "無法判斷宿舍性別"
+        )
+
+    sheet_name = str(
+        attendance_date
+    )
+
+    # ==================================================
+    # 男生／女生點名回報欄位
+    # ==================================================
+
+    rollcall_headers = [
+        "學號",
+        "班級",
+        "姓名",
+        "床位",
+        "房號",
+        "本地/境外",
+        "手機",
+        "家長姓名",
+        "連絡電話1",
+        "狀態",
+        "備註",
+    ]
+
+    # ==================================================
+    # 點名單總表／補點名單欄位
+    # ==================================================
+
+    makeup_headers = [
+        "宿舍",
+        "床位",
+        "房號",
+        "學號",
+        "班級",
+        "姓名",
+        "狀態",
+        "備註",
+    ]
+
+    absent_rollcall_rows = []
+    absent_makeup_rows = []
+
+    # ==================================================
+    # 只收集狀態為缺的學生
+    # ==================================================
+
+    for _, student_row in final_df.iterrows():
+
+        status = str(
+            student_row.get(
+                "狀態",
+                ""
+            )
+        ).strip()
+
+        if status not in ["缺", "未入住"]:
+            continue
+
+        # ==============================================
+        # 男生／女生點名回報完整資料
+        # ==============================================
+
+        rollcall_row = [
+            student_row.get(
+                "學號",
+                ""
+            ),
+            student_row.get(
+                "班級",
+                ""
+            ),
+            student_row.get(
+                "姓名",
+                ""
+            ),
+            student_row.get(
+                "床位",
+                ""
+            ),
+            student_row.get(
+                "房號",
+                ""
+            ),
+            student_row.get(
+                "本地/境外",
+                ""
+            ),
+            student_row.get(
+                "手機",
+                ""
+            ),
+            student_row.get(
+                "家長姓名",
+                ""
+            ),
+            student_row.get(
+                "連絡電話1",
+                ""
+            ),
+            status,
+            student_row.get(
+                "備註",
+                ""
+            ),
+        ]
+
+        # ==============================================
+        # 補點名單簡化資料
+        # ==============================================
+
+        makeup_row = [
+            dorm,
+            student_row.get("床位", ""),
+            student_row.get("房號", ""),
+            student_row.get("學號", ""),
+            student_row.get("班級", ""),
+            student_row.get("姓名", ""),
+            status,
+            student_row.get("備註", ""),
+        ]
+
+        absent_rollcall_rows.append(
+            rollcall_row
+        )
+
+        absent_makeup_rows.append(
+            makeup_row
+        )
+
+    # ==================================================
+    # 沒有缺席學生，不寫入任何資料
+    # ==================================================
+
+    if not absent_rollcall_rows:
         return 0
 
-    try:
-        ss = open_sheet(ROLLCALL_SHEET_URL)
-        try:
-            ws = get_worksheet(ss, sheet_name)
-            existing = get_all_values(ws)
-        except Exception:
-            existing = []
-    except Exception as e:
-        raise Exception(f"點名單總表開啟失敗：{e}")
+    # ==================================================
+    # 寫入男生／女生點名回報
+    # ==================================================
 
-    keys = set()
-    if len(existing) > 1:
-        eh = [str(x).strip() for x in existing[0]]
-        pos = {h:i for i,h in enumerate(eh)}
-        for r in existing[1:]:
-            sid = str(r[pos["學號"]]).strip() if "學號" in pos and len(r)>pos["學號"] else ""
-            dorm = str(r[pos["宿舍"]]).strip() if "宿舍" in pos and len(r)>pos["宿舍"] else ""
-            if sid: keys.add((sid,dorm))
+    append_rows_to_sheet(
+        spreadsheet_url=rollcall_url,
+        sheet_name=sheet_name,
+        headers=rollcall_headers,
+        rows=absent_rollcall_rows,
+    )
 
-    new_rows=[]
-    for r in rows:
-        key=(r[4],r[1])
-        if key in keys: continue
-        keys.add(key); new_rows.append(r)
-    if not new_rows: return 0
+    # ==================================================
+    # 寫入點名單總表／補點名單
+    # ==================================================
 
-    append_rows_to_sheet(ROLLCALL_SHEET_URL, sheet_name, headers, new_rows)
-    return len(new_rows)
+    append_rows_to_sheet(
+        spreadsheet_url=need_makeup_url,
+        sheet_name=sheet_name,
+        headers=makeup_headers,
+        rows=absent_makeup_rows,
+    )
 
-
-def save_rollcall_result(attendance_date, dorm, floor, final_df):
-    """點名完成後寫入男女來源表、補點名單，並同步男女資料到統一總表。"""
-    gender = get_dorm_gender(dorm)
-    if gender == "女生":
-        need_makeup_url, rollcall_url = NEED_MAKEUP_GIRL_URL, ROLLCALL_GIRL_URL
-    elif gender == "男生":
-        need_makeup_url, rollcall_url = NEED_MAKEUP_BOY_URL, ROLLCALL_BOY_URL
-    else:
-        raise Exception("無法判斷宿舍性別")
-
-    sheet_name = str(attendance_date)
-    rollcall_headers = ["宿舍","學號","班級","姓名","床位","房號","本地/境外","手機","家長姓名","連絡電話1","狀態","備註"]
-    makeup_headers = ["宿舍","床位","房號","學號","班級","姓名","狀態","備註"]
-    absent_rollcall_rows=[]; absent_makeup_rows=[]
-
-    for _, r in final_df.iterrows():
-        status=str(r.get("狀態","")).strip()
-        if status not in ["缺","未入住"]: continue
-        absent_rollcall_rows.append([
-            dorm,r.get("學號",""),r.get("班級",""),r.get("姓名",""),r.get("床位",""),
-            r.get("房號",""),r.get("本地/境外",""),r.get("手機",""),r.get("家長姓名",""),
-            r.get("連絡電話1",""),status,r.get("備註","")])
-        absent_makeup_rows.append([
-            dorm,r.get("床位",""),r.get("房號",""),r.get("學號",""),r.get("班級",""),
-            r.get("姓名",""),status,r.get("備註","")])
-
-    if not absent_rollcall_rows: return 0
-    append_rows_to_sheet(rollcall_url, sheet_name, rollcall_headers, absent_rollcall_rows)
-    append_rows_to_sheet(need_makeup_url, sheet_name, makeup_headers, absent_makeup_rows)
-    sync_rollcall_to_unified(attendance_date)
-    return len(absent_rollcall_rows)
+    return len(
+        absent_rollcall_rows
+    )
 
 def color_text(text, color):
     return f"<span style='color:{color}; font-weight:700'>{text}</span>"
@@ -1185,13 +1302,7 @@ def parse_sheet_date(value):
 def show_attendance():
 
     st.header("點名系統")
-
-    #st.markdown(
-    #"""
-    #<div id="attendance-top"></div>
-    #""",
-    #unsafe_allow_html=True,
-    #)
+   
 
     # ==================================================
     # 點名類型
@@ -1826,59 +1937,110 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
+   
     # ==============================
     # 回到最上面按鈕
     # ==============================
-
-    '''
     st.markdown(
         """
         <style>
-        .attendance-back-top {
-            position: fixed;
-            left: 25px;
-            bottom: 50px;
+
+        /* 預留底部空間 */
+        section[data-testid="stMain"] {
+            padding-bottom: 90px !important;
+        }
+
+        /* 固定回到最上面的按鈕 */
+        div[data-testid="stButton"] {
             z-index: 999999;
-            display: inline-block;
-            padding: 9px 15px;
-            background: white;
-            color: #333333 !important;
-            border: 1px solid #cccccc;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            text-decoration: none !important;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.18);
-            cursor: pointer;
         }
 
-        .attendance-back-top:hover {
-            background: #f3f3f3;
-            color: #333333 !important;
-        }
         </style>
-
-        <a
-            class="attendance-back-top"
-            href="javascript:void(0);"
-            onclick="
-                const main = document.querySelector('section[data-testid="stMain"]');
-                if (main) {
-                    main.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                } else {
-                    window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
-                }
-            "
-        >
-            ↑ 回到最上面
-        </a>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
-    '''
+
+
+    # Streamlit 原生按鈕
+    if st.button(
+        "↑ 回到最上面",
+        key="back_to_top"
+    ):
+        pass
+
+
+    # JavaScript
+    components.html(
+        """
+        <script>
+
+        setTimeout(function() {
+
+            const buttons =
+                window.parent.document.querySelectorAll(
+                    'button'
+                );
+
+
+            buttons.forEach(function(button) {
+
+                if (
+                    button.innerText.trim() ===
+                    "↑ 回到最上面"
+                ) {
+
+                    // 固定位置
+                    button.style.position = "fixed";
+                    button.style.left = "50%";
+                    button.style.bottom = "10px";
+                    button.style.transform =
+                        "translateX(-50%)";
+
+                    button.style.zIndex = "999999";
+
+
+                    // 點擊
+                    button.addEventListener(
+                        "click",
+                        function() {
+
+                            setTimeout(function() {
+
+                                const main =
+                                    window.parent.document
+                                    .querySelector(
+                                        'section[data-testid="stMain"]'
+                                    );
+
+
+                                if (main) {
+
+                                    main.scrollTo({
+                                        top: 0,
+                                        behavior: "smooth"
+                                    });
+
+                                }
+
+
+                                window.parent.scrollTo({
+                                    top: 0,
+                                    behavior: "smooth"
+                                });
+
+                            }, 50);
+
+                        }
+                    );
+
+                }
+
+            });
+
+        }, 500);
+
+        </script>
+        """,
+        height=0,
+    )
+'''
