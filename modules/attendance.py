@@ -2,6 +2,8 @@ import time
 import streamlit as st
 import pandas as pd
 from datetime import date
+import streamlit.components.v1 as components
+import streamlit as st
 
 
 from core.config import (
