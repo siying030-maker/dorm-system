@@ -390,39 +390,90 @@ def get_need_makeup_url_by_gender(gender):
 # =========================================================
 
 def _prepare_dorm_column(df):
+    """
+    依照 性別 + 房號 判斷宿舍
 
-    result = df.copy()
+    女生：
+        81 → 女一
+        82 → 女二
+        83 → 女三
 
-    # -----------------------------------------
-    # 1. 優先使用資料本身的宿舍欄位
-    # -----------------------------------------
+    男生：
+        81 → 女一一樓
+        82 → 男一
+        83 → 男三
+    """
 
-    source_col = None
+    df = df.copy()
 
-    for candidate in [
-        "宿舍",
-        "宿舍別",
-        "宿舍名稱",
-        "宿別",
-        "住宿宿舍",
-    ]:
-
-        if candidate in result.columns:
-            source_col = candidate
-            break
-
-    if source_col:
-
-        result["宿舍"] = (
-            result[source_col]
+    # 已經有宿舍欄位就直接整理
+    if "宿舍" in df.columns:
+        df["宿舍"] = (
+            df["宿舍"]
+            .fillna("")
             .astype(str)
             .str.strip()
-            .map(canonical_dorm)
         )
 
-    else:
+        return df
 
-        result["宿舍"] = ""
+    # 沒有房號就無法判斷
+    if "房號" not in df.columns:
+        st.warning(
+            "目前補點資料沒有「宿舍」或「房號」欄位，"
+            "無法判斷學生所屬宿舍。"
+        )
+        return df
+
+    # 判斷性別欄位
+    gender_col = None
+
+    for col in ["性別", "男女", "性別別"]:
+        if col in df.columns:
+            gender_col = col
+            break
+
+    if gender_col is None:
+        st.warning(
+            "目前補點資料沒有「性別」欄位，"
+            "無法區分女生 81 與男生 81。"
+        )
+        return df
+
+    def get_dorm(row):
+        gender = str(row.get(gender_col, "")).strip()
+        room = str(row.get("房號", "")).strip()
+
+        # 清除可能的小數
+        if room.endswith(".0"):
+            room = room[:-2]
+
+        # 取得房號前兩碼
+        prefix = room[:2]
+
+        # 女生
+        if gender in ["女", "女生", "女性"]:
+            if prefix == "81":
+                return "女一"
+            elif prefix == "82":
+                return "女二"
+            elif prefix == "83":
+                return "女三"
+
+        # 男生
+        elif gender in ["男", "男生", "男性"]:
+            if prefix == "81":
+                return "女一一樓"
+            elif prefix == "82":
+                return "男一"
+            elif prefix == "83":
+                return "男三"
+
+        return ""
+
+    df["宿舍"] = df.apply(get_dorm, axis=1)
+
+    return df
 
     # -----------------------------------------
     # 2. 沒有宿舍 → 嘗試從房號判斷
@@ -598,16 +649,28 @@ def infer_dorm_for_leader(
 # =========================================================
 
 def filter_by_leader_scope(df):
+    df = _prepare_dorm_column(df)
 
-    role = str(
-        st.session_state.get(
-            "role",
-            ""
-        )
-    ).strip()
+    allowed_dorms = get_allowed_dorms()
 
-    if df.empty:
+    if not allowed_dorms:
         return df
+
+    # 只保留有成功判斷宿舍的資料
+    if "宿舍" not in df.columns:
+        st.warning("目前補點資料無法判斷宿舍。")
+        return pd.DataFrame()
+
+    # 顯示目前帳號管理的宿舍
+    st.info(
+        f"目前帳號管理宿舍：{', '.join(allowed_dorms)}"
+    )
+
+    result = df[
+        df["宿舍"].isin(allowed_dorms)
+    ].copy()
+
+    return result
 
     # -----------------------------------------
     # 先整理宿舍
