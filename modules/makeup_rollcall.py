@@ -24,6 +24,7 @@ from core.config import (
 
 def clean_sheet_value(value):
     """清理 Google Sheet 儲存格內容"""
+
     if value is None:
         return ""
 
@@ -37,7 +38,8 @@ def clean_sheet_value(value):
 
 
 def normalize_text(value):
-    """一般文字正規化"""
+    """文字正規化"""
+
     value = clean_sheet_value(value)
 
     if not value:
@@ -70,6 +72,7 @@ def normalize_gender(value):
 
 
 def gender_to_label(gender):
+
     gender = normalize_gender(gender)
 
     if gender == "女生":
@@ -109,11 +112,23 @@ def canonical_dorm(value):
         "女一樓": "女一一樓",
     }
 
-    return dorm_map.get(value, value)
+    return dorm_map.get(
+        value,
+        value
+    )
 
 
 def find_col_index(headers, target_name):
-    """尋找指定欄位位置"""
+    """
+    找欄位。
+
+    注意：
+    回傳的是 Python 0-based index。
+
+    Google Sheets update_cell()
+    則需要 1-based index，
+    所以寫入時必須 +1。
+    """
 
     headers = [
         clean_sheet_value(x)
@@ -125,6 +140,7 @@ def find_col_index(headers, target_name):
     )
 
     for i, header in enumerate(headers):
+
         if header == target_name:
             return i
 
@@ -132,9 +148,7 @@ def find_col_index(headers, target_name):
 
 
 def normalize_date_value(value):
-    """
-    日期統一成 YYYY-MM-DD
-    """
+    """日期統一成 YYYY-MM-DD"""
 
     value = clean_sheet_value(value)
 
@@ -142,12 +156,14 @@ def normalize_date_value(value):
         return ""
 
     try:
+
         dt = pd.to_datetime(
             value,
             errors="coerce"
         )
 
         if pd.notna(dt):
+
             return dt.strftime(
                 "%Y-%m-%d"
             )
@@ -165,12 +181,14 @@ def normalize_date_value(value):
         candidate = value[:10]
 
         try:
+
             dt = pd.to_datetime(
                 candidate,
                 errors="coerce"
             )
 
             if pd.notna(dt):
+
                 return dt.strftime(
                     "%Y-%m-%d"
                 )
@@ -186,9 +204,6 @@ def normalize_date_value(value):
 # =========================================================
 
 def get_login_role():
-    """
-    取得登入身分。
-    """
 
     role_keys = [
         "role",
@@ -214,9 +229,6 @@ def get_login_role():
 
 
 def get_login_gender():
-    """
-    取得登入者性別。
-    """
 
     gender_keys = [
         "gender",
@@ -237,27 +249,19 @@ def get_login_gender():
             "女生",
             "男生"
         ]:
+
             return value
 
     return ""
 
 
 def get_allowed_genders():
-    """
-    行政：
-        女生 + 男生
-
-    舍監：
-        依登入性別
-
-    舍長／樓長：
-        依登入性別
-    """
 
     role = get_login_role()
+
     role_lower = role.lower()
 
-    # 行政
+    # 行政可以看男女
     if (
         "行政" in role
         or "管理員" in role
@@ -267,6 +271,7 @@ def get_allowed_genders():
             "administrator",
         ]
     ):
+
         return [
             "女生",
             "男生"
@@ -278,6 +283,7 @@ def get_allowed_genders():
         "女生",
         "男生"
     ]:
+
         return [gender]
 
     return [
@@ -292,11 +298,8 @@ def get_allowed_genders():
 
 def get_makeup_target_date():
     """
-    00:00 ~ 11:59
-        → 前一天
-
-    12:00 ~ 23:59
-        → 當天
+    00:00～11:59 → 前一天
+    12:00～23:59 → 當天
     """
 
     tz = ZoneInfo(
@@ -364,7 +367,7 @@ def load_need_makeup_source():
     """
     從統一點名總表讀取待補點資料。
 
-    ROLLCALL_SHEET_URL：
+    統一點名總表欄位：
 
     日期
     宿舍
@@ -376,10 +379,6 @@ def load_need_makeup_source():
     狀態
     備註
     性別
-
-    只顯示：
-        狀態 = 缺
-        狀態 = 未入住
     """
 
     try:
@@ -388,10 +387,12 @@ def load_need_makeup_source():
             ROLLCALL_SHEET_URL
         )
 
-        # 統一點名總表是單一工作表
+        # 統一點名總表只有一個工作表
         ws = ss.sheet1
 
-        values = get_all_values(ws)
+        values = get_all_values(
+            ws
+        )
 
         if not values:
             return pd.DataFrame()
@@ -433,23 +434,24 @@ def load_need_makeup_source():
 
         df = pd.DataFrame(
             normalized_rows,
-            columns=headers,
+            columns=headers
         )
 
         if df.empty:
             return df
 
-        # =================================================
+        # =====================================================
         # 日期
-        # =================================================
+        # =====================================================
 
         if "日期" not in df.columns:
             return pd.DataFrame()
 
-        df["日期"] = df[
-            "日期"
-        ].apply(
-            normalize_date_value
+        df["日期"] = (
+            df["日期"]
+            .apply(
+                normalize_date_value
+            )
         )
 
         target_date = (
@@ -464,9 +466,9 @@ def load_need_makeup_source():
         if df.empty:
             return df
 
-        # =================================================
+        # =====================================================
         # 狀態
-        # =================================================
+        # =====================================================
 
         if "狀態" not in df.columns:
             return pd.DataFrame()
@@ -478,7 +480,7 @@ def load_need_makeup_source():
             .str.strip()
         )
 
-        # ★ 已補點不再顯示
+        # 已補點不再顯示
         df = df[
             df["狀態"].isin(
                 [
@@ -491,9 +493,9 @@ def load_need_makeup_source():
         if df.empty:
             return df
 
-        # =================================================
+        # =====================================================
         # 性別
-        # =================================================
+        # =====================================================
 
         allowed_genders = (
             get_allowed_genders()
@@ -547,13 +549,10 @@ def _prepare_dorm_column(df):
 
 
 def get_allowed_dorms():
-    """
-    取得樓長管理宿舍。
-    """
 
     role = get_login_role()
 
-    # 舍監、舍長不用管理宿舍限制
+    # 舍監、舍長不限制管理宿舍
     if "舍監" in role:
         return []
 
@@ -628,17 +627,6 @@ def get_allowed_dorms():
 
 
 def infer_dorm_for_leader(row):
-    """
-    宿舍對應：
-
-    女生 + 81 → 女一
-    女生 + 82 → 女二
-    女生 + 83 → 女三
-
-    男生 + 81 → 女一一樓
-    男生 + 82 → 男一
-    男生 + 83 → 男三
-    """
 
     gender = normalize_gender(
         row.get(
@@ -709,10 +697,6 @@ def infer_dorm_for_leader(row):
     return ""
 
 
-# =========================================================
-# 管理範圍
-# =========================================================
-
 def filter_by_leader_scope(df):
 
     df = df.copy()
@@ -742,6 +726,7 @@ def filter_by_leader_scope(df):
             "administrator",
         ]
     ):
+
         return df
 
     # 樓長
@@ -755,6 +740,7 @@ def filter_by_leader_scope(df):
         )
 
         if not allowed_dorms:
+
             return df.iloc[
                 0:0
             ].copy()
@@ -808,6 +794,111 @@ def filter_by_leader_scope(df):
 
 
 # =========================================================
+# 寫入後驗證
+# =========================================================
+
+def write_status_and_verify(
+    ws,
+    matched_row,
+    status_col,
+    source_name=""
+):
+    """
+    將狀態改成「已補點」並重新讀取驗證。
+
+    status_col：
+        Python 0-based
+
+    Google Sheet：
+        1-based
+
+    所以真正寫入：
+        status_col + 1
+    """
+
+    if status_col < 0:
+
+        raise Exception(
+            f"{source_name} 找不到「狀態」欄"
+        )
+
+    google_status_col = (
+        status_col + 1
+    )
+
+    # =====================================================
+    # 寫入
+    # =====================================================
+
+    update_cell(
+        ws,
+        matched_row,
+        google_status_col,
+        "已補點"
+    )
+
+    # =====================================================
+    # 重新讀取確認
+    # =====================================================
+
+    check_values = get_all_values(
+        ws
+    )
+
+    if not check_values:
+
+        raise Exception(
+            f"{source_name} 寫入後無法重新讀取資料"
+        )
+
+    # Google Sheet row number 是 1-based
+    # list index 是 0-based
+    check_row_index = (
+        matched_row - 1
+    )
+
+    if (
+        check_row_index < 0
+        or check_row_index
+        >= len(check_values)
+    ):
+
+        raise Exception(
+            f"{source_name} 寫入後找不到第 "
+            f"{matched_row} 列"
+        )
+
+    check_row = check_values[
+        check_row_index
+    ]
+
+    if (
+        status_col < 0
+        or status_col
+        >= len(check_row)
+    ):
+
+        raise Exception(
+            f"{source_name} 寫入後找不到狀態欄"
+        )
+
+    check_status = (
+        clean_sheet_value(
+            check_row[status_col]
+        )
+    )
+
+    if check_status != "已補點":
+
+        raise Exception(
+            f"{source_name} 寫入驗證失敗，"
+            f"目前狀態為「{check_status}」"
+        )
+
+    return True
+
+
+# =========================================================
 # ① 更新統一點名總表
 # =========================================================
 
@@ -816,6 +907,17 @@ def update_rollcall_status_to_makeup(
 ):
     """
     統一點名總表：
+
+    日期
+    宿舍
+    床位
+    房號
+    學號
+    班級
+    姓名
+    狀態
+    備註
+    性別
 
     只修改：
         狀態 → 已補點
@@ -834,6 +936,7 @@ def update_rollcall_status_to_makeup(
         )
 
         if not values:
+
             raise Exception(
                 "統一點名總表沒有資料"
             )
@@ -869,18 +972,21 @@ def update_rollcall_status_to_makeup(
         )
 
         if date_col == -1:
+
             raise Exception(
-                "找不到「日期」欄"
+                "統一點名總表找不到「日期」欄"
             )
 
         if sid_col == -1:
+
             raise Exception(
-                "找不到「學號」欄"
+                "統一點名總表找不到「學號」欄"
             )
 
         if status_col == -1:
+
             raise Exception(
-                "找不到「狀態」欄"
+                "統一點名總表找不到「狀態」欄"
             )
 
         target_date = (
@@ -992,18 +1098,18 @@ def update_rollcall_status_to_makeup(
         if matched_row is None:
 
             raise Exception(
-                "找不到統一點名總表對應學生："
+                "統一點名總表找不到對應學生："
                 f"{target_date} / "
                 f"{target_sid} / "
                 f"{target_name}"
             )
 
-        # ★★★ 只修改狀態欄 ★★★
-        update_cell(
+        # ★★★ 0-based → 1-based ★★★
+        write_status_and_verify(
             ws,
             matched_row,
             status_col,
-            "已補點"
+            "統一點名總表"
         )
 
         return True
@@ -1016,7 +1122,7 @@ def update_rollcall_status_to_makeup(
 
 
 # =========================================================
-# ② 更新女生／男生需補點表
+# ② 更新男女需補點表
 # =========================================================
 
 def update_need_makeup_status_to_done(
@@ -1061,7 +1167,7 @@ def update_need_makeup_status_to_done(
         if not values:
 
             raise Exception(
-                "工作表沒有資料"
+                f"{gender} 需補點表沒有資料"
             )
 
         headers = [
@@ -1092,13 +1198,13 @@ def update_need_makeup_status_to_done(
         if sid_col == -1:
 
             raise Exception(
-                "找不到「學號」欄"
+                f"{gender} 需補點表找不到「學號」欄"
             )
 
         if status_col == -1:
 
             raise Exception(
-                "找不到「狀態」欄"
+                f"{gender} 需補點表找不到「狀態」欄"
             )
 
         target_sid = normalize_text(
@@ -1190,17 +1296,17 @@ def update_need_makeup_status_to_done(
         if matched_row is None:
 
             raise Exception(
-                f"找不到學生："
+                f"{gender} 需補點表找不到學生："
                 f"{target_sid} / "
                 f"{target_name}"
             )
 
-        # ★★★ 只修改狀態欄 ★★★
-        update_cell(
+        # ★★★ 0-based → 1-based ★★★
+        write_status_and_verify(
             ws,
             matched_row,
             status_col,
-            "已補點"
+            f"{gender}需補點表"
         )
 
         return True
@@ -1213,7 +1319,7 @@ def update_need_makeup_status_to_done(
 
 
 # =========================================================
-# ③ 更新女生／男生一般點名表
+# ③ 更新男女一般點名表
 # =========================================================
 
 def update_gender_rollcall_status(
@@ -1258,7 +1364,7 @@ def update_gender_rollcall_status(
         if not values:
 
             raise Exception(
-                "工作表沒有資料"
+                f"{gender} 一般點名表沒有資料"
             )
 
         headers = [
@@ -1289,13 +1395,13 @@ def update_gender_rollcall_status(
         if sid_col == -1:
 
             raise Exception(
-                "找不到「學號」欄"
+                f"{gender} 一般點名表找不到「學號」欄"
             )
 
         if status_col == -1:
 
             raise Exception(
-                "找不到「狀態」欄"
+                f"{gender} 一般點名表找不到「狀態」欄"
             )
 
         target_sid = normalize_text(
@@ -1387,17 +1493,17 @@ def update_gender_rollcall_status(
         if matched_row is None:
 
             raise Exception(
-                f"找不到學生："
+                f"{gender} 一般點名表找不到學生："
                 f"{target_sid} / "
                 f"{target_name}"
             )
 
-        # ★★★ 只修改狀態欄 ★★★
-        update_cell(
+        # ★★★ 0-based → 1-based ★★★
+        write_status_and_verify(
             ws,
             matched_row,
             status_col,
-            "已補點"
+            f"{gender}一般點名表"
         )
 
         return True
@@ -1422,8 +1528,6 @@ def show_makeup_rollcall():
     # =====================================================
 
     role = get_login_role()
-
-    gender = get_login_gender()
 
     # =====================================================
     # 補點日期
@@ -1714,7 +1818,6 @@ def show_makeup_rollcall():
 
             # =================================================
             # ① 統一點名總表
-            # 狀態 → 已補點
             # =================================================
 
             update_rollcall_status_to_makeup(
@@ -1723,7 +1826,6 @@ def show_makeup_rollcall():
 
             # =================================================
             # ② 男女需補點表
-            # 狀態 → 已補點
             # =================================================
 
             update_need_makeup_status_to_done(
@@ -1733,7 +1835,6 @@ def show_makeup_rollcall():
 
             # =================================================
             # ③ 男女一般點名表
-            # 狀態 → 已補點
             # =================================================
 
             update_gender_rollcall_status(
@@ -1742,13 +1843,13 @@ def show_makeup_rollcall():
             )
 
             # =================================================
-            # 清除快取
+            # 清除補點資料快取
             # =================================================
 
             load_need_makeup_source.clear()
 
             # =================================================
-            # 成功訊息
+            # 成功
             # =================================================
 
             st.success(
@@ -1757,7 +1858,10 @@ def show_makeup_rollcall():
 
             st.info(
                 f"學號：{student_sid}\n\n"
-                "已將相關點名表的「狀態」欄更新為「已補點」。"
+                "統一點名總表、"
+                f"{student_gender}需補點表、"
+                f"{student_gender}一般點名表，"
+                "「狀態」皆已更新為「已補點」。"
             )
 
             st.rerun()
