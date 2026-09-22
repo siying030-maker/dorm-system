@@ -27,10 +27,10 @@ from core.config import (
 def normalize_gender(value):
     value = str(value).strip()
 
-    if value in ["男", "男生"]:
+    if value in ["男", "男生", "男性"]:
         return "男"
 
-    if value in ["女", "女生"]:
+    if value in ["女", "女生", "女性"]:
         return "女"
 
     if "男" in value:
@@ -62,6 +62,7 @@ def canonical_dorm(value):
     """
     統一宿舍名稱。
     """
+
     value = (
         str(value)
         .strip()
@@ -73,6 +74,8 @@ def canonical_dorm(value):
         "女一宿": "女一",
         "女二宿": "女二",
         "女三宿": "女三",
+        "女一樓": "女一一樓",
+        "女一一樓宿": "女一一樓",
         "男一宿": "男一",
         "男二宿": "男二",
         "男三宿": "男三",
@@ -88,8 +91,14 @@ def canonical_dorm(value):
 def get_login_gender():
 
     # 1. 直接讀 gender
-    gender = st.session_state.get("gender", "")
-    gender = normalize_gender(gender)
+    gender = st.session_state.get(
+        "gender",
+        ""
+    )
+
+    gender = normalize_gender(
+        gender
+    )
 
     if gender:
         return gender
@@ -100,18 +109,44 @@ def get_login_gender():
         ""
     )
 
-    gender = normalize_gender(supervisor_type)
+    gender = normalize_gender(
+        supervisor_type
+    )
 
     if gender:
         return gender
 
     # 3. 宿舍
-    dorm = st.session_state.get("dorm", "")
+    dorm = st.session_state.get(
+        "dorm",
+        ""
+    )
 
-    gender = normalize_gender(dorm)
+    gender = normalize_gender(
+        dorm
+    )
 
     if gender:
         return gender
+
+    # 4. 管理宿舍
+    for key in [
+        "manage_dorms",
+        "winter_dorms",
+        "summer_dorms",
+    ]:
+
+        value = st.session_state.get(
+            key,
+            ""
+        )
+
+        gender = normalize_gender(
+            value
+        )
+
+        if gender:
+            return gender
 
     return ""
 
@@ -119,12 +154,25 @@ def get_login_gender():
 def get_allowed_genders():
 
     role = str(
-        st.session_state.get("role", "")
+        st.session_state.get(
+            "role",
+            ""
+        )
     ).strip()
 
-    # 行政不透過性別限制
+    # -----------------------------------------
+    # 行政
+    # -----------------------------------------
+
     if role == "行政":
-        return ["男生", "女生"]
+        return [
+            "男生",
+            "女生",
+        ]
+
+    # -----------------------------------------
+    # 取得登入者性別
+    # -----------------------------------------
 
     login_gender = get_login_gender()
 
@@ -200,10 +248,12 @@ def load_need_makeup_source(gender):
     for sheet_name in date_formats:
 
         try:
+
             ws = get_worksheet(
                 ss,
                 sheet_name
             )
+
             break
 
         except Exception:
@@ -227,9 +277,9 @@ def load_need_makeup_source(gender):
         columns=headers
     )
 
-    # -----------------------------------------
+    # =====================================================
     # 必要欄位
-    # -----------------------------------------
+    # =====================================================
 
     required_columns = [
         "學號",
@@ -242,9 +292,9 @@ def load_need_makeup_source(gender):
         if col not in df.columns:
             return pd.DataFrame()
 
-    # -----------------------------------------
+    # =====================================================
     # 狀態
-    # -----------------------------------------
+    # =====================================================
 
     df["狀態"] = (
         df["狀態"]
@@ -254,21 +304,25 @@ def load_need_makeup_source(gender):
 
     df = df[
         df["狀態"].isin(
-            ["缺", "未入住"]
+            [
+                "缺",
+                "未入住",
+            ]
         )
     ].copy()
 
     if df.empty:
         return pd.DataFrame()
 
-    # -----------------------------------------
+    # =====================================================
     # 性別
-    # -----------------------------------------
+    # =====================================================
 
     target_gender = normalize_gender(
         gender
     )
 
+    # 如果統一點名表本身有性別欄位
     if "性別" in df.columns:
 
         df["性別"] = (
@@ -281,28 +335,39 @@ def load_need_makeup_source(gender):
             df["性別"] == target_gender
         ].copy()
 
-        df["性別"] = df["性別"].map(
-            lambda x:
-                "男生"
-                if x == "男"
-                else "女生"
-        )
-
     else:
 
-        df["性別"] = gender
+        # 統一點名表沒有性別
+        # 因為這裡是由男生／女生來源分開讀取
+        # 所以直接使用傳入的 gender
+        df["性別"] = target_gender
 
-    # -----------------------------------------
+    if df.empty:
+        return pd.DataFrame()
+
+    # =====================================================
+    # 統一顯示文字
+    # =====================================================
+
+    df["性別"] = df["性別"].map(
+        lambda x:
+            "男生"
+            if normalize_gender(x) == "男"
+            else "女生"
+            if normalize_gender(x) == "女"
+            else str(x)
+    )
+
+    # =====================================================
     # 日期
-    # -----------------------------------------
+    # =====================================================
 
     df["來源Sheet"] = ws.title
-
     df["日期"] = ws.title
 
-    # -----------------------------------------
+    # =====================================================
     # 清除空白學生
-    # -----------------------------------------
+    # =====================================================
 
     df["學號"] = (
         df["學號"]
@@ -331,7 +396,10 @@ def load_need_makeup_source(gender):
 # 欄位工具
 # =========================================================
 
-def find_col_index(headers, col_name):
+def find_col_index(
+    headers,
+    col_name
+):
 
     for i, h in enumerate(
         headers,
@@ -389,9 +457,12 @@ def get_need_makeup_url_by_gender(gender):
 # 宿舍判斷
 # =========================================================
 
-def _prepare_dorm_column(df):
+def _prepare_dorm_column(
+    df,
+    default_gender=None
+):
     """
-    依照 性別 + 房號 判斷宿舍
+    根據「性別 + 房號」判斷宿舍。
 
     女生：
         81 → 女一
@@ -402,12 +473,25 @@ def _prepare_dorm_column(df):
         81 → 女一一樓
         82 → 男一
         83 → 男三
+
+    注意：
+    統一點名表可能沒有性別欄位，
+    但 load_need_makeup_source()
+    已經依照男生／女生來源補上「性別」。
     """
 
     df = df.copy()
 
-    # 已經有宿舍欄位就直接整理
-    if "宿舍" in df.columns:
+    # =====================================================
+    # 沒有宿舍欄位 → 建立
+    # 有宿舍欄位 → 先整理
+    # =====================================================
+
+    if "宿舍" not in df.columns:
+        df["宿舍"] = ""
+
+    else:
+
         df["宿舍"] = (
             df["宿舍"]
             .fillna("")
@@ -415,132 +499,144 @@ def _prepare_dorm_column(df):
             .str.strip()
         )
 
-        return df
+        df["宿舍"] = df[
+            "宿舍"
+        ].apply(
+            canonical_dorm
+        )
 
-    # 沒有房號就無法判斷
+    # =====================================================
+    # 沒有房號
+    # =====================================================
+
     if "房號" not in df.columns:
-        st.warning(
-            "目前補點資料沒有「宿舍」或「房號」欄位，"
-            "無法判斷學生所屬宿舍。"
-        )
         return df
 
-    # 判斷性別欄位
-    gender_col = None
+    # =====================================================
+    # 判斷每一筆資料的性別
+    # =====================================================
 
-    for col in ["性別", "男女", "性別別"]:
-        if col in df.columns:
-            gender_col = col
-            break
+    if "性別" in df.columns:
 
-    if gender_col is None:
-        st.warning(
-            "目前補點資料沒有「性別」欄位，"
-            "無法區分女生 81 與男生 81。"
+        gender_series = (
+            df["性別"]
+            .apply(normalize_gender)
         )
-        return df
 
-    def get_dorm(row):
-        gender = str(row.get(gender_col, "")).strip()
-        room = str(row.get("房號", "")).strip()
+    else:
 
-        # 清除可能的小數
-        if room.endswith(".0"):
-            room = room[:-2]
+        default_gender = normalize_gender(
+            default_gender
+        )
 
-        # 取得房號前兩碼
-        prefix = room[:2]
+        gender_series = pd.Series(
+            default_gender,
+            index=df.index
+        )
 
-        # 女生
-        if gender in ["女", "女生", "女性"]:
-            if prefix == "81":
-                return "女一"
-            elif prefix == "82":
-                return "女二"
-            elif prefix == "83":
-                return "女三"
+    # =====================================================
+    # 房號轉文字
+    # =====================================================
 
-        # 男生
-        elif gender in ["男", "男生", "男性"]:
-            if prefix == "81":
-                return "女一一樓"
-            elif prefix == "82":
-                return "男一"
-            elif prefix == "83":
-                return "男三"
+    room_series = (
+        df["房號"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
 
-        return ""
+    # 清除 Google Sheet 可能出現的 .0
+    room_series = room_series.str.replace(
+        r"\.0$",
+        "",
+        regex=True
+    )
 
-    df["宿舍"] = df.apply(get_dorm, axis=1)
+    # =====================================================
+    # 依照性別 + 房號判斷
+    # =====================================================
 
-    return df
-
-    # -----------------------------------------
-    # 2. 沒有宿舍 → 嘗試從房號判斷
-    # -----------------------------------------
-
-    if "房號" not in result.columns:
-        return result
-
-    login_gender = get_login_gender()
-
-    def infer_dorm(room):
+    def get_dorm(
+        room,
+        gender
+    ):
 
         room = str(room).strip()
+        gender = normalize_gender(
+            gender
+        )
 
         if not room:
             return ""
 
         prefix = room[:2]
 
-        # ------------------------------
+        # -----------------------------------------
+        # 女生
+        # -----------------------------------------
+
+        if gender == "女":
+
+            if prefix == "81":
+                return "女一"
+
+            if prefix == "82":
+                return "女二"
+
+            if prefix == "83":
+                return "女三"
+
+        # -----------------------------------------
         # 男生
-        # ------------------------------
+        # -----------------------------------------
 
-        if login_gender == "男":
+        if gender == "男":
 
-            if prefix in ["81", "82"]:
+            if prefix == "81":
+                return "女一一樓"
+
+            if prefix == "82":
                 return "男一"
 
             if prefix == "83":
                 return "男三"
 
-        # ------------------------------
-        # 女生
-        # ------------------------------
-
-        elif login_gender == "女":
-
-            # 如果只有宿舍來源沒有辦法判斷，
-            # 暫時不亂猜宿舍。
-            #
-            # 後面會交給樓長權限處理。
-
-            return ""
-
         return ""
 
-    inferred = result[
-        "房號"
-    ].apply(
-        infer_dorm
+    inferred_dorm = pd.Series(
+        [
+            get_dorm(
+                room,
+                gender
+            )
+            for room, gender
+            in zip(
+                room_series,
+                gender_series
+            )
+        ],
+        index=df.index
     )
 
+    # =====================================================
+    # 只要原本宿舍空白，就使用推算結果
+    # =====================================================
+
     empty_dorm = (
-        result["宿舍"]
+        df["宿舍"]
         .astype(str)
         .str.strip()
         .eq("")
     )
 
-    result.loc[
+    df.loc[
         empty_dorm,
         "宿舍"
-    ] = inferred[
+    ] = inferred_dorm[
         empty_dorm
     ]
 
-    return result
+    return df
 
 
 # =========================================================
@@ -580,7 +676,9 @@ def get_allowed_dorms():
             if not item:
                 continue
 
-            item = canonical_dorm(item)
+            item = canonical_dorm(
+                item
+            )
 
             if item.endswith("宿"):
                 item = item[:-1]
@@ -603,43 +701,92 @@ def get_allowed_dorms():
 
 def infer_dorm_for_leader(
     room,
+    gender,
     allowed_dorms
 ):
+    """
+    根據：
+        性別 + 房號 + 樓長管理宿舍
+
+    判斷宿舍。
+
+    女生：
+        81 → 女一
+        82 → 女二
+        83 → 女三
+
+    男生：
+        81 → 女一一樓
+        82 → 男一
+        83 → 男三
+    """
 
     room = str(room).strip()
 
+    if room.endswith(".0"):
+        room = room[:-2]
+
     if not room:
         return ""
+
+    gender = normalize_gender(
+        gender
+    )
 
     allowed_dorms = [
         canonical_dorm(x)
         for x in allowed_dorms
     ]
 
-    # -----------------------------------------
-    # 男生
-    # -----------------------------------------
+    prefix = room[:2]
 
-    if "男一" in allowed_dorms:
-        if room.startswith(
-            ("81", "82")
+    # =====================================================
+    # 女生
+    # =====================================================
+
+    if gender == "女":
+
+        if (
+            prefix == "81"
+            and "女一" in allowed_dorms
+        ):
+            return "女一"
+
+        if (
+            prefix == "82"
+            and "女二" in allowed_dorms
+        ):
+            return "女二"
+
+        if (
+            prefix == "83"
+            and "女三" in allowed_dorms
+        ):
+            return "女三"
+
+    # =====================================================
+    # 男生
+    # =====================================================
+
+    if gender == "男":
+
+        if (
+            prefix == "81"
+            and "女一一樓" in allowed_dorms
+        ):
+            return "女一一樓"
+
+        if (
+            prefix == "82"
+            and "男一" in allowed_dorms
         ):
             return "男一"
 
-    if "男三" in allowed_dorms:
-        if room.startswith("83"):
+        if (
+            prefix == "83"
+            and "男三" in allowed_dorms
+        ):
             return "男三"
-
-    # -----------------------------------------
-    # 女生
-    # -----------------------------------------
-
-    # 女生目前不硬判定 81 / 82 / 83
-    # 避免把女一、女二、女三判錯。
-    #
-    # 如果統一點名表有宿舍欄位，
-    # 前面的 _prepare_dorm_column()
-    # 會優先使用。
 
     return ""
 
@@ -648,48 +795,38 @@ def infer_dorm_for_leader(
 # 補點資料權限篩選
 # =========================================================
 
-def filter_by_leader_scope(df):
-    df = _prepare_dorm_column(df)
+def filter_by_leader_scope(
+    df
+):
 
-    allowed_dorms = get_allowed_dorms()
+    role = str(
+        st.session_state.get(
+            "role",
+            ""
+        )
+    ).strip()
 
-    if not allowed_dorms:
+    if df.empty:
         return df
 
-    # 只保留有成功判斷宿舍的資料
-    if "宿舍" not in df.columns:
-        st.warning("目前補點資料無法判斷宿舍。")
-        return pd.DataFrame()
-
-    # 顯示目前帳號管理的宿舍
-    st.info(
-        f"目前帳號管理宿舍：{', '.join(allowed_dorms)}"
-    )
-
-    result = df[
-        df["宿舍"].isin(allowed_dorms)
-    ].copy()
-
-    return result
-
-    # -----------------------------------------
+    # =====================================================
     # 先整理宿舍
-    # -----------------------------------------
+    # =====================================================
 
-    result = _prepare_dorm_column(
+    df = _prepare_dorm_column(
         df
     )
 
-    # -----------------------------------------
+    # =====================================================
     # 行政
-    # -----------------------------------------
+    # =====================================================
 
     if role == "行政":
-        return result
+        return df
 
-    # -----------------------------------------
+    # =====================================================
     # 舍監
-    # -----------------------------------------
+    # =====================================================
 
     if role == "舍監":
 
@@ -709,8 +846,8 @@ def filter_by_leader_scope(df):
 
         if login_gender == "男":
 
-            return result[
-                result["宿舍"]
+            return df[
+                df["宿舍"]
                 .astype(str)
                 .str.startswith(
                     "男",
@@ -720,8 +857,8 @@ def filter_by_leader_scope(df):
 
         if login_gender == "女":
 
-            return result[
-                result["宿舍"]
+            return df[
+                df["宿舍"]
                 .astype(str)
                 .str.startswith(
                     "女",
@@ -733,11 +870,11 @@ def filter_by_leader_scope(df):
             "無法判斷舍監管理的宿舍性別"
         )
 
-        return result.iloc[0:0].copy()
+        return df.iloc[0:0].copy()
 
-    # -----------------------------------------
+    # =====================================================
     # 樓長
-    # -----------------------------------------
+    # =====================================================
 
     if role == "樓長":
 
@@ -751,61 +888,22 @@ def filter_by_leader_scope(df):
                 "目前帳號沒有設定可管理的宿舍"
             )
 
-            return result.iloc[0:0].copy()
+            return df.iloc[0:0].copy()
 
-        # -------------------------------------
-        # 先使用資料中的宿舍
-        # -------------------------------------
+        # =================================================
+        # 重新依照「性別 + 房號」建立宿舍
+        # =================================================
 
-        has_dorm = (
-            result["宿舍"]
-            .astype(str)
-            .str.strip()
-            .ne("")
-            .any()
+        df = _prepare_dorm_column(
+            df
         )
 
-        if has_dorm:
+        # =================================================
+        # 如果已經成功判斷宿舍
+        # =================================================
 
-            matched = result[
-                result["宿舍"].isin(
-                    allowed_dorms
-                )
-            ].copy()
-
-            return matched
-
-        # -------------------------------------
-        # 沒有宿舍 → 嘗試用房號
-        # -------------------------------------
-
-        if "房號" not in result.columns:
-
-            st.warning(
-                "補點資料沒有「宿舍」或「房號」資訊，"
-                "無法依樓長權限篩選。"
-            )
-
-            return result.iloc[0:0].copy()
-
-        result["房號"] = (
-            result["房號"]
-            .astype(str)
-            .str.strip()
-        )
-
-        result["宿舍"] = result[
-            "房號"
-        ].apply(
-            lambda room:
-                infer_dorm_for_leader(
-                    room,
-                    allowed_dorms
-                )
-        )
-
-        matched = result[
-            result["宿舍"].isin(
+        matched = df[
+            df["宿舍"].isin(
                 allowed_dorms
             )
         ].copy()
@@ -813,23 +911,103 @@ def filter_by_leader_scope(df):
         if not matched.empty:
             return matched
 
+        # =================================================
+        # 如果還是沒有匹配
+        # 再依照樓長管理宿舍 + 性別 + 房號判斷
+        # =================================================
+
+        if "房號" not in df.columns:
+
+            st.warning(
+                "補點資料沒有「房號」欄位，"
+                "無法依樓長管理宿舍篩選。"
+            )
+
+            return df.iloc[0:0].copy()
+
+        # =================================================
+        # 性別
+        # =================================================
+
+        if "性別" in df.columns:
+
+            gender_series = (
+                df["性別"]
+                .apply(normalize_gender)
+            )
+
+        else:
+
+            login_gender = get_login_gender()
+
+            gender_series = pd.Series(
+                login_gender,
+                index=df.index
+            )
+
+        # =================================================
+        # 房號
+        # =================================================
+
+        df["房號"] = (
+            df["房號"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(
+                r"\.0$",
+                "",
+                regex=True
+            )
+        )
+
+        # =================================================
+        # 重新判斷宿舍
+        # =================================================
+
+        df["宿舍"] = [
+            infer_dorm_for_leader(
+                room,
+                gender,
+                allowed_dorms
+            )
+            for room, gender
+            in zip(
+                df["房號"],
+                gender_series
+            )
+        ]
+
+        matched = df[
+            df["宿舍"].isin(
+                allowed_dorms
+            )
+        ].copy()
+
+        if not matched.empty:
+            return matched
+
+        # =================================================
+        # 找不到
+        # =================================================
+
         st.warning(
             "目前補點資料無法判斷符合此樓長帳號的宿舍。"
             f"目前帳號管理宿舍："
             f"{', '.join(allowed_dorms)}"
         )
 
-        return result.iloc[0:0].copy()
+        return df.iloc[0:0].copy()
 
-    # -----------------------------------------
+    # =====================================================
     # 其他身分
-    # -----------------------------------------
+    # =====================================================
 
     st.warning(
         "目前帳號沒有補點名單權限"
     )
 
-    return result.iloc[0:0].copy()
+    return df.iloc[0:0].copy()
 
 
 # =========================================================
@@ -891,7 +1069,9 @@ def update_rollcall_status_to_makeup(
             f"點名單總表找不到 Sheet：{sheet_name}"
         )
 
-    values = get_all_values(ws)
+    values = get_all_values(
+        ws
+    )
 
     if len(values) <= 1:
         raise Exception(
@@ -950,14 +1130,15 @@ def update_rollcall_status_to_makeup(
             else ""
         )
 
-        # 有宿舍欄位 → 學號＋宿舍
+        # 有宿舍欄位
         if dorm_col:
 
             if (
                 row_sid == sid
                 and (
                     not dorm
-                    or row_dorm == dorm
+                    or canonical_dorm(row_dorm)
+                    == canonical_dorm(dorm)
                 )
             ):
 
@@ -970,7 +1151,7 @@ def update_rollcall_status_to_makeup(
 
                 return True
 
-        # 沒有宿舍欄位 → 只比學號
+        # 沒有宿舍欄位
         else:
 
             if row_sid == sid:
@@ -1090,7 +1271,8 @@ def update_need_makeup_status_to_done(
                 return
 
     except Exception:
-        # 舊資料同步失敗不影響統一點名總表
+        # 舊資料同步失敗
+        # 不影響統一點名總表
         return
 
 
@@ -1108,9 +1290,9 @@ def show_makeup_rollcall():
         "資料每 15 秒重新讀取。"
     )
 
-    # -----------------------------------------
+    # =====================================================
     # 手動刷新
-    # -----------------------------------------
+    # =====================================================
 
     if st.button(
         "重新整理補點名單",
@@ -1121,9 +1303,9 @@ def show_makeup_rollcall():
 
         st.rerun()
 
-    # -----------------------------------------
+    # =====================================================
     # 權限
-    # -----------------------------------------
+    # =====================================================
 
     allowed_genders = (
         get_allowed_genders()
@@ -1137,9 +1319,9 @@ def show_makeup_rollcall():
 
         return
 
-    # -----------------------------------------
+    # =====================================================
     # 讀取男女資料
-    # -----------------------------------------
+    # =====================================================
 
     dfs = []
 
@@ -1165,9 +1347,9 @@ def show_makeup_rollcall():
         ignore_index=True
     )
 
-    # -----------------------------------------
+    # =====================================================
     # 權限篩選
-    # -----------------------------------------
+    # =====================================================
 
     df = filter_by_leader_scope(
         df
@@ -1181,9 +1363,9 @@ def show_makeup_rollcall():
 
         return
 
-    # -----------------------------------------
+    # =====================================================
     # 搜尋
-    # -----------------------------------------
+    # =====================================================
 
     keyword = st.text_input(
         "搜尋學號 / 姓名 / 房號",
@@ -1233,9 +1415,9 @@ def show_makeup_rollcall():
 
         return
 
-    # -----------------------------------------
+    # =====================================================
     # 顯示資料
-    # -----------------------------------------
+    # =====================================================
 
     show_cols = [
         c
@@ -1244,6 +1426,8 @@ def show_makeup_rollcall():
             "學號",
             "班級",
             "姓名",
+            "房號",
+            "宿舍",
             "狀態",
             "備註",
         ]
@@ -1258,9 +1442,9 @@ def show_makeup_rollcall():
 
     st.divider()
 
-    # -----------------------------------------
+    # =====================================================
     # 補點完成
-    # -----------------------------------------
+    # =====================================================
 
     st.subheader(
         "補點完成"
@@ -1280,8 +1464,19 @@ def show_makeup_rollcall():
         )
 
         options.append(
-            (i, label)
+            (
+                i,
+                label
+            )
         )
+
+    if not options:
+
+        st.info(
+            "目前沒有可以補點的學生"
+        )
+
+        return
 
     selected_label = st.selectbox(
         "選擇已補點學生",
@@ -1298,9 +1493,9 @@ def show_makeup_rollcall():
         if x[1] == selected_label
     ][0]
 
-    # -----------------------------------------
+    # =====================================================
     # 確認補點
-    # -----------------------------------------
+    # =====================================================
 
     if st.button(
         "確認補點完成",
@@ -1322,26 +1517,38 @@ def show_makeup_rollcall():
                 )
             )
 
+            # ---------------------------------------------
             # 1. 更新統一點名總表
+            # ---------------------------------------------
+
             update_rollcall_status_to_makeup(
                 gender,
                 target_row
             )
 
+            # ---------------------------------------------
             # 2. 同步舊男女補點名單
+            # ---------------------------------------------
+
             update_need_makeup_status_to_done(
                 gender,
                 target_row
             )
 
+            # ---------------------------------------------
             # 3. 清除快取
+            # ---------------------------------------------
+
             load_need_makeup_source.clear()
+
+            # ---------------------------------------------
+            # 4. 重新整理
+            # ---------------------------------------------
 
             st.success(
                 "已將狀態更新為：已補點"
             )
 
-            # 4. 重新整理
             st.rerun()
 
         except Exception as e:
