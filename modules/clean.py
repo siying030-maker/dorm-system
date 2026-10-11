@@ -934,10 +934,10 @@ def show_clean():
 
         return
 
-    clean_term = setting.get(
-        "學期",
-        ""
-    )
+    school_year = str(setting.get("學年", "")).strip()
+    semester = str(setting.get("學期", "")).strip()
+
+    clean_term = convert_clean_term(school_year, semester)
 
     contest = setting.get(
         "第幾次",
@@ -1397,3 +1397,17 @@ def show_clean_view():
         st.error(
             f"讀取整潔比賽資料失敗：{error}"
         )
+
+def convert_clean_term(school_year, semester):
+    """將學年與學期轉換成 115-1、115-2 格式"""
+    year = str(school_year).strip()
+    semester_text = str(semester).strip()
+
+    if semester_text in ("上學期", "1", "上"):
+        semester_number = "1"
+    elif semester_text in ("下學期", "2", "下"):
+        semester_number = "2"
+    else:
+        raise ValueError(f"無法辨識學期：{semester_text}")
+
+    return f"{year}-{semester_number}"
