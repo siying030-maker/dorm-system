@@ -467,16 +467,14 @@ def load_need_makeup_source():
             return df
 
         # =====================================================
-        # 狀態
-        # =====================================================
-
-        
-        # =====================================================
-        # 狀態＋備註
+        # 狀態＋備註判斷
         # =====================================================
 
         if "狀態" not in df.columns:
             return pd.DataFrame()
+
+        if "備註" not in df.columns:
+            df["備註"] = ""
 
         df["狀態"] = (
             df["狀態"]
@@ -485,10 +483,6 @@ def load_need_makeup_source():
             .str.strip()
         )
 
-        # 備註欄不存在時，視為空白
-        if "備註" not in df.columns:
-            df["備註"] = ""
-
         df["備註"] = (
             df["備註"]
             .fillna("")
@@ -496,19 +490,22 @@ def load_need_makeup_source():
             .str.strip()
         )
 
-        # 狀態為「缺」或「未入住」，
-        # 或者備註有填寫，都列入補點名單
-        # 已補點的資料不再顯示
+        # 條件一：狀態是「缺」或「未入住」
+        condition_status = df["狀態"].isin(
+            ["缺", "未入住"]
+        )
+
+        # 條件二：狀態有內容，且備註有內容
+        condition_note = (
+            (df["狀態"] != "")
+            & (df["備註"] != "")
+        )
+
+        # 任一條件符合即可列入
         df = df[
-            (
-                df["狀態"].isin(
-                    ["缺", "未入住"]
-                )
-                | (df["備註"] != "")
-            )
+            (condition_status | condition_note)
             & (df["狀態"] != "已補點")
         ].copy()
-
 
         if df.empty:
             return df
