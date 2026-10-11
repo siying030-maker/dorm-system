@@ -427,12 +427,19 @@ def load_need_makeup_source():
         if "備註" not in df.columns:
             df["備註"] = ""
 
+        
+        # =====================================================
         # 日期標準化
+        # =====================================================
+
         df["日期"] = df["日期"].apply(
             normalize_date_value
         )
 
+        # =====================================================
         # 狀態、備註標準化
+        # =====================================================
+
         df["狀態"] = df["狀態"].apply(
             normalize_text
         )
@@ -440,20 +447,34 @@ def load_need_makeup_source():
         df["備註"] = df["備註"].apply(
             normalize_text
         )
-        
-        # ===== 除錯：查看原始資料 =====
+
+        # =====================================================
+        # 先篩選補點日期
+        # =====================================================
+
+        target_date = get_makeup_target_date()
+
+        df = df[
+            df["日期"] == target_date
+        ].copy()
+
         st.write("### 補點名單除錯")
+        st.write("目前補點日期：", target_date)
+        st.write("該日期資料筆數：", len(df))
 
-        st.write("目前補點日期：", get_makeup_target_date())
+        if df.empty:
+            st.info("該補點日期沒有資料")
+            return df
 
-        st.write("原始資料筆數：", len(df))
+        # =====================================================
+        # 顯示該日期的「在」資料
+        # =====================================================
 
-        st.write("各狀態筆數：")
-        st.write(df["狀態"].value_counts(dropna=False))
+        debug_present = df[
+            df["狀態"].str.strip() == "在"
+        ].copy()
 
-        st.write("狀態為「在」的資料：")
-
-        debug_present = df[df["狀態"] == "在"].copy()
+        st.write("該日期狀態為「在」的人數：", len(debug_present))
 
         if not debug_present.empty:
             debug_columns = [
@@ -469,21 +490,11 @@ def load_need_makeup_source():
                 use_container_width=True,
                 hide_index=True
             )
-        else:
-            st.warning("原始資料中沒有狀態完全等於「在」的紀錄。")
 
+        # =====================================================
+        # 判斷補點條件
+        # =====================================================
 
-                # 僅讀取目前應補點的日期
-            target_date = get_makeup_target_date()
-
-        df = df[
-            df["日期"] == target_date
-        ].copy()
-
-        if df.empty:
-            return df
-
-        # 再次清理狀態，避免不可見空白造成比對失敗
         df["狀態"] = (
             df["狀態"]
             .str.replace("\u00a0", " ", regex=False)
@@ -498,25 +509,28 @@ def load_need_makeup_source():
             .str.strip()
         )
 
-        # 條件一：缺、未入住
         condition_status = df["狀態"].isin([
             "缺",
             "未入住"
         ])
 
-        # 條件二：在，而且備註不為空
         condition_note = (
-            (df["狀態"] == "在")
-            & (df["備註"] != "")
+            df["狀態"].eq("在")
+            & df["備註"].ne("")
         )
 
-        # 只要符合其中一項，就列入補點名單
+        st.write("缺／未入住人數：", int(condition_status.sum()))
+        st.write("在且有備註人數：", int(condition_note.sum()))
+
         df = df[
             condition_status | condition_note
         ].copy()
 
+        st.write("符合補點條件人數：", len(df))
+
         if df.empty:
             return df
+
 
         # 性別標準化與權限篩選
         allowed_genders = get_allowed_genders()
