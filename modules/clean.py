@@ -92,6 +92,10 @@ FLOOR_OPTIONS = {
         "6F",
         "7F",
     ],
+    # 新增：男一樓長只能管理女一一樓
+    "女一一樓": [
+        "1F",
+    ],
     "女二": [
         "1F",
         "2F",
@@ -122,6 +126,7 @@ FLOOR_OPTIONS = {
 
 DORM_PREFIX = {
     "女一": "81",
+    "女一一樓": "81",  # 新增
     "女二": "82",
     "女三": "83",
     "男一": "82",
@@ -223,15 +228,19 @@ def get_manage_dorm_options():
         )
         dorm_options = [dorm_value] if dorm_value else []
 
-    # 只允許管理已設定的宿舍
+    # 只保留已設定的宿舍
     dorm_options = [
         dorm for dorm in dorm_options
         if dorm in DORM_PREFIX
     ]
 
     # 男一樓長額外管理女一一樓
-    if normalize_dorm(st.session_state.get("dorm", "")) == "男一":
-        dorm_options.append("女一")
+    current_dorm = normalize_dorm(
+        st.session_state.get("dorm", "")
+    )
+
+    if current_dorm == "男一":
+        dorm_options.append("女一一樓")
 
     return list(dict.fromkeys(dorm_options))
 
@@ -421,17 +430,20 @@ def query_clean(
 
         return pd.DataFrame()
 
-    if dorm not in CLEAN_SHEET[semester]:
+    # 女一一樓使用女一原本的住宿名單試算表
+    source_dorm = (
+        "女一"
+        if dorm == "女一一樓"
+        else dorm
+    )
 
+    if source_dorm not in CLEAN_SHEET[semester]:
         st.warning(
-            f"找不到 {dorm} 的住宿名單試算表"
+            f"找不到 {source_dorm} 的住宿名單試算表"
         )
-
         return pd.DataFrame()
 
-    url = CLEAN_SHEET[
-        semester
-    ][dorm]
+    url = CLEAN_SHEET[semester][source_dorm]
 
     result = []
 
