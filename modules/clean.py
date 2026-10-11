@@ -199,16 +199,11 @@ def get_floor_sheet_name(
 # 取得登入者管理宿舍
 # ==================================================
 
-def get_manage_dorm_options():
 
-    manage_dorms = st.session_state.get(
-        "manage_dorms",
-        ""
-    )
+def get_manage_dorm_options():
+    manage_dorms = st.session_state.get("manage_dorms", "")
 
     if manage_dorms:
-
-        # 統一各種宿舍分隔符號
         normalized = (
             str(manage_dorms)
             .replace("，", ",")
@@ -222,28 +217,24 @@ def get_manage_dorm_options():
             for item in normalized.split(",")
             if item.strip()
         ]
-
     else:
-
         dorm_value = normalize_dorm(
             st.session_state.get("dorm", "")
         )
+        dorm_options = [dorm_value] if dorm_value else []
 
-        dorm_options = (
-            [dorm_value]
-            if dorm_value
-            else []
-        )
-
-    # 只顯示目前整潔比賽已設定的宿舍
+    # 只允許管理已設定的宿舍
     dorm_options = [
-        dorm
-        for dorm in dorm_options
+        dorm for dorm in dorm_options
         if dorm in DORM_PREFIX
     ]
 
-    # 去除重複宿舍，保留原本順序
+    # 男一樓長額外管理女一一樓
+    if normalize_dorm(st.session_state.get("dorm", "")) == "男一":
+        dorm_options.append("女一")
+
     return list(dict.fromkeys(dorm_options))
+
 
 
 # ==================================================
