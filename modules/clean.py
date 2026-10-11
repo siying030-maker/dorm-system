@@ -194,6 +194,7 @@ def get_floor_sheet_name(
     return f"{prefix}-{floor}"
 
 
+
 # ==================================================
 # 取得登入者管理宿舍
 # ==================================================
@@ -207,23 +208,25 @@ def get_manage_dorm_options():
 
     if manage_dorms:
 
+        # 統一各種宿舍分隔符號
+        normalized = (
+            str(manage_dorms)
+            .replace("，", ",")
+            .replace("、", ",")
+            .replace("；", ",")
+            .replace(";", ",")
+        )
+
         dorm_options = [
             normalize_dorm(item)
-            for item in (
-                str(manage_dorms)
-                .replace("，", ",")
-                .split(",")
-            )
-            if str(item).strip()
+            for item in normalized.split(",")
+            if item.strip()
         ]
 
     else:
 
         dorm_value = normalize_dorm(
-            st.session_state.get(
-                "dorm",
-                ""
-            )
+            st.session_state.get("dorm", "")
         )
 
         dorm_options = (
@@ -232,17 +235,15 @@ def get_manage_dorm_options():
             else []
         )
 
+    # 只顯示目前整潔比賽已設定的宿舍
     dorm_options = [
         dorm
         for dorm in dorm_options
         if dorm in DORM_PREFIX
     ]
 
-    return list(
-        dict.fromkeys(
-            dorm_options
-        )
-    )
+    # 去除重複宿舍，保留原本順序
+    return list(dict.fromkeys(dorm_options))
 
 
 # ==================================================

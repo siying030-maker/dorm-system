@@ -54,7 +54,7 @@ def normalize_gender(value):
 
 import time
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_users(role):
 
     try:
