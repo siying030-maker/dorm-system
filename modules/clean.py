@@ -701,7 +701,7 @@ def get_or_create_result_worksheet(
 def save_clean_result(
     total,
     school_year,
-    semester,
+    save_semester,
     contest,
     rank,
     dorm,
@@ -727,24 +727,20 @@ def save_clean_result(
         if name == "":
             continue
 
+        
         rows.append(
             [
                 school_year,
-                semester,
+                save_semester,
                 contest,
                 rank,
                 dorm,
-                row.get(
-                    "房號",
-                    ""
-                ),
-                row.get(
-                    "學號",
-                    ""
-                ),
+                row.get("房號", ""),
+                row.get("學號", ""),
                 name,
             ]
         )
+
 
     if not rows:
         return 0
@@ -934,39 +930,44 @@ def show_clean():
 
         return
 
-    school_year = str(setting.get("學年", "")).strip()
-    semester = str(setting.get("學期", "")).strip()
+    
+    clean_term = str(
+        setting.get("學期", "")
+    ).strip()
 
-    clean_term = convert_clean_term(school_year, semester)
+    contest = str(
+        setting.get("第幾次", "")
+    ).strip()
 
-    contest = setting.get(
-        "第幾次",
-        ""
-    )
-
+    # 學期格式必須是 115-1、115-2
     if "-" not in clean_term:
-
         st.warning(
             "整潔比賽學期格式錯誤，"
             "應為例如：115-1"
         )
-
         return
 
-    term_parts = clean_term.split(
-        "-",
-        1
-    )
+    term_parts = clean_term.split("-", 1)
 
-    school_year = term_parts[0]
+    school_year = term_parts[0].strip()
+    semester_number = term_parts[1].strip()
 
-    semester_number = term_parts[1]
+    if not school_year.isdigit() or semester_number not in ("1", "2"):
+        st.warning(
+            "學期格式錯誤，請使用 115-1 或 115-2"
+        )
+        return
 
+    # 顯示及查詢住宿名單使用的學期名稱
     semester = (
         "上學期"
         if semester_number == "1"
         else "下學期"
     )
+
+    # 寫入結果試算表使用的學期格式
+    save_semester = f"{school_year}-{semester_number}"
+
 
     st.info(
         f"""
@@ -1178,7 +1179,7 @@ def show_clean():
                 saved_count = save_clean_result(
                     total,
                     school_year,
-                    semester,
+                    save_semester,
                     contest,
                     rank,
                     dorm
@@ -1295,7 +1296,12 @@ def show_clean_view():
                 "下學期",
             ],
             key="view_clean_semester"
-        )
+            )
+
+        semester_map = {
+            "上學期": f"{school_year}-1",
+            "下學期": f"{school_year}-2",
+        }
 
         contest = st.selectbox(
             "第幾次",
@@ -1323,13 +1329,13 @@ def show_clean_view():
             semester != "全部"
             and "學期" in df.columns
         ):
+            target_semester = semester_map[semester]
 
             df = df[
                 df["學期"]
                 .astype(str)
                 .str.strip()
-                ==
-                semester
+                .eq(target_semester)
             ].copy()
 
         if (
@@ -1397,17 +1403,3 @@ def show_clean_view():
         st.error(
             f"讀取整潔比賽資料失敗：{error}"
         )
-
-def convert_clean_term(school_year, semester):
-    """將學年與學期轉換成 115-1、115-2 格式"""
-    year = str(school_year).strip()
-    semester_text = str(semester).strip()
-
-    if semester_text in ("上學期", "1", "上"):
-        semester_number = "1"
-    elif semester_text in ("下學期", "2", "下"):
-        semester_number = "2"
-    else:
-        raise ValueError(f"無法辨識學期：{semester_text}")
-
-    return f"{year}-{semester_number}"
