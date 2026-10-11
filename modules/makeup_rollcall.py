@@ -544,6 +544,7 @@ def load_need_makeup_source():
 
 
 
+
         # 性別標準化與權限篩選
         allowed_genders = get_allowed_genders()
 
