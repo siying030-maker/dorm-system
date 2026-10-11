@@ -440,9 +440,41 @@ def load_need_makeup_source():
         df["備註"] = df["備註"].apply(
             normalize_text
         )
+        
+        # ===== 除錯：查看原始資料 =====
+        st.write("### 補點名單除錯")
 
-        # 僅讀取目前應補點的日期
-        target_date = get_makeup_target_date()
+        st.write("目前補點日期：", get_makeup_target_date())
+
+        st.write("原始資料筆數：", len(df))
+
+        st.write("各狀態筆數：")
+        st.write(df["狀態"].value_counts(dropna=False))
+
+        st.write("狀態為「在」的資料：")
+
+        debug_present = df[df["狀態"] == "在"].copy()
+
+        if not debug_present.empty:
+            debug_columns = [
+                col for col in [
+                    "日期", "宿舍", "房號", "學號",
+                    "姓名", "狀態", "備註", "性別"
+                ]
+                if col in debug_present.columns
+            ]
+
+            st.dataframe(
+                debug_present[debug_columns],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.warning("原始資料中沒有狀態完全等於「在」的紀錄。")
+
+
+                # 僅讀取目前應補點的日期
+            target_date = get_makeup_target_date()
 
         df = df[
             df["日期"] == target_date
