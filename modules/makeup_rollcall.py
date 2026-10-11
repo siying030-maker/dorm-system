@@ -362,75 +362,48 @@ def get_need_makeup_url_by_gender(gender):
 # 讀取待補點資料
 # =========================================================
 
+
 @st.cache_data(ttl=15)
 def load_need_makeup_source():
     """
     從統一點名總表讀取待補點資料。
 
-    統一點名總表欄位：
+    列入條件：
+    1. 狀態為「缺」
+    2. 狀態為「未入住」
+    3. 狀態為「在」且備註有內容
 
-    日期
-    宿舍
-    床位
-    房號
-    學號
-    班級
-    姓名
-    狀態
-    備註
-    性別
+    排除：
+    1. 狀態為「已補點」
+    2. 不符合以上條件的資料
     """
 
     try:
-
-        ss = open_sheet(
-            ROLLCALL_SHEET_URL
-        )
-
-        # 統一點名總表只有一個工作表
+        ss = open_sheet(ROLLCALL_SHEET_URL)
         ws = ss.sheet1
+        values = get_all_values(ws)
 
-        values = get_all_values(
-            ws
-        )
-
-        if not values:
+        if not values or len(values) < 2:
             return pd.DataFrame()
 
-        if len(values) < 2:
-            return pd.DataFrame()
-
+        # 清理標題
         headers = [
-            clean_sheet_value(x)
+            normalize_text(x)
             for x in values[0]
         ]
 
-        rows = values[1:]
-
+        # 清理每一列，並補齊欄位
         normalized_rows = []
 
-        for row in rows:
-
+        for row in values[1:]:
             row = list(row)
 
             if len(row) < len(headers):
+                row.extend([""] * (len(headers) - len(row)))
 
-                row.extend(
-                    [""] * (
-                        len(headers)
-                        - len(row)
-                    )
-                )
+            row = row[:len(headers)]
 
-            if len(row) > len(headers):
-
-                row = row[
-                    :len(headers)
-                ]
-
-            normalized_rows.append(
-                row
-            )
+            normalized_rows.append(row)
 
         df = pd.DataFrame(
             normalized_rows,
@@ -440,108 +413,101 @@ def load_need_makeup_source():
         if df.empty:
             return df
 
-        # =====================================================
-        # 日期
-        # =====================================================
+        # 檢查必要欄位
+        required_columns = ["日期", "狀態"]
 
-        if "日期" not in df.columns:
-            return pd.DataFrame()
+        for col in required_columns:
+            if col not in df.columns:
+                st.error(
+                    f"統一點名總表找不到「{col}」欄位。"
+                    f"目前讀取到的標題：{headers}"
+                )
+                return pd.DataFrame()
 
-        df["日期"] = (
-            df["日期"]
-            .apply(
-                normalize_date_value
-            )
+        if "備註" not in df.columns:
+            df["備註"] = ""
+
+        # 日期標準化
+        df["日期"] = df["日期"].apply(
+            normalize_date_value
         )
 
-        target_date = (
-            get_makeup_target_date()
+        # 狀態、備註標準化
+        df["狀態"] = df["狀態"].apply(
+            normalize_text
         )
+
+        df["備註"] = df["備註"].apply(
+            normalize_text
+        )
+
+        # 僅讀取目前應補點的日期
+        target_date = get_makeup_target_date()
 
         df = df[
-            df["日期"]
-            == target_date
+            df["日期"] == target_date
         ].copy()
 
         if df.empty:
             return df
 
-        
-        # =====================================================
-        # 狀態＋備註判斷
-        # =====================================================
-
-        if "狀態" not in df.columns:
-            return pd.DataFrame()
-
-        if "備註" not in df.columns:
-            df["備註"] = ""
-
+        # 再次清理狀態，避免不可見空白造成比對失敗
         df["狀態"] = (
             df["狀態"]
-            .fillna("")
-            .astype(str)
+            .str.replace("\u00a0", " ", regex=False)
+            .str.replace("\u3000", " ", regex=False)
             .str.strip()
         )
 
         df["備註"] = (
             df["備註"]
-            .fillna("")
-            .astype(str)
+            .str.replace("\u00a0", " ", regex=False)
+            .str.replace("\u3000", " ", regex=False)
             .str.strip()
         )
 
-        # 條件一：狀態為「缺」或「未入住」
+        # 條件一：缺、未入住
         condition_status = df["狀態"].isin([
             "缺",
             "未入住"
         ])
 
-        # 條件二：狀態為「在」，且備註有內容
+        # 條件二：在，而且備註不為空
         condition_note = (
             (df["狀態"] == "在")
             & (df["備註"] != "")
         )
 
-        # 符合任一條件即可列入
+        # 只要符合其中一項，就列入補點名單
         df = df[
             condition_status | condition_note
         ].copy()
 
         if df.empty:
             return df
-        
-        # =====================================================
-        # 性別
-        # =====================================================
 
-        allowed_genders = (
-            get_allowed_genders()
-        )
+        # 性別標準化與權限篩選
+        allowed_genders = get_allowed_genders()
 
         if "性別" in df.columns:
-
-            df["性別"] = (
-                df["性別"]
-                .apply(
-                    normalize_gender
-                )
+            df["性別"] = df["性別"].apply(
+                normalize_gender
             )
 
             df = df[
-                df["性別"].isin(
-                    allowed_genders
-                )
+                df["性別"].isin(allowed_genders)
             ].copy()
+        else:
+            st.warning(
+                "統一點名總表沒有「性別」欄位，"
+                "無法進行性別篩選。"
+            )
+            return pd.DataFrame()
 
         return df
 
     except Exception as e:
-
-        st.error(
-            f"讀取需補點資料失敗：{e}"
-        )
-
+        st.error(f"讀取需補點資料失敗：{e}")
         return pd.DataFrame()
 
 
