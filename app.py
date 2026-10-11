@@ -1,6 +1,7 @@
 import streamlit as st
 from modules.checkout import show_checkout
 from modules.network import show_network
+from modules.leader_rollcall import show_leader_rollcall
 
 from modules.announcement import show_announcement
 
@@ -154,6 +155,12 @@ tab_names = build_tabs(
     st.session_state.get("role", ""),
     st.session_state.get("is_main", False)
 )
+# 樓長點名送出狀況：確保樓長有這個功能選單
+if (
+    st.session_state.get("role", "") == "樓長"
+    and "樓長點名送出狀況" not in tab_names
+):
+    tab_names.append("樓長點名送出狀況")
 
 # 移除不要的頁面
 tab_names = [
@@ -281,3 +288,6 @@ elif selected_page == "離宿":
 
 elif selected_page == "網路查詢":
     show_network()
+    
+elif selected_page == "樓長點名送出狀況":
+    show_leader_rollcall()
