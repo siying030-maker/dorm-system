@@ -845,26 +845,65 @@ def load_special_status(term, attendance_date):
         except Exception as error:
             st.warning(f"外宿申請讀取失敗：{error}")
 
+      
         # ==================================================
-        # 長期外宿：固定抓 C 欄
+        # 長期外宿：依「星期」判斷
+        # C 欄 = 學號
+        # M 欄 = 星期
+        # 例如：一、三、四五六、一四
         # ==================================================
 
         try:
             long_leave_ws = get_worksheet(ss, "長期外宿")
             long_leave_values = get_all_values(long_leave_ws)
 
+            # Python weekday：星期一 = 0，星期日 = 6
+            weekday_map = {
+                0: "一",
+                1: "二",
+                2: "三",
+                3: "四",
+                4: "五",
+                5: "六",
+                6: "日",
+            }
+
+            target_weekday = weekday_map[target_date.weekday()]
+
             for row in long_leave_values:
 
-                if len(row) < 3:
+                # C 欄學號、M 欄星期
+                if len(row) < 13:
                     continue
 
                 sid = normalize_value(row[2])
+                weekday_text = str(row[12]).strip()
 
-                if sid and "學號" not in sid:
+                # 跳過標題或無效資料
+                if not sid or "學號" in sid:
+                    continue
+
+                if not weekday_text or "星期" in weekday_text:
+                    continue
+
+                # 統一星期格式
+                weekday_text = (
+                    weekday_text
+                    .replace("星期", "")
+                    .replace("週", "")
+                    .replace("、", "")
+                    .replace("，", "")
+                    .replace(",", "")
+                    .replace(" ", "")
+                )
+
+                # 若有包含點名當天星期，才標示長期外宿
+                if target_weekday in weekday_text:
                     long_leave_ids.add(sid)
 
         except Exception as error:
             st.warning(f"長期外宿讀取失敗：{error}")
+
 
         # ==================================================
         # 長期晚歸：固定抓 C 欄
