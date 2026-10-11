@@ -448,88 +448,100 @@ def load_need_makeup_source():
             normalize_text
         )
 
+        
         # =====================================================
-        # 先篩選補點日期
-        # =====================================================
-
-        target_date = get_makeup_target_date()
-
-        df = df[
-            df["日期"] == target_date
-        ].copy()
-
-        st.write("### 補點名單除錯")
-        st.write("目前補點日期：", target_date)
-        st.write("該日期資料筆數：", len(df))
-
-        if df.empty:
-            st.info("該補點日期沒有資料")
-            return df
-
-        # =====================================================
-        # 顯示該日期的「在」資料
+        # 先標準化日期、狀態、備註
         # =====================================================
 
-        debug_present = df[
-            df["狀態"].str.strip() == "在"
-        ].copy()
-
-        st.write("該日期狀態為「在」的人數：", len(debug_present))
-
-        if not debug_present.empty:
-            debug_columns = [
-                col for col in [
-                    "日期", "宿舍", "房號", "學號",
-                    "姓名", "狀態", "備註", "性別"
-                ]
-                if col in debug_present.columns
-            ]
-
-            st.dataframe(
-                debug_present[debug_columns],
-                use_container_width=True,
-                hide_index=True
-            )
-
-        # =====================================================
-        # 判斷補點條件
-        # =====================================================
+        df["日期"] = df["日期"].apply(normalize_date_value)
 
         df["狀態"] = (
             df["狀態"]
+            .fillna("")
+            .astype(str)
             .str.replace("\u00a0", " ", regex=False)
             .str.replace("\u3000", " ", regex=False)
+            .str.replace("\n", "", regex=False)
+            .str.replace("\r", "", regex=False)
             .str.strip()
         )
 
         df["備註"] = (
             df["備註"]
+            .fillna("")
+            .astype(str)
             .str.replace("\u00a0", " ", regex=False)
             .str.replace("\u3000", " ", regex=False)
+            .str.replace("\n", "", regex=False)
+            .str.replace("\r", "", regex=False)
             .str.strip()
         )
 
-        condition_status = df["狀態"].isin([
-            "缺",
-            "未入住"
-        ])
+        # =====================================================
+        # 診斷：先看所有資料，不要急著篩日期
+        # =====================================================
+
+        target_date = get_makeup_target_date()
+
+        st.write("### 補點名單診斷")
+        st.write("目前補點日期：", target_date)
+        st.write("來源總筆數：", len(df))
+        st.write("來源日期範例：", df["日期"].drop_duplicates().head(10).tolist())
+        st.write("來源狀態統計：", df["狀態"].value_counts(dropna=False).to_dict())
+
+        # 找出所有「在」且有備註的資料
+        all_present_with_note = df[
+            df["狀態"].eq("在")
+            & df["備註"].ne("")
+        ].copy()
+
+        st.write("全部日期中「在」且有備註：", len(all_present_with_note))
+
+        if not all_present_with_note.empty:
+            st.dataframe(
+                all_present_with_note[
+                    [
+                        c for c in ["日期", "宿舍", "房號", "學號", "姓名", "狀態", "備註", "性別"]
+                        if c in all_present_with_note.columns
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+
+        # =====================================================
+        # 篩選補點日期
+        # =====================================================
+
+        df = df[df["日期"].eq(target_date)].copy()
+
+        st.write("該日期資料筆數：", len(df))
+
+        if df.empty:
+            st.warning("補點日期沒有資料，請核對試算表日期格式與目前補點日期。")
+            return df
+
+        # =====================================================
+        # 補點條件
+        # =====================================================
+
+        condition_status = df["狀態"].isin(["缺", "未入住"])
 
         condition_note = (
             df["狀態"].eq("在")
             & df["備註"].ne("")
         )
 
-        st.write("缺／未入住人數：", int(condition_status.sum()))
-        st.write("在且有備註人數：", int(condition_note.sum()))
+        st.write("該日期「缺／未入住」筆數：", int(condition_status.sum()))
+        st.write("該日期「在且有備註」筆數：", int(condition_note.sum()))
 
-        df = df[
-            condition_status | condition_note
-        ].copy()
+        df = df[condition_status | condition_note].copy()
 
-        st.write("符合補點條件人數：", len(df))
+        st.write("符合補點條件筆數：", len(df))
 
         if df.empty:
             return df
+
 
 
         # 性別標準化與權限篩選
