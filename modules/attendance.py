@@ -1867,14 +1867,10 @@ def show_attendance():
             st.error(
                 f"儲存失敗：{error}"
             )
-    # ==============================
-    # 回到最上面按鈕
-    # ==============================
-    
+   
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 預留底部空間
 st.markdown(
     """
     <style>
@@ -1882,71 +1878,61 @@ st.markdown(
         padding-bottom: 90px !important;
     }
 
-    /* 固定按鈕樣式 */
-    div[data-testid="stButton"]:has(button#back_to_top_button) {
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
+    /* 固定按鈕在畫面底部 */
+    div[data-testid="stButton"]:has(
+        button[kind="secondary"]
+    ) {
         z-index: 999999;
-    }
-
-    div[data-testid="stButton"] button {
-        border-radius: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# 使用 JavaScript 建立獨立的固定按鈕
-components.html(
-    """
-    <button id="back_to_top_button" onclick="
+# 原生 Streamlit 按鈕，確保正常顯示
+clicked = st.button(
+    "↑ 回到最上面",
+    key="back_to_top",
+    use_container_width=False
+)
+
+# 點擊後透過 HTML 元件執行捲動
+if clicked:
+    components.html(
+        """
+        <script>
         const doc = window.parent.document;
 
-        const selectors = [
-            'section[data-testid="stMain"]',
-            'div[data-testid="stAppViewContainer"]',
-            'div[data-testid="stMainBlockContainer"]'
-        ];
+        function scrollToTop() {
+            const main = doc.querySelector(
+                'section[data-testid="stMain"]'
+            );
 
-        selectors.forEach(function(selector) {
-            const el = doc.querySelector(selector);
-            if (el) {
-                el.scrollTo({
+            if (main) {
+                main.scrollTo({
                     top: 0,
-                    behavior: 'smooth'
+                    behavior: "smooth"
                 });
             }
-        });
 
-        window.parent.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    "
-    style="
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 999999;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 24px;
-        background: #ff4b4b;
-        color: white;
-        font-size: 15px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        white-space: nowrap;
-    ">
-        ↑ 回到最上面
-    </button>
-    """,
-    height=0,
-    scrolling=False
-)
+            window.parent.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+            const scrollers = doc.querySelectorAll(
+                '[data-testid="stMain"], ' +
+                '[data-testid="stAppViewContainer"]'
+            );
+
+            scrollers.forEach(function(el) {
+                el.scrollTop = 0;
+            });
+        }
+
+        scrollToTop();
+        setTimeout(scrollToTop, 100);
+        </script>
+        """,
+        height=1
+    )
