@@ -1870,107 +1870,105 @@ def show_attendance():
     # ==============================
     # 回到最上面按鈕
     # ==============================
-
-    
     st.markdown(
-            """
-            <style>
+         """
+        <style>
     
-            /* 預留底部空間 */
-            section[data-testid="stMain"] {
-                padding-bottom: 90px !important;
-            }
+        /* 預留底部空間 */
+        section[data-testid="stMain"] {
+            padding-bottom: 90px !important;
+         }
     
-            /* 固定回到最上面的按鈕 */
-            div[data-testid="stButton"] {
-                z-index: 999999;
-            }
+         /* 固定回到最上面的按鈕 */
+        div[data-testid="stButton"] {
+            z-index: 999999;
+        }
     
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     
     
-        # Streamlit 原生按鈕
+    # Streamlit 原生按鈕
     if st.button(
-            "↑ 回到最上面",
-            key="back_to_top"
-        ):
-            pass
+        "↑ 回到最上面",
+        key="back_to_top"
+    ):
+        pass
     
     
-        # JavaScript
+    # JavaScript
     components.html(
-            """
-            <script>
+        """
+        <script>
     
-            setTimeout(function() {
+         setTimeout(function() {
     
-                const buttons =
-                    window.parent.document.querySelectorAll(
-                        'button'
-                    );
-    
-    
-                buttons.forEach(function(button) {
-    
-                    if (
-                        button.innerText.trim() ===
-                        "↑ 回到最上面"
-                    ) {
-    
-                        // 固定位置
-                        button.style.position = "fixed";
-                        button.style.left = "50%";
-                        button.style.bottom = "10px";
-                        button.style.transform =
-                            "translateX(-50%)";
-    
-                        button.style.zIndex = "999999";
+            const buttons =
+                window.parent.document.querySelectorAll(
+                    'button'
+                );
     
     
-                        // 點擊
-                        button.addEventListener(
-                            "click",
-                            function() {
+            buttons.forEach(function(button) {
     
-                                setTimeout(function() {
+                if (
+                    button.innerText.trim() ===
+                    "↑ 回到最上面"
+                ) {
     
-                                    const main =
-                                        window.parent.document
-                                        .querySelector(
-                                            'section[data-testid="stMain"]'
-                                        );
+                    // 固定位置
+                    button.style.position = "fixed";
+                    button.style.left = "50%";
+                    button.style.bottom = "10px";
+                    button.style.transform =
+                        "translateX(-50%)";
     
-    
-                                    if (main) {
-    
-                                        main.scrollTo({
-                                            top: 0,
-                                            behavior: "smooth"
-                                        });
-    
-                                    }
+                    button.style.zIndex = "999999";
     
     
-                                    window.parent.scrollTo({
+                    // 點擊
+                    button.addEventListener(
+                        "click",
+                        function() {
+    
+                            setTimeout(function() {
+    
+                                const main =
+                                    window.parent.document
+                                    .querySelector(
+                                        'section[data-testid="stMain"]'
+                                    );
+    
+    
+                                if (main) {
+    
+                                    main.scrollTo({
                                         top: 0,
                                         behavior: "smooth"
                                     });
     
-                                }, 50);
+                                }
     
-                            }
-                        );
     
-                    }
+                                window.parent.scrollTo({
+                                    top: 0,
+                                    behavior: "smooth"
+                                });
     
-                });
+                            }, 50);
     
-            }, 500);
+                        }
+                    );
     
-            </script>
-            """,
-            height=0,
-        )
+                }
+    
+            });
+    
+        }, 500);
+    
+        </script>
+        """,
+        height=0,
+    )
