@@ -1868,71 +1868,110 @@ def show_attendance():
                 f"儲存失敗：{error}"
             )
    
-import streamlit as st
-import streamlit.components.v1 as components
 
-st.markdown(
-    """
-    <style>
-    section[data-testid="stMain"] {
-        padding-bottom: 90px !important;
-    }
-
-    /* 固定按鈕在畫面底部 */
-    div[data-testid="stButton"]:has(
-        button[kind="secondary"]
-    ) {
-        z-index: 999999;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# 原生 Streamlit 按鈕，確保正常顯示
-clicked = st.button(
-    "↑ 回到最上面",
-    key="back_to_top",
-    use_container_width=False
-)
-
-# 點擊後透過 HTML 元件執行捲動
-if clicked:
-    components.html(
-        """
-        <script>
-        const doc = window.parent.document;
-
-        function scrollToTop() {
-            const main = doc.querySelector(
-                'section[data-testid="stMain"]'
-            );
-
-            if (main) {
-                main.scrollTo({
-                    top: 0,
-                    behavior: "smooth"
-                });
+        # ==============================
+        # 回到最上面按鈕
+        # ==============================
+        st.markdown(
+            """
+            <style>
+    
+            /* 預留底部空間 */
+            section[data-testid="stMain"] {
+                padding-bottom: 90px !important;
             }
-
-            window.parent.scrollTo({
-                top: 0,
-                behavior: "smooth"
-            });
-
-            const scrollers = doc.querySelectorAll(
-                '[data-testid="stMain"], ' +
-                '[data-testid="stAppViewContainer"]'
-            );
-
-            scrollers.forEach(function(el) {
-                el.scrollTop = 0;
-            });
-        }
-
-        scrollToTop();
-        setTimeout(scrollToTop, 100);
-        </script>
-        """,
-        height=1
-    )
+    
+            /* 固定回到最上面的按鈕 */
+            div[data-testid="stButton"] {
+                z-index: 999999;
+            }
+    
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    
+        # Streamlit 原生按鈕
+        if st.button(
+            "↑ 回到最上面",
+            key="back_to_top"
+        ):
+            pass
+    
+    
+        # JavaScript
+        components.html(
+            """
+            <script>
+    
+            setTimeout(function() {
+    
+                const buttons =
+                    window.parent.document.querySelectorAll(
+                        'button'
+                    );
+    
+    
+                buttons.forEach(function(button) {
+    
+                    if (
+                        button.innerText.trim() ===
+                        "↑ 回到最上面"
+                    ) {
+    
+                        // 固定位置
+                        button.style.position = "fixed";
+                        button.style.left = "50%";
+                        button.style.bottom = "10px";
+                        button.style.transform =
+                            "translateX(-50%)";
+    
+                        button.style.zIndex = "999999";
+    
+    
+                        // 點擊
+                        button.addEventListener(
+                            "click",
+                            function() {
+    
+                                setTimeout(function() {
+    
+                                    const main =
+                                        window.parent.document
+                                        .querySelector(
+                                            'section[data-testid="stMain"]'
+                                        );
+    
+    
+                                    if (main) {
+    
+                                        main.scrollTo({
+                                            top: 0,
+                                            behavior: "smooth"
+                                        });
+    
+                                    }
+    
+    
+                                    window.parent.scrollTo({
+                                        top: 0,
+                                        behavior: "smooth"
+                                    });
+    
+                                }, 50);
+    
+                            }
+                        );
+    
+                    }
+    
+                });
+    
+            }, 500);
+    
+            </script>
+            """,
+            height=0,
+        )
+    
